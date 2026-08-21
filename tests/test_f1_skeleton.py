@@ -21,9 +21,39 @@ def test_admin_status(client):
     assert isinstance(body["objects"], int)
 
 
-def test_upload_not_implemented_yet(client):
-    r = client.post("/api/v1/upload")
-    assert r.status_code == 501
+def test_upload_roundtrip_fake(backend, client):
+    import hashlib
+
+    payload = b"x" * (20 * 1024 * 1024 + 123)  # splits into 16MB + 4MB+123
+    r = client.post(
+        "/api/v1/upload",
+        files={"file": ("big.bin", payload, "application/octet-stream")},
+        headers={"Authorization": "Bearer test-key"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["size"] == len(payload)
+    assert body["sha256"] == hashlib.sha256(payload).hexdigest()
+    assert body["chunks"] == 2
+    assert body["url"].endswith(f"/f/{body['id']}")
+
+    from anbar.objects import Manifest
+    from anbar.storage import ObjectRef
+
+    row = client.app.state.db.get_object(body["id"])
+    assert row["size"] == len(payload)
+    assert row["sha256"] == hashlib.sha256(payload).hexdigest()
+    m = Manifest.from_json(row["manifest"])
+    assert m.total_size == len(payload)
+    assert len(m.chunks) == 2
+    assert m.chunks[0].size == 16 * 1024 * 1024
+    assert m.chunks[1].size == 4 * 1024 * 1024 + 123
+    # each stored chunk is retrievable from the backend
+    import asyncio
+
+    for c in m.chunks:
+        data = asyncio.run(backend.open(ObjectRef(file_id=c.file_id, backend="fake")))
+        assert len(data) == c.size
 
 
 def test_download_not_implemented_yet(client):

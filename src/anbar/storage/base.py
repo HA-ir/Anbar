@@ -11,9 +11,18 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ObjectRef:
-    """Handle to stored bytes inside a backend."""
+    """Handle to stored bytes inside a backend.
+
+    `message_id` is backend-specific extra context (bot: the channel message
+    that holds the blob, needed to delete it). `size`/`name` are carried for
+    convenience so the object layer can build manifests without re-reading.
+    """
+
     file_id: str
     backend: str
+    size: int = 0
+    name: str = ""
+    message_id: int | None = None
 
 
 class StorageBackend(abc.ABC):
@@ -37,6 +46,9 @@ class StorageBackend(abc.ABC):
     async def health(self) -> bool:
         return True
 
+    async def close(self) -> None:  # pragma: no cover - default no-op
+        return None
+
 
 class FakeBackend(StorageBackend):
     """In-memory backend for tests — implements the exact same contract."""
@@ -46,11 +58,18 @@ class FakeBackend(StorageBackend):
 
     def __init__(self) -> None:
         self._store: dict[str, bytes] = {}
+        self._next_msg = 1
 
     async def store(self, data: bytes, name: str) -> ObjectRef:
         ref = f"fake-{len(self._store)}"
         self._store[ref] = bytes(data)
-        return ObjectRef(file_id=ref, backend=self.name)
+        return ObjectRef(
+            file_id=ref,
+            backend=self.name,
+            size=len(data),
+            name=name,
+            message_id=self._next_msg,
+        )
 
     async def open(self, ref: ObjectRef) -> bytes:
         return self._store[ref.file_id]
