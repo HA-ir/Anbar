@@ -28,7 +28,7 @@ ANBAR_ADMIN_KEY=<32+ random chars>
 ANBAR_API_KEY=<32+ random chars>
 ANBAR_HMAC_SECRET=<32+ random chars>
 ANBAR_CHANNEL_ID=@yourprivatechannel     # F2: where files are posted
-AUTH_ENABLED=true
+ANBAR_AUTH_ENABLED=true
 ```
 
 Generate secrets:
@@ -46,6 +46,44 @@ head -c 32 /dev/urandom | base64
 4. Copy the channel's `@username` (or numeric id) into `ANBAR_CHANNEL_ID`.
 
 The bot cannot create channels via the Bot API, so this step is manual.
+
+### MTProto backend (F5 — files up to 2 GB)
+
+`ANBAR_BACKEND=mtproto` uses a dedicated **user account** (Telethon) instead of
+a bot. Blobs live in the account's Saved Messages.
+
+1. Get `api_id` / `api_hash` from https://my.telegram.org (→ *API development
+   tools*). Use a **dedicated account** — not your personal one.
+2. Log in once (interactive, ~1 min; needs a TTY so Telethon can ask for the
+   login code and any 2FA password):
+
+   ```bash
+   docker compose run --rm anbar anbarctl login \
+     --api-id 123456 --api-hash abcdef --phone +98...
+   ```
+
+   This writes `./secrets/session.session` (already a mounted volume).
+3. Configure:
+
+   ```env
+   ANBAR_BACKEND=mtproto
+   ANBAR_API_ID=123456
+   ANBAR_API_HASH=abcdef...
+   ANBAR_SESSION_FILE=/app/secrets/session.session
+   # chunk size may now be raised: 49 MB is the default cap
+   ANBAR_CHUNK_SIZE_MB=49
+   ```
+4. `docker compose up -d`. On startup the server loads the session file — it
+   never authenticates itself, so no phone number or code is ever in `.env`.
+
+Notes:
+
+- **Keep the session file** (`./secrets/`): losing it strands all mtproto
+  objects and requires re-login.
+- The account will show as *online* in Telegram while the server runs —
+  cosmetic, but expected for a storage account.
+- Bot (20 MB) and MTProto (2 GB) objects **coexist**: each object row records
+  which backend stored it (see "Upgrading backends" below).
 
 ## 2. Run
 
@@ -125,11 +163,12 @@ KB of metadata). That is the whole point of Anbar.
 | Task | Command |
 |------|---------|
 | Toggle auth (no restart) | `anbarctl auth on` / `anbarctl auth off` |
-| Rotate HMAC secret | `anbarctl rotate-secret` (F4) |
-| List objects | `anbarctl list` (F4) |
-| Mint a share link | `anbarctl link /path/file --ttl 3600` (F4) |
+| Rotate HMAC secret | `anbarctl rotate-secret` |
+| List objects | `anbarctl objects` |
+| Mint a share link | `anbarctl link <object_id> --ttl 3600` |
+| MTProto login (once) | `anbarctl login --api-id … --api-hash … --phone …` |
 | Health | `curl http://127.0.0.1:8317/healthz` |
-| Check backend | `anbarctl status` or `/api/v1/admin/status` |
+| Check backend | `curl …/api/v1/admin/status` (admin key) |
 | Update | `git pull && cd docker && docker compose up -d` (DB migrations are forward-only) |
 
 ### Non-Docker (fallback)
@@ -148,7 +187,7 @@ only makes its own objects unreadable; the rest keep serving.
 
 - [ ] `.env` is `chmod 600`, not in git
 - [ ] service reachable only via reverse proxy (loopback bind)
-- [ ] `AUTH_ENABLED=true` in production
+- [ ] `ANBAR_AUTH_ENABLED=true` in production
 - [ ] admin key ≠ api key, both high-entropy
 - [ ] reverse proxy has TLS + HSTS
 - [ ] `client_max_body_size` matches your intended ceiling

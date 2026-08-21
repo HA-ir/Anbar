@@ -17,7 +17,7 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 | F2 | Bot storage backend + upload endpoints (multipart + raw) | ✅ `v0.2.0` |
 | F3 | Streaming download + HTTP Range + object info | ✅ `v0.3.0` |
 | F4 | Auth: API keys, HMAC signed URLs, runtime toggle, anbarctl CLI | ✅ `v0.4.0` |
-| F5 | MTProto backend (up to 2 GB, user-selectable) | ⏳ |
+| F5 | MTProto backend (up to 2 GB, user-selectable) | ✅ `v0.5.0` |
 | F6 | Hardening: full CLI, LRU cache, docs, production deploy, v1.0 | ⏳ |
 
 ## Why

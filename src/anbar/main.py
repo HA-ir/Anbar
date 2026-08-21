@@ -22,6 +22,8 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         injected = backend is not None
         app.state.backend = backend or _default_backend(settings)
         app.state.settings = settings
+        if hasattr(app.state.backend, "connect"):
+            await app.state.backend.connect()
         yield
         db.close()
         if not injected:
@@ -58,5 +60,16 @@ def _default_backend(settings) -> StorageBackend:
 
         return BotBackend(settings.bot_token.get_secret_value(), settings.channel_id)
     if settings.backend.value == "mtproto":
-        raise RuntimeError("MTProto backend lands in F5.")
+        if not settings.api_id or not settings.api_hash:
+            raise RuntimeError(
+                "backend=mtproto requires ANBAR_API_ID and ANBAR_API_HASH from "
+                "my.telegram.org (see docs/DEPLOY.md 'MTProto backend')."
+            )
+        from .storage import MTProtoBackend
+
+        return MTProtoBackend(
+            api_id=settings.api_id,
+            api_hash=settings.api_hash,
+            session_file=str(settings.session_file),
+        )
     raise RuntimeError(f"unknown backend {settings.backend!r}")

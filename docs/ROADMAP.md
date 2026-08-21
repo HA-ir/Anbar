@@ -8,7 +8,7 @@
 | F2 | `f2-bot-backend` | Bot storage backend (private channel), upload (multipart + raw), chunking + manifest, object ids | 10–15 MB file uploaded to Telegram, metadata correct, resume works | ✅ (resume → F3) |
 | F3 | `f3-download` | streaming download, Range (incl. multi-chunk), `/f/{id}/info`, Content-Disposition | curl Range returns exact bytes; sha256 matches upload | ✅ |
 | F4 | `f4-auth` | API keys, HMAC signed URLs (±expiry), runtime toggle, DELETE, link minting, objects list, anbarctl CLI | security checklist in DEPLOY passes; toggle on/off without restart | ✅ (rate limits → F6) |
-| F5 | `f5-mtproto` | Telethon backend (dedicated account, Saved Messages), 2 GB, backend selection at runtime | file > 100 MB uploaded/downloaded; bot & mtproto coexist | ⏳ |
+| F5 | `f5-mtproto` | Telethon backend (dedicated account, Saved Messages), 2 GB, backend selection at runtime | file > 100 MB uploaded/downloaded; bot & mtproto coexist | ✅ v0.5.0 (golden needs a real account) |
 | F6 | `f6-hardening` | full CLI (link/list/auth/rotate-secret), LRU cache wired, docs final, production deploy, load test | golden test end-to-end; `v1.0` tag | ⏳ |
 
 Each phase: branch → small commits (`fN: <summary>`) → tests green → merge to
@@ -27,11 +27,13 @@ Each phase: branch → small commits (`fN: <summary>`) → tests green → merge
 | — | One-element manifest for small files | single code path for blob & chunked objects |
 | — | Chunking layer above backends | removes hard size ceiling; enables resumable uploads |
 | — | Bot backend first, MTProto selectable in F5 | user decision: simple first, 2 GB later, user picks per deployment |
+| — | Telethon (not Pyrogram/MTProto-raw) for F5 | async-native (matches FastAPI), maintained, session-file model fits "login once via anbarctl, server reuses" |
+| — | MTProto chunk cap 49 MB (tunable) | blobs = messages in Saved Messages; bigger chunks → fewer messages, still well under 2 GB |
 
 ## Open questions
 
 - Domain for the public deployment (candidate: `d.example.com`) — F6.
-- Dedicated MTProto account availability — needed only at F5.
+- Dedicated MTProto account + `api_id`/`api_hash` — needed for the F5 golden test and the real deploy (F6).
 - Optional web dashboard — explicitly out of scope for v1; revisit after v1.0.
 
 ## v1.0 definition of done

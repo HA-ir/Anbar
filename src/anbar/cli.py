@@ -92,6 +92,45 @@ def _cmd_rotate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_login(args: argparse.Namespace) -> int:
+    """One-time interactive MTProto login (phone + code, optional 2FA).
+
+    Writes the session file that the server (backend=mtproto) reuses on
+    startup. Telethon itself prompts for the login code and 2FA password
+    on stdin, so this must be run from a real TTY (e.g. `docker exec -it`).
+    """
+    import asyncio
+
+    from telethon import TelegramClient
+
+    if not args.api_id or not args.api_hash:
+        print("error: need --api-id/--api-hash or $ANBAR_API_ID/$ANBAR_API_HASH "
+              "(get them from my.telegram.org)", file=sys.stderr)
+        return 1
+    if not args.phone:
+        print("error: need --phone or $ANBAR_LOGIN_PHONE", file=sys.stderr)
+        return 1
+
+    client = TelegramClient(args.session, int(args.api_id), args.api_hash)
+
+    async def _run() -> None:
+        await client.start(phone=args.phone)
+
+    try:
+        asyncio.run(_run())
+    except KeyboardInterrupt:
+        print("cancelled", file=sys.stderr)
+        return 1
+    except Exception as e:  # noqa: BLE001 - Telethon raises many auth errors
+        print(f"login failed: {e}", file=sys.stderr)
+        return 1
+    finally:
+        client.disconnect()
+    print(f"logged in — session saved to {args.session}")
+    print("start the server with ANBAR_BACKEND=mtproto pointing at this file")
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="anbarctl", description=__doc__)
     parser.add_argument("--base-url",
@@ -120,6 +159,22 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_rot = sub.add_parser("rotate-secret", help="rotate the HMAC signing secret")
     p_rot.set_defaults(func=_cmd_rotate)
+
+    p_login = sub.add_parser(
+        "login",
+        help="one-time MTProto account login (creates the session file; needs a TTY)",
+    )
+    p_login.add_argument("--api-id", type=int,
+                         default=os.environ.get("ANBAR_API_ID"),
+                         help="api_id from my.telegram.org (default: $ANBAR_API_ID)")
+    p_login.add_argument("--api-hash", default=os.environ.get("ANBAR_API_HASH"),
+                         help="api_hash (default: $ANBAR_API_HASH)")
+    p_login.add_argument("--phone", default=os.environ.get("ANBAR_LOGIN_PHONE"),
+                         help="account phone, e.g. +98... (default: $ANBAR_LOGIN_PHONE)")
+    p_login.add_argument("--session",
+                         default=os.environ.get("ANBAR_SESSION_FILE", "secrets/session.session"),
+                         help="where to save the session (default: $ANBAR_SESSION_FILE)")
+    p_login.set_defaults(func=_cmd_login)
 
     return parser
 

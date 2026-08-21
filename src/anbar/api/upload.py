@@ -72,12 +72,18 @@ async def _store_stream(request: Request, stream, filename: str) -> tuple[Manife
 
     try:
         _, sha_hex = await chunk_stream(stream, settings.chunk_size, on_chunk)
-    except TelegramError as e:
+    except Exception as e:
         for c in manifest.chunks:  # best-effort rollback of posted blobs
-            await backend.delete(
-                ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=backend.name)
-            )
-        raise HTTPException(502, f"telegram: {e.message}") from e
+            try:
+                await backend.delete(
+                    ObjectRef(file_id=c.file_id, message_id=c.message_id,
+                              backend=backend.name)
+                )
+            except Exception:  # noqa: BLE001
+                pass
+        if isinstance(e, TelegramError):
+            raise HTTPException(502, f"telegram: {e.message}") from e
+        raise HTTPException(502, f"storage error: {e}") from e
     return manifest, sha_hex
 
 

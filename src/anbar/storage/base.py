@@ -46,6 +46,10 @@ class StorageBackend(abc.ABC):
     async def health(self) -> bool:
         return True
 
+    async def connect(self) -> None:  # pragma: no cover - default no-op
+        """Establish any backend connection (mtproto loads its session)."""
+        return None
+
     async def close(self) -> None:  # pragma: no cover - default no-op
         return None
 

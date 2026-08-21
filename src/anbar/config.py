@@ -68,9 +68,16 @@ class Settings(BaseSettings):
 
     @property
     def chunk_size(self) -> int:
-        """Effective chunk size in bytes (capped by the 20 MB bot ceiling)."""
+        """Effective chunk size in bytes (capped by the backend's send limit).
+
+        bot: 19 MB (Bot API ceiling is 20 MB).
+        mtproto: 49 MB (larger blobs → fewer messages; Telethon handles any
+        size up to 2 GB per file, so this is a tunable efficiency knob).
+        fake: 19 MB (mirrors the bot contract).
+        """
         size = self.chunk_size_mb * 1024 * 1024
-        return min(size, 19 * 1024 * 1024)
+        cap = 49 * 1024 * 1024 if self.backend is Backend.MTPROTO else 19 * 1024 * 1024
+        return min(size, cap)
 
 
 @lru_cache
