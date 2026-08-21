@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install
+        run: uv sync --extra dev
+
+      - name: Lint
+        run: uv run ruff check src tests
+
+      - name: Test
+        run: uv run pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f docker/Dockerfile -t tg-link-proxy:ci .
+      - name: Smoke — healthz
+        run: |
+          docker run -d --name tglp -e TGLINK_BACKEND=fake -p 127.0.0.1:8317:8000 tg-link-proxy:ci
+          for i in $(seq 1 15); do
+            sleep 1
+            if curl -fsS http://127.0.0.1:8317/healthz; then exit 0; fi
+          done
+          echo "healthz never came up"; exit 1

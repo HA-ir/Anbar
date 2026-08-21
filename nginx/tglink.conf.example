@@ -1,0 +1,41 @@
+# tg-link-proxy — example reverse proxy (drop into your existing Nginx)
+# Adjust server_name / cert paths for your host.
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name d.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/d.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/d.example.com/privkey.pem;
+
+    # chunked uploads up to the logical ceiling (backend ceiling still applies per chunk)
+    client_max_body_size 2048m;
+    # stream uploads to the app without buffering on disk
+    proxy_request_buffering off;
+    proxy_buffering off;
+
+    location / {
+        proxy_pass http://127.0.0.1:8317;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # long-lived streams for big downloads
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        add_header X-Content-Type-Options nosniff;
+    }
+
+    # health check endpoint for monitoring (unauthenticated)
+    location = /healthz {
+        proxy_pass http://127.0.0.1:8317;
+        access_log off;
+    }
+}
+
+server {
+    listen 80;
+    server_name d.example.com;
+    return 301 https://$host$request_uri;
+}

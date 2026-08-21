@@ -1,0 +1,18 @@
+# tg-link-proxy — local dev / default deploy
+# Usage:  cp .env.example .env  &&  edit .env  &&  docker compose up -d
+services:
+  tglink:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: tg-link-proxy:latest
+    env_file:
+      - ../.env
+    volumes:
+      - ../data:/app/data          # SQLite (few KB) + optional LRU cache (capped)
+      - ../secrets:/app/secrets    # MTProto session (optional, F5)
+    ports:
+      - "127.0.0.1:8317:8000"      # loopback only — put a reverse proxy in front
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
