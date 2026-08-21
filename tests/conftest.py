@@ -10,7 +10,12 @@ from anbar.storage import FakeBackend
 
 @pytest.fixture(autouse=True)
 def _isolate_env(monkeypatch, tmp_path):
-    """Tests must not see the developer's .env or ambient ANBAR_* variables."""
+    """Tests must not see the developer's .env or ambient ANBAR_* variables.
+
+    pydantic-settings reads `.env` from the CWD even when the variable is
+    absent from the environment, so the CWD itself must leave the repo root.
+    """
+    monkeypatch.chdir(tmp_path)
     for var in (
         "ANBAR_BACKEND", "ANBAR_DB_PATH", "ANBAR_DATA_DIR", "ANBAR_BASE_URL",
         "ANBAR_AUTH_ENABLED", "ANBAR_BOT_TOKEN", "ANBAR_CHANNEL_ID",
