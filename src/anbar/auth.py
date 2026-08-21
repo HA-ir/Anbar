@@ -15,6 +15,7 @@ import time
 
 from fastapi import HTTPException
 
+from . import webauth
 from .db import Database
 
 KV_AUTH = "auth_enabled"
@@ -66,7 +67,11 @@ def new_secret(nbytes: int = 32) -> str:
 
 # ── FastAPI dependencies ────────────────────────────────────────────────────
 def whoami(request) -> str:
-    """Resolve the caller: 'admin' | 'uploader' | 'anon' (constant-time)."""
+    """Resolve the caller: 'admin' | 'uploader' | 'anon' (constant-time).
+
+    Accepts a `Authorization: Bearer <key>` header OR a valid web session
+    cookie (issued by the F7 UI). The bearer header wins when present.
+    """
     settings = request.app.state.settings
     auth = request.headers.get("authorization", "")
     key = auth[7:] if auth.lower().startswith("bearer ") else None
@@ -76,6 +81,15 @@ def whoami(request) -> str:
         return "admin"
     if key and api_key and constant_time_equal(key, api_key):
         return "uploader"
+    # F7: signed web session cookie (no key in the cookie)
+    cookie = request.cookies.get("anbar_session")
+    if cookie:
+        try:
+            role = webauth.verify_session(request.app.state.db, cookie)
+        except Exception:  # pragma: no cover - bad cookie must never 500
+            role = None
+        if role:
+            return role
     return "anon"
 
 

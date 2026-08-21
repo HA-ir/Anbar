@@ -1,1 +1,3 @@
-__version__ = "0.6.0"
+"""anbar: Telegram-backed object storage (zero local file retention)."""
+
+__version__ = "0.7.0"

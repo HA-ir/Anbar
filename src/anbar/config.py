@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     # rate limiting (F6; 0 disables a limiter)
     rate_download_per_min: int = Field(default=10, ge=0)
     rate_upload_per_min: int = Field(default=5, ge=0)
+    rate_login_per_min: int = Field(default=10, ge=0)
+
+    # web UI sessions (F7)
+    web_session_ttl: int = Field(default=43200, ge=300)  # 12 h
 
     # cache
     cache_enabled: bool = False

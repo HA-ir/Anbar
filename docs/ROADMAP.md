@@ -9,7 +9,8 @@
 | F3 | `f3-download` | streaming download, Range (incl. multi-chunk), `/f/{id}/info`, Content-Disposition | curl Range returns exact bytes; sha256 matches upload | ✅ |
 | F4 | `f4-auth` | API keys, HMAC signed URLs (±expiry), runtime toggle, DELETE, link minting, objects list, anbarctl CLI | security checklist in DEPLOY passes; toggle on/off without restart | ✅ (rate limits → F6) |
 | F5 | `f5-mtproto` | Telethon backend (dedicated account, Saved Messages), 2 GB, backend selection at runtime | file > 100 MB uploaded/downloaded; bot & mtproto coexist | ✅ v0.5.0 (golden needs a real account) |
-| F6 | `f6-hardening` | rate limiting (SQLite), LRU cache (off by default), load test, docs final, production deploy | golden test end-to-end; `v1.0` tag | ✅ deployed (`anbar.example.com`) — `v1.0` tag deferred at user request |
+| F6 | `f6-hardening` | rate limiting (SQLite), LRU cache (off by default), load test, docs final, production deploy | golden test end-to-end; `v1.0` tag | ✅ v0.6.0 — deployed (`anbar.example.com`) — `v1.0` tag deferred at user request |
+| F7 | `f7-web-ui` | web UI (RTL): login with admin key → signed session cookie; list / upload / download / delete / share | UI E2E green: cookie-auth upload+download, tamper rejected, logout invalidates | ✅ v0.7.0 — E2E 14/14 on prod |
 
 Each phase: branch → small commits (`fN: <summary>`) → tests green → merge to
 `main` → tag `v0.N.0`.
@@ -32,6 +33,8 @@ Each phase: branch → small commits (`fN: <summary>`) → tests green → merge
 | — | Fixed-window rate limits in SQLite (no Redis) | matches zero-ops/SQLite-only architecture; per-(IP,obj) download + per-key upload, `429` + `Retry-After` |
 | — | LRU disk cache **off by default** | user decision: purest zero-retention stays the default; cache is evictable scratch space, never persistent storage |
 | — | Download streaming stays O(chunk) | no per-request `fetched` dict / whole-object buffering; load test (20×48 MB) proves bounded RSS |
+| — | UI auth = signed session cookie (HMAC), not JWT | stateless (no token table), reuses `hmac_secret`; value is `{exp}:{tag}:{sig}` — raw key never stored client-side; HttpOnly + SameSite=Lax + Secure |
+| — | UI gate = admin key only | it's a personal owner tool (full list + delete + share); uploader keys stay API-only |
 
 ## Open questions
 

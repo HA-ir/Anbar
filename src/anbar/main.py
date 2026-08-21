@@ -52,11 +52,12 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
     async def healthz():
         return {"status": "ok", "service": "anbar", "version": __version__}
 
-    from .api import admin, download, upload  # noqa: PLC0415
+    from .api import admin, download, upload, web  # noqa: PLC0415
 
     app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
     app.include_router(download.router, prefix="/f", tags=["download"])
     app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
+    app.include_router(web.router, tags=["web ui"])
     return app
 
 

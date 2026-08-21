@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>انبار — anbar</title>
+<style>
+  :root{--bg:#0f1420;--card:#161d2b;--line:#26314a;--txt:#e7ecf5;--mut:#8b97ad;--acc:#5b8cff;--ok:#3ecf8e;--bad:#ff6b6b}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Tahoma,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+  header{display:flex;align-items:center;gap:10px;padding:16px 22px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
+  header h1{font-size:20px;margin:0}
+  header .sub{color:var(--mut);font-size:13px}
+  header .left{margin-inline-start:auto;display:flex;gap:8px;align-items:center}
+  main{max-width:1000px;margin:0 auto;padding:22px 16px 60px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px}
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:30px 20px;text-align:center;color:var(--mut);cursor:pointer;transition:.15s}
+  .drop.on{border-color:var(--acc);color:var(--txt);background:#1a2438}
+  .drop b{color:var(--acc)}
+  input[type=file]{display:none}
+  button{background:var(--acc);border:0;color:#fff;padding:9px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600;font-family:inherit}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
+  button.danger{background:#b03a48}
+  button.sm{padding:5px 11px;font-size:12.5px;border-radius:7px}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  a.btn{display:inline-block;background:var(--acc);color:#fff;padding:5px 11px;border-radius:7px;font-size:12.5px;text-decoration:none;font-weight:600}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:right;padding:10px 8px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle}
+  th{color:var(--mut);font-weight:600;font-size:12.5px;white-space:nowrap}
+  tr:last-child td{border-bottom:0}
+  .name{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mut{color:var(--mut);font-size:12.5px}
+  .empty{text-align:center;color:var(--mut);padding:38px 0}
+  #loginCard{max-width:380px;margin:10vh auto 0}
+  #loginCard .logo{text-align:center;font-size:40px;margin-bottom:6px}
+  #loginCard label{display:block;font-size:13px;color:var(--mut);margin-bottom:7px}
+  input[type=password],input[type=text]{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:#0c111b;color:var(--txt);font-size:15px;font-family:inherit}
+  input:focus{outline:0;border-color:var(--acc)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:10px}
+  .bar i{display:block;height:100%;width:0;background:var(--acc);transition:.2s}
+  .msg{font-size:13.5px;margin-top:9px;min-height:20px}
+  .tag{font-size:11.5px;color:var(--mut);border:1px solid var(--line);padding:1px 8px;border-radius:20px;white-space:nowrap}
+  .hidden{display:none}
+  .stat{display:flex;gap:18px;flex-wrap:wrap}
+  .stat div{font-size:13px;color:var(--mut)}
+  .stat b{display:block;font-size:19px;color:var(--txt)}
+  .actions{white-space:nowrap}
+  .actions button,.actions a{margin-inline-start:4px}
+  .toast{position:fixed;bottom:22px;inset-inline-start:50%;transform:translateX(50%);background:#1f2a40;border:1px solid var(--line);color:var(--txt);padding:11px 20px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:9}
+  .toast.show{opacity:1}
+  @media (max-width:640px){th:nth-child(4),td:nth-child(4){display:none}.name{max-width:150px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>📦 انبار</h1>
+  <span class="tag" id="vtag">v__VERSION__</span>
+  <span class="sub" id="sub"></span>
+  <div class="left">
+    <button class="ghost sm hidden" id="logoutBtn" onclick="logout()">خروج</button>
+  </div>
+</header>
+<main>
+  <!-- LOGIN -->
+  <div class="card hidden" id="loginCard">
+    <div class="logo">📦</div>
+    <h2 style="margin:0 0 2px;text-align:center">ورود به انبار</h2>
+    <p class="mut" style="text-align:center;margin:0 0 16px">کلید admin را وارد کن</p>
+    <form id="loginForm">
+      <label for="pw">Key</label>
+      <input type="password" id="pw" autocomplete="off" required>
+      <div style="margin-top:14px"><button type="submit" id="loginBtn" style="width:100%">ورود</button></div>
+      <div class="msg" id="loginMsg"></div>
+    </form>
+  </div>
+
+  <!-- APP -->
+  <div id="app" class="hidden">
+    <div class="card stat" id="statCard"></div>
+
+    <div class="card">
+      <div class="drop" id="drop">
+        <div>فایل را اینجا رها کن یا <b>انتخاب کن</b></div>
+        <div class="mut" id="maxNote"></div>
+        <input type="file" id="file" multiple>
+      </div>
+      <div class="bar hidden" id="uBar"><i></i></div>
+      <div class="msg" id="uMsg"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:4px">
+        <b>فایل‌ها</b>
+        <button class="ghost sm" onclick="loadList()">↻ تازه‌سازی</button>
+      </div>
+      <div id="list" style="overflow-x:auto"><div class="empty">در حال بارگذاری…</div></div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+let VERSION='__VERSION__';
+let authed=false, role=null, maxBytes=0;
+
+function human(n){n=+n||0;const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return n.toFixed(n<10&&i>0?1:0)+' '+u[i]}
+function fmtDate(ts){return new Date(ts*1000).toLocaleString('fa-IR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2600)}
+
+async function jfetch(u,opt){
+  const r=await fetch(u,Object.assign({credentials:'same-origin'},opt||{}));
+  let j=null; try{j=await r.json()}catch(e){}
+  if(!r.ok){const e=new Error((j&&j.detail)||r.status);e.status=r.status;e.body=j;throw e}
+  return j;
+}
+
+function show(which){
+  $('#loginCard').classList.toggle('hidden',which!=='login');
+  $('#app').classList.toggle('hidden',which!=='app');
+  $('#logoutBtn').classList.toggle('hidden',which!=='login');
+  $('#sub').textContent=which==='app'?'storage: telegram · local: none':'';
+}
+
+async function login(key){
+  $('#loginMsg').textContent='';$('#loginBtn').disabled=true;
+  try{
+    await jfetch('/ui/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
+    role='admin';authed=true;
+    show('app');await loadList();
+  }catch(e){$('#loginMsg').textContent=e.status===429?'تلاش‌های زیادی بود، یک دقیقه صبر کن':'کلید اشتباه است'}
+  finally{$('#loginBtn').disabled=false}
+}
+
+async function logout(){
+  try{await fetch('/ui/logout',{method:'POST',credentials:'same-origin'})}catch(e){}
+  authed=false;show('login');$('#pw').value='';
+}
+
+async function loadStatus(){
+  try{
+    const st=await jfetch('/api/v1/admin/status');
+    maxBytes=st.max_upload_bytes||0;
+    $('#maxNote').textContent=maxBytes?('حداکثر آپلود: '+human(maxBytes)):'';
+    const el=$('#statCard');
+    el.innerHTML='<div><b>'+st.objects+'</b>فایل</div>'
+      +'<div><b>'+esc(st.backend)+'</b>backend</div>'
+      +'<div><b>'+(st.auth_enabled?'ON':'OFF')+'</b>auth</div>'
+      +'<div><b>'+(st.cache&&st.cache.enabled?human(st.cache.bytes):'OFF')+'</b>cache</div>';
+  }catch(e){/* authed=false → login screen */}
+}
+
+async function loadList(){
+  const box=$('#list');
+  let rows;
+  try{
+    const j=await jfetch('/api/v1/admin/objects?limit=500');
+    rows=j.objects||[];
+  }catch(e){box.innerHTML='<div class="empty">خطا در دریافت لیست</div>';return}
+  if(!rows.length){box.innerHTML='<div class="empty">هنوز فایلی نیست — اولین فایل را بالا آپلود کن.</div>';return}
+  let h='<table><tr><th>Filename</th><th>Size</th><th>Backend</th><th>Uploaded</th><th>DL</th><th>Actions</th></tr>';
+  for(const o of rows){
+    h+='<tr><td class="name" title="'+esc(o.filename)+'">'+esc(o.filename)+'</td>'
+      +'<td>'+human(o.size)+'</td>'
+      +'<td><span class="tag">'+esc(o.backend)+'</span></td>'
+      +'<td class="mut">'+fmtDate(o.created_at)+'</td>'
+      +'<td class="mut">'+(o.downloaded||0)+'</td>'
+      +'<td class="actions">'
+      +'<a class="btn" href="/f/'+o.id+'" title="دانلود">⬇ دانلود</a>'
+      +'<button class="sm" onclick="shareLink(\''+o.id+'\')">🔗 لینک</button> '
+      +'<button class="sm ghost" onclick="rm(\''+o.id+'\',\''+esc(o.filename)+'\')">🗑</button>'
+      +'</td></tr>';
+  }
+  box.innerHTML=h+'</table>';
+}
+
+async function shareLink(id){
+  try{
+    const j=await jfetch('/f/'+id+'/link?ttl=86400',{method:'POST'});
+    await navigator.clipboard.writeText(j.url);
+    toast('لینک ۲۴ ساعته کپی شد ✓');
+  }catch(e){toast('خطا در ساخت لینک: '+e.message)}
+}
+
+async function rm(id,fname){
+  if(!confirm('فایل «'+fname+'» برای همیشه حذف شود؟'))return;
+  try{
+    await jfetch('/f/'+id,{method:'DELETE'});
+    toast('حذف شد');loadList();loadStatus();
+  }catch(e){toast('خطا: '+e.message)}
+}
+
+function upload(files){
+  const bar=$('#uBar'),fill=bar.querySelector('i'),msg=$('#uMsg');
+  let done=0;bar.classList.remove('hidden');msg.innerHTML='';
+  files.forEach(f=>{
+    const fd=new FormData();fd.append('file',f);
+    const xhr=new XMLHttpRequest();
+    const total=f.size;
+    xhr.open('POST','/api/v1/upload');
+    xhr.upload.onprogress=e=>{if(e.lengthComputable){
+      fill.style.width=(Math.min(100,(done+(e.loaded/total))/files.length*100)).toFixed(1)+'%'}};
+    xhr.onload=()=>{done++;fill.style.width=Math.min(100,done/files.length*100)+'%';
+      msg.innerHTML=xhr.status===200
+        ?'<span style="color:var(--ok)">✔ '+esc(f.name)+' آپلود شد</span>'
+        :'<span style="color:var(--bad)">✖ '+esc(f.name)+': '+xhr.status+'</span>';
+      if(done===files.length)setTimeout(()=>{bar.classList.add('hidden');loadList();loadStatus()},700)};
+    xhr.onerror=()=>{done++;msg.innerHTML='<span style="color:var(--bad)">✖ '+esc(f.name)+' (خطای شبکه)</span>';
+      if(done===files.length)bar.classList.add('hidden')};
+    xhr.send(fd);
+  });
+}
+
+const drop=$('#drop'),fileInput=$('#file');
+drop.onclick=()=>fileInput.click();
+fileInput.onchange=()=>{if(fileInput.files.length)upload([...fileInput.files]);fileInput.value=''};
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('on')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('on')}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length)upload([...e.dataTransfer.files])});
+$('#loginForm').onsubmit=e=>{e.preventDefault();login($('#pw').value.trim())};
+
+async function boot(){
+  let me=null;
+  try{me=await jfetch('/ui/me')}catch(e){}
+  if(me&&me.authed){
+    authed=true;role=me.role;show('app');
+    loadList();loadStatus();
+  }else{
+    show('login');
+  }
+}
+document.addEventListener('DOMContentLoaded',boot);
+</script>
+</body>
+</html>

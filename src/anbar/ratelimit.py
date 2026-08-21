@@ -44,3 +44,12 @@ def limit_upload(db: Database, request: Request, limit: int) -> None:
     ok, retry_after, _n = db.rate_check(f"up:{digest}", _WINDOW_S, limit)
     if not ok:
         _raise_limited(retry_after)
+
+
+def limit_login(db: Database, request: Request, limit: int) -> None:
+    """Per client IP per minute (F7 web login — throttles brute force)."""
+    if limit <= 0:
+        return
+    ok, retry_after, _n = db.rate_check(f"lg:{_client_ip(request)}", _WINDOW_S, limit)
+    if not ok:
+        _raise_limited(retry_after)

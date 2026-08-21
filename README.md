@@ -18,7 +18,8 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 | F3 | Streaming download + HTTP Range + object info | ✅ `v0.3.0` |
 | F4 | Auth: API keys, HMAC signed URLs, runtime toggle, anbarctl CLI | ✅ `v0.4.0` |
 | F5 | MTProto backend (up to 2 GB, user-selectable) | ✅ `v0.5.0` |
-| F6 | Hardening: rate limiting, LRU cache, load test, docs, production deploy | 🚧 `v0.6.0` code — deploy pending |
+| F6 | Hardening: rate limiting, LRU cache, load test, docs, production deploy | ✅ `v0.6.0` — deployed |
+| F7 | Web UI (RTL): login → signed session cookie; list / upload / download / delete / share | ✅ `v0.7.0` |
 
 ## Why
 
@@ -41,6 +42,22 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
   be evicted (or the cache deleted) at any time, not persistent storage.
 - **Streaming stays O(chunk)** — a download never buffers the whole object; a
   concurrent load test (20 × 48 MB) verifies byte-exactness and bounded memory.
+
+## Web UI (F7)
+
+A minimal RTL (Persian) single page at the site root (`/`):
+
+- **Login** — enter the **admin** key. On success a signed session cookie
+  (`anbar_session`, `HttpOnly` + `SameSite=Lax` + `Secure`) is set. The raw key
+  is *not* stored in the browser afterward — every same-origin request carries
+  the cookie, and `whoami` resolves the role from it.
+- **List / upload / download / delete / share** — the page reuses the existing
+  JSON API (`/api/v1/*`, `/f/{id}`), so storage logic is not duplicated. Upload
+  supports drag&drop + multiple files with a progress bar; "link" mints a
+  24-hour signed URL; downloads stream through the same `/f/{id}` route.
+- **Stateless sessions** — the cookie is `HMAC-SHA256(secret, exp:tag)`, so a
+  tampered cookie fails the signature check and the login endpoint is
+  rate-limited per IP. Logout clears the cookie server-side.
 
 ## Core concepts
 

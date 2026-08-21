@@ -34,6 +34,7 @@ async def status(request: Request):
                   "bytes": cache.size(),
                   "max_bytes": s.cache_max_mb * 1024 * 1024}
         ),
+        "max_upload_bytes": s.max_upload_bytes(),
         "time": int(time.time()),
     }
 
