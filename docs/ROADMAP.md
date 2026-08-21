@@ -9,7 +9,7 @@
 | F3 | `f3-download` | streaming download, Range (incl. multi-chunk), `/f/{id}/info`, Content-Disposition | curl Range returns exact bytes; sha256 matches upload | ✅ |
 | F4 | `f4-auth` | API keys, HMAC signed URLs (±expiry), runtime toggle, DELETE, link minting, objects list, anbarctl CLI | security checklist in DEPLOY passes; toggle on/off without restart | ✅ (rate limits → F6) |
 | F5 | `f5-mtproto` | Telethon backend (dedicated account, Saved Messages), 2 GB, backend selection at runtime | file > 100 MB uploaded/downloaded; bot & mtproto coexist | ✅ v0.5.0 (golden needs a real account) |
-| F6 | `f6-hardening` | rate limiting (SQLite), LRU cache (off by default), load test, docs final, production deploy + `v1.0` tag | golden test end-to-end; `v1.0` tag | 🚧 code done (v0.6.0) — deploy pending approval |
+| F6 | `f6-hardening` | rate limiting (SQLite), LRU cache (off by default), load test, docs final, production deploy | golden test end-to-end; `v1.0` tag | ✅ deployed (`anbar.example.com`) — `v1.0` tag deferred at user request |
 
 Each phase: branch → small commits (`fN: <summary>`) → tests green → merge to
 `main` → tag `v0.N.0`.
