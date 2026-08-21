@@ -22,11 +22,18 @@ async def status(request: Request):
     s = request.app.state.settings
     db = request.app.state.db
     backend = request.app.state.backend
+    cache = getattr(request.app.state, "cache", None)
     return {
         "status": "ok",
         "backend": getattr(backend, "name", s.backend.value),
         "auth_enabled": effective_auth_enabled(db, s.auth_enabled),
         "objects": len(db.list_objects(limit=1000)),
+        "cache": (
+            {"enabled": False} if cache is None
+            else {"enabled": True, "entries": cache.count(),
+                  "bytes": cache.size(),
+                  "max_bytes": s.cache_max_mb * 1024 * 1024}
+        ),
         "time": int(time.time()),
     }
 

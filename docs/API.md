@@ -142,10 +142,17 @@ Admin only. Generates a fresh HMAC signing secret; every previously minted
 signed link becomes invalid immediately. Returns the new secret so it can be
 recorded in your secret store. `anbarctl rotate-secret` wraps this.
 
-## Rate limits *(F6)*
+## Rate limits
 
-Not implemented in F4 — planned for the hardening phase (per-IP download and
-per-key upload counters in SQLite, `429` + `Retry-After`).
+Fixed-window counters in SQLite (no Redis):
+
+- **Downloads** — limited per `(client IP, object id)` to
+  `ANBAR_RATE_DOWNLOAD_PER_MIN` requests/minute (default 30).
+- **Uploads** — limited per API key to `ANBAR_RATE_UPLOAD_PER_MIN`
+  requests/minute (default 20).
+
+A `0` limit disables that limiter. Over-limit requests return
+`429` with a `Retry-After` header (seconds until the window resets).
 
 ## Error model
 
@@ -157,6 +164,6 @@ per-key upload counters in SQLite, `429` + `Retry-After`).
 | 404 | unknown object id |
 | 410 | signed link expired |
 | 413 | over configured upload ceiling |
-| 429 | rate limited (see `Retry-After`) — F6 |
+| 429 | rate limited (see `Retry-After`) |
 | 502 | upstream (Telegram) failure |
 | 503 | service degraded / backend unhealthy |

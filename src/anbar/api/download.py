@@ -14,6 +14,7 @@ Auth (F4):
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 
@@ -28,6 +29,7 @@ from ..auth import (
     whoami,
 )
 from ..objects import Manifest
+from ..ratelimit import limit_download
 from ..storage import ObjectRef
 
 router = APIRouter()
@@ -89,8 +91,11 @@ def _authenticate_download(request: Request, obj_id: str) -> None:
 
 @router.get("/{obj_id}")
 async def download(request: Request, obj_id: str):
+    settings = request.app.state.settings
     db = request.app.state.db
     backend = request.app.state.backend
+    # rate limit before auth: an anonymous hammerer gets 429, not endless 401s
+    limit_download(db, request, obj_id, settings.rate_download_per_min)
     row = db.get_object(obj_id)
     if row is None:
         raise HTTPException(404, "object not found")
@@ -107,17 +112,6 @@ async def download(request: Request, obj_id: str):
         length = total
         segments = manifest.map_range(0, total)
 
-    async def stream():
-        fetched: dict[int, bytes] = {}  # chunk_index -> bytes (this request only)
-        for idx, off, n in segments:
-            chunk = fetched.get(idx)
-            if chunk is None:
-                ref = ObjectRef(file_id=manifest.chunks[idx].file_id, backend=backend.name)
-                chunk = await backend.open(ref)
-                fetched[idx] = chunk
-            yield chunk[off : off + n]
-
-    db.bump_downloads(obj_id)
     headers = {
         "Content-Length": str(length),
         "Content-Type": row["content_type"] or "application/octet-stream",
@@ -127,6 +121,61 @@ async def download(request: Request, obj_id: str):
     if start is not None:
         headers["Content-Range"] = f"bytes {start}-{end}/{total}"
     status = 206 if start is not None else 200
+    db.bump_downloads(obj_id)
+
+    cache = getattr(request.app.state, "cache", None)
+    use_cache = (
+        cache is not None
+        and start is None  # full downloads only; ranges stay on the backend path
+        and total > 0
+        and total <= settings.cache_max_mb * 1024 * 1024
+    )
+
+    if use_cache and (path := cache.get(obj_id)) is not None:
+        # cache hit: stream the temp file, zero backend calls
+        async def cached_stream():
+            with open(path, "rb") as f:
+                while chunk := f.read(1024 * 1024):
+                    yield chunk
+
+        return StreamingResponse(cached_stream(), status_code=status, headers=headers)
+
+    if use_cache:
+        # cache miss: stream from the backend AND fill a temp file; commit to
+        # the cache only if the stream completes (client abort drops the file).
+        # Each chunk index appears in at most one segment (map_range walks
+        # contiguously), so per-request memory is one chunk, never the object.
+        async def filling_stream():
+            tmp = cache.new_entry_path()
+            size = 0
+            try:
+                with open(tmp, "wb") as out:
+                    for idx, off, n in segments:
+                        ref = ObjectRef(file_id=manifest.chunks[idx].file_id,
+                                        backend=backend.name)
+                        chunk = await backend.open(ref)
+                        part = chunk[off : off + n]
+                        out.write(part)
+                        size += len(part)
+                        yield part
+                if size == total:
+                    cache.add(obj_id, tmp, size)
+            except BaseException:  # client abort (GeneratorExit) or backend error
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+                raise
+
+        return StreamingResponse(filling_stream(), status_code=status, headers=headers)
+
+    async def stream():
+        # one chunk in flight per request — never the whole object
+        for idx, off, n in segments:
+            ref = ObjectRef(file_id=manifest.chunks[idx].file_id, backend=backend.name)
+            chunk = await backend.open(ref)
+            yield chunk[off : off + n]
+
     return StreamingResponse(stream(), status_code=status, headers=headers)
 
 
@@ -194,6 +243,11 @@ async def delete(request: Request, obj_id: str):
         except Exception:  # noqa: BLE001 - best-effort remote cleanup
             pass
     db.delete_object(obj_id)
+    # drop any cached copy of this object (and its chunks, if chunked ids share
+    # the prefix) so a re-upload under a new id never serves stale bytes
+    cache = getattr(request.app.state, "cache", None)
+    if cache is not None:
+        cache.remove(obj_id)
     return {"deleted": True, "id": obj_id, "blobs_removed": deleted_blobs}
 
 

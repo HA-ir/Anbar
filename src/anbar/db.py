@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS kv (
   k TEXT PRIMARY KEY,
   v TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS rate (
+  k TEXT PRIMARY KEY,
+  window_start INTEGER NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -107,6 +112,45 @@ class Database:
             (key, value),
         )
         self._conn.commit()
+
+    # -- rate limiting (fixed windows in SQLite) ------------------------------
+    def rate_check(self, key: str, window_s: int, limit: int) -> tuple[bool, int, int]:
+        """Atomically check+count one request in a fixed window.
+
+        Returns (allowed, retry_after_s, current_count). Rows from
+        finished windows are recycled in place.
+        """
+        now = int(time.time())
+        win_start = now - (now % window_s)
+        self._conn.execute(
+            """INSERT INTO rate (k, window_start, n) VALUES (?, ?, 1)
+               ON CONFLICT(k) DO UPDATE SET
+                 window_start = CASE WHEN rate.window_start = ? THEN ? ELSE ? END,
+                 n = CASE
+                       WHEN rate.window_start = ? THEN rate.n + 1
+                       ELSE 1
+                     END""",
+            (key, win_start, win_start, win_start, now, win_start),
+        )
+        self._conn.commit()
+        row = self._conn.execute(
+            "SELECT window_start, n FROM rate WHERE k = ?", (key,)).fetchone()
+        n = row["n"] if row else 1
+        if row is not None and row["window_start"] < win_start:  # pragma: no cover
+            n = 1
+        if n > limit:
+            retry_after = win_start + window_s - now
+            return False, max(1, retry_after), n
+        return True, 0, n
+
+    def rate_prune(self, max_age_s: int = 3600) -> int:
+        """Drop finished windows; returns rows removed."""
+        cur = self._conn.execute(
+            "DELETE FROM rate WHERE window_start < ?",
+            (int(time.time()) - max_age_s,),
+        )
+        self._conn.commit()
+        return cur.rowcount
 
     # -- maintenance ------------------------------------------------------
     def vacuum(self) -> None:

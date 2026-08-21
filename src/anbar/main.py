@@ -1,6 +1,7 @@
 """anbar: Telegram-backed object storage (zero local file retention)."""
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -24,7 +25,22 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         app.state.settings = settings
         if hasattr(app.state.backend, "connect"):
             await app.state.backend.connect()
+        app.state.cache = _build_cache(settings)
+
+        async def _prune_rate_loop() -> None:
+            """Drop finished rate windows so the table doesn't grow forever."""
+            while True:
+                await asyncio.sleep(600)
+                try:
+                    db.rate_prune()
+                except Exception:  # pragma: no cover - db already closed
+                    return
+
+        prune_task = asyncio.create_task(_prune_rate_loop())
         yield
+        prune_task.cancel()
+        if app.state.cache is not None:
+            app.state.cache.close()
         db.close()
         if not injected:
             await app.state.backend.close()
@@ -73,3 +89,12 @@ def _default_backend(settings) -> StorageBackend:
             session_file=str(settings.session_file),
         )
     raise RuntimeError(f"unknown backend {settings.backend!r}")
+
+
+def _build_cache(settings):
+    """LRU object cache if enabled (F6); None otherwise (zero overhead)."""
+    if not settings.cache_enabled:
+        return None
+    from .cache import DiskLRU
+
+    return DiskLRU(settings.cache_dir, settings.cache_max_mb * 1024 * 1024)

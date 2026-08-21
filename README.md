@@ -18,7 +18,7 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 | F3 | Streaming download + HTTP Range + object info | ✅ `v0.3.0` |
 | F4 | Auth: API keys, HMAC signed URLs, runtime toggle, anbarctl CLI | ✅ `v0.4.0` |
 | F5 | MTProto backend (up to 2 GB, user-selectable) | ✅ `v0.5.0` |
-| F6 | Hardening: full CLI, LRU cache, docs, production deploy, v1.0 | ⏳ |
+| F6 | Hardening: rate limiting, LRU cache, load test, docs, production deploy | 🚧 `v0.6.0` code — deploy pending |
 
 ## Why
 
@@ -28,6 +28,19 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 - **Auth on/off at runtime** — no restart needed; toggle via API or `anbarctl`.
 - **Portable** — Docker-first. One `docker compose up` on any server. Per-deploy Telegram channel/account keeps instances independent.
 - **Pluggable backends** — `bot` (F2), `mtproto` (F5), with room for S3/local fallback behind the same interface.
+
+## Hardening (F6)
+
+- **Rate limiting** — fixed-window counters in SQLite (no Redis). Downloads are
+  limited per `(IP, object)`; uploads per API key. Over-limit requests get
+  `429` + `Retry-After`. Limits are per-minute ceilings, `0` disables.
+- **Optional LRU cache** — OFF by default. When enabled, whole objects are kept
+  as *evictable* temp files (bounded by `ANBAR_CACHE_MAX_MB`, LRU-evicted) under
+  the `data` volume so repeat downloads skip the Telegram round-trip. The
+  zero-retention guarantee is unchanged: cached files are scratch space that can
+  be evicted (or the cache deleted) at any time, not persistent storage.
+- **Streaming stays O(chunk)** — a download never buffers the whole object; a
+  concurrent load test (20 × 48 MB) verifies byte-exactness and bounded memory.
 
 ## Core concepts
 
@@ -42,17 +55,19 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 src/anbar/
 ├── main.py           # FastAPI app factory (backend injectable for tests)
 ├── config.py         # env-driven settings (pydantic-settings), validated
-├── db.py             # SQLite WAL metadata store (objects + kv tables)
+├── db.py             # SQLite WAL metadata store (objects + kv + rate tables)
+├── cache.py          # F6: optional LRU disk cache (off by default)
+├── ratelimit.py      # F6: fixed-window rate limits (SQLite, no Redis)
 ├── cli.py            # anbarctl — operational CLI
 ├── api/
 │   ├── upload.py     # POST /api/v1/upload, /upload/raw
 │   ├── download.py   # GET /f/{id}, /f/{id}/info
-│   └── admin.py      # GET /api/v1/admin/status (+ auth toggle in F4)
+│   └── admin.py      # GET /api/v1/admin/status (+ auth toggle)
 └── storage/
     ├── base.py       # StorageBackend interface + FakeBackend (test contract)
     ├── bot_backend.py# F2: Bot API via httpx (no bot framework)
-    └── mtproto_backend.py  # F5: Telethon
-tests/                # 15 passing — skeleton, DB contract, storage contract
+    └── mtproto_backend.py  # F5: Telethon (dedicated account, 2 GB)
+tests/                # 67 passing — API golden tests, storage contract, hardening
 docker/               # Dockerfile (non-root, healthcheck), compose.yaml
 nginx/anbar.conf.example
 docs/                 # ARCHITECTURE, API, DEPLOY, ROADMAP
@@ -63,8 +78,8 @@ docs/                 # ARCHITECTURE, API, DEPLOY, ROADMAP
 
 ```bash
 uv sync --extra dev
-uv run pytest -q          # 15 passing
-uv run anbarctl version   # anbar 0.1.0
+uv run pytest -q          # 67 passing
+uv run anbarctl version   # anbar 0.6.0
 ```
 
 Run a local instance with the in-memory backend (no Telegram needed):

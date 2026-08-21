@@ -29,6 +29,10 @@ ANBAR_API_KEY=<32+ random chars>
 ANBAR_HMAC_SECRET=<32+ random chars>
 ANBAR_CHANNEL_ID=@yourprivatechannel     # F2: where files are posted
 ANBAR_AUTH_ENABLED=true
+ANBAR_RATE_DOWNLOAD_PER_MIN=30           # F6: per (IP, object); 0 disables
+ANBAR_RATE_UPLOAD_PER_MIN=20             # F6: per API key; 0 disables
+ANBAR_CACHE_ENABLED=false                # F6: optional LRU cache (default off)
+ANBAR_CACHE_MAX_MB=512
 ```
 
 Generate secrets:
@@ -107,6 +111,13 @@ reverse proxy.
 Back up `./data/anbar.db` periodically (a few MB). Backing up the DB does **not**
 restore file bytes — those live in Telegram; the DB only points at them.
 
+> **Ownership pitfall:** the container runs as the non-root `anbar` user
+> (UID 999). Host directories bind-mounted to `/app/data` and `/app/secrets`
+> must be writable by UID 999, otherwise startup fails with
+> `sqlite3.OperationalError: unable to open database file`. Fix once:
+> `sudo chown -R 999:999 ./data ./secrets` (or create a local `anbar` user with
+> UID 999 and chown to it). Never use `chmod 777` in production.
+
 ## 3. Reverse proxy
 
 ### Caddy (automatic HTTPS)
@@ -168,7 +179,8 @@ KB of metadata). That is the whole point of Anbar.
 | Mint a share link | `anbarctl link <object_id> --ttl 3600` |
 | MTProto login (once) | `anbarctl login --api-id … --api-hash … --phone …` |
 | Health | `curl http://127.0.0.1:8317/healthz` |
-| Check backend | `curl …/api/v1/admin/status` (admin key) |
+| Check backend / cache | `curl …/api/v1/admin/status` (admin key) |
+| Install as systemd (no Docker) | `anbarctl install --env-file /etc/anbar/.env` (then `systemctl enable --now anbar`) |
 | Update | `git pull && cd docker && docker compose up -d` (DB migrations are forward-only) |
 
 ### Non-Docker (fallback)

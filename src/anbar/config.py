@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     hmac_secret: SecretStr | None = None
     auth_enabled: bool = True
 
+    # rate limiting (F6; 0 disables a limiter)
+    rate_download_per_min: int = Field(default=10, ge=0)
+    rate_upload_per_min: int = Field(default=5, ge=0)
+
     # cache
     cache_enabled: bool = False
     cache_dir: Path = Path("data/cache")

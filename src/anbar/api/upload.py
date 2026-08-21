@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 
 from ..auth import require_uploader
 from ..objects import Chunk, Manifest, chunk_stream, new_object_id
+from ..ratelimit import limit_upload
 from ..storage import ObjectRef, TelegramError
 
 router = APIRouter()
@@ -92,6 +93,8 @@ async def upload_multipart(request: Request, file: Annotated[UploadFile, File(..
     """Multipart upload (field `file`). Streams to the backend in chunks."""
     require_uploader(request)
     settings = request.app.state.settings
+    db = request.app.state.db
+    limit_upload(db, request, settings.rate_upload_per_min)
     filename = file.filename or "upload.bin"
     content_type = file.content_type or "application/octet-stream"
     if (await _peek_size(file)) > settings.max_upload_bytes():
@@ -109,6 +112,8 @@ async def upload_raw(request: Request):
     """
     require_uploader(request)
     settings = request.app.state.settings
+    db = request.app.state.db
+    limit_upload(db, request, settings.rate_upload_per_min)
     filename = request.headers.get("x-file-name", "upload.bin")
     content_type = request.headers.get("content-type", "application/octet-stream")
 

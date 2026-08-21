@@ -22,10 +22,14 @@ def _isolate_env(monkeypatch, tmp_path):
         "ANBAR_ADMIN_KEY", "ANBAR_API_KEY", "ANBAR_HMAC_SECRET",
         "ANBAR_CACHE_ENABLED", "ANBAR_CACHE_DIR", "ANBAR_CACHE_MAX_MB",
         "ANBAR_MAX_UPLOAD_MB", "ANBAR_CHUNKING", "ANBAR_CHUNK_SIZE_MB",
+        "ANBAR_RATE_DOWNLOAD_PER_MIN", "ANBAR_RATE_UPLOAD_PER_MIN",
     ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("ANBAR_DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.setenv("ANBAR_DATA_DIR", str(tmp_path))
+    # rate limits are on by default; generous values keep F2/F3 tests unthrottled
+    monkeypatch.setenv("ANBAR_RATE_DOWNLOAD_PER_MIN", "1000")
+    monkeypatch.setenv("ANBAR_RATE_UPLOAD_PER_MIN", "1000")
     # auth is ON by design — give tests stable, known keys
     monkeypatch.setenv("ANBAR_API_KEY", "test-key")
     monkeypatch.setenv("ANBAR_ADMIN_KEY", "test-admin-key")
