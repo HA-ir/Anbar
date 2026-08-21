@@ -26,12 +26,12 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         if not injected:
             await app.state.backend.close()
 
-    app = FastAPI(title="anbar", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="anbar", version="0.3.0", lifespan=lifespan)
     app.state.settings = settings
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():
-        return {"status": "ok", "service": "anbar", "version": "0.2.0"}
+        return {"status": "ok", "service": "anbar", "version": "0.3.0"}
 
     from .api import admin, download, upload  # noqa: PLC0415
 

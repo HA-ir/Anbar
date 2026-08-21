@@ -14,8 +14,8 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 | Phase | Scope | Status |
 |-------|-------|--------|
 | F1 | Skeleton: repo, config, SQLite, app factory, Docker, CI | ✅ `v0.1.0` |
-| F2 | Bot storage backend + upload endpoints (multipart + raw) | ⏳ |
-| F3 | Streaming download + HTTP Range + object info | ⏳ |
+| F2 | Bot storage backend + upload endpoints (multipart + raw) | ✅ `v0.2.0` |
+| F3 | Streaming download + HTTP Range + object info | ✅ `v0.3.0` |
 | F4 | Auth: API keys, HMAC signed URLs, runtime toggle, rate limits | ⏳ |
 | F5 | MTProto backend (up to 2 GB, user-selectable) | ⏳ |
 | F6 | Hardening: full CLI, LRU cache, docs, production deploy, v1.0 | ⏳ |
