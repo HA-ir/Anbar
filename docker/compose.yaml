@@ -1,11 +1,11 @@
-# tg-link-proxy — local dev / default deploy
+# anbar — local dev / default deploy
 # Usage:  cp .env.example .env  &&  edit .env  &&  docker compose up -d
 services:
-  tglink:
+  anbar:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: tg-link-proxy:latest
+    image: anbar:latest
     env_file:
       - ../.env
     volumes:

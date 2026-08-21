@@ -9,7 +9,7 @@ def test_healthz(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
-    assert body["service"] == "tg-link-proxy"
+    assert body["service"] == "anbar"
 
 
 def test_admin_status(client):
@@ -33,7 +33,7 @@ def test_download_not_implemented_yet(client):
 
 class TestConfig:
     def test_defaults(self):
-        from tglink.config import get_settings
+        from anbar.config import get_settings
 
         get_settings.cache_clear()
         s = get_settings()
@@ -45,7 +45,7 @@ class TestConfig:
     def test_port_bounds(self):
         from pydantic import ValidationError
 
-        from tglink.config import Settings, get_settings
+        from anbar.config import Settings, get_settings
 
         with pytest.raises(ValidationError):
             Settings(port=70000)

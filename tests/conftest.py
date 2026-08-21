@@ -4,8 +4,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from tglink.main import create_app
-from tglink.storage import FakeBackend
+from anbar.main import create_app
+from anbar.storage import FakeBackend
 
 
 @pytest.fixture()
@@ -15,11 +15,11 @@ def backend() -> FakeBackend:
 
 @pytest.fixture()
 def client(backend, tmp_path, monkeypatch):
-    monkeypatch.setenv("TGLINK_BACKEND", "fake")
-    monkeypatch.setenv("TGLINK_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("TGLINK_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("ANBAR_BACKEND", "fake")
+    monkeypatch.setenv("ANBAR_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("ANBAR_DATA_DIR", str(tmp_path))
     # clear lru_cache so settings re-read env
-    from tglink.config import get_settings
+    from anbar.config import get_settings
 
     get_settings.cache_clear()
     app = create_app(backend=backend)

@@ -1,56 +1,116 @@
-# tg-link-proxy
+# Anbar
 
-Object storage که فایل‌ها را در **تلگرام** نگه می‌دارد و روی سرور شما فقط چند کیلوبایت متادیتا می‌ماند.
+**Telegram-backed object storage with zero local file retention.**
 
-- **Upload + Download** دوطرفه با لینک مستقیم
-- **فایل روی دیسک سرور نگه نمی‌ماند** — فقط SQLite با متادیتا
-- **Auth روشن/خاموش‌شونده** در لحظه (API / CLI / کانفیگ)
-- **Chunking** — سقف حجم عملیاً برداشته شده + resumable upload
-- **Portable** — Docker-first، deploy روی هر سروری با `docker compose up`
+Anbar is a two-way proxy (upload + download) between your users and Telegram.
+Files live in the Telegram cloud; only a few kilobytes of metadata per object
+remain on your server (SQLite, WAL mode). Users get plain direct-download links
+— nothing in a URL reveals where the bytes actually live.
 
-## وضعیت
+> The name: *anbar* (انبار) — a warehouse where goods pass through, not one where they stay.
 
-| Faz | Scope | Status |
-|-----|-------|--------|
-| F1 | اسکلت: repo، config، DB، API skeleton، Docker، CI | ✅ |
-| F2 | Bot backend + upload (multipart + raw) | ⏳ |
-| F3 | Streaming download + Range | ⏳ |
-| F4 | Auth: API keys، signed URLs، toggle runtime | ⏳ |
-| F5 | MTProto backend (تا 2GB، قابل انتخاب) | ⏳ |
-| F6 | Hardening: CLI کامل، cache، docs، v1.0 | ⏳ |
+## Status
 
-## شروع سریع (dev)
+| Phase | Scope | Status |
+|-------|-------|--------|
+| F1 | Skeleton: repo, config, SQLite, app factory, Docker, CI | ✅ `v0.1.0` |
+| F2 | Bot storage backend + upload endpoints (multipart + raw) | ⏳ |
+| F3 | Streaming download + HTTP Range + object info | ⏳ |
+| F4 | Auth: API keys, HMAC signed URLs, runtime toggle, rate limits | ⏳ |
+| F5 | MTProto backend (up to 2 GB, user-selectable) | ⏳ |
+| F6 | Hardening: full CLI, LRU cache, docs, production deploy, v1.0 | ⏳ |
+
+## Why
+
+- **Disk relief** — the server holds metadata, not files. A 1 TB of objects ≈ a few MB of SQLite.
+- **Direct links** — `https://host/f/<id>` works with curl, browsers, any HTTP client. Range/seek supported.
+- **No hard size ceiling** — large files are chunked into ≤16 MB parts stored individually; manifests live in SQLite. Uploads are resumable.
+- **Auth on/off at runtime** — no restart needed; toggle via API or `anbarctl`.
+- **Portable** — Docker-first. One `docker compose up` on any server. Per-deploy Telegram channel/account keeps instances independent.
+- **Pluggable backends** — `bot` (F2), `mtproto` (F5), with room for S3/local fallback behind the same interface.
+
+## Core concepts
+
+- **Object** — an uploaded file, referenced by a short base62 `id`. May consist of one blob (≤ backend ceiling) or many chunks (manifest).
+- **Backend** — where the bytes live. `bot` = Telegram Bot API into a **private channel** the bot administers (≤20 MB per blob). `mtproto` = MTProto user session into Saved Messages (≤2 GB per blob).
+- **Manifest** — JSON in SQLite mapping an object to its ordered chunks. A single-blob object has a one-element manifest; the download/upload code paths are identical either way.
+- **Signed URL** — `{base}/f/{id}?e=<expiry>&s=<HMAC-SHA256>` used when auth is enabled.
+
+## Repository layout
+
+```
+src/anbar/
+├── main.py           # FastAPI app factory (backend injectable for tests)
+├── config.py         # env-driven settings (pydantic-settings), validated
+├── db.py             # SQLite WAL metadata store (objects + kv tables)
+├── cli.py            # anbarctl — operational CLI
+├── api/
+│   ├── upload.py     # POST /api/v1/upload, /upload/raw
+│   ├── download.py   # GET /f/{id}, /f/{id}/info
+│   └── admin.py      # GET /api/v1/admin/status (+ auth toggle in F4)
+└── storage/
+    ├── base.py       # StorageBackend interface + FakeBackend (test contract)
+    ├── bot_backend.py# F2: Bot API via httpx (no bot framework)
+    └── mtproto_backend.py  # F5: Telethon
+tests/                # 15 passing — skeleton, DB contract, storage contract
+docker/               # Dockerfile (non-root, healthcheck), compose.yaml
+nginx/anbar.conf.example
+docs/                 # ARCHITECTURE, API, DEPLOY, ROADMAP
+.env.example
+```
+
+## Quick start (development)
 
 ```bash
 uv sync --extra dev
-uv run pytest -q
-uv run tglpctl version
+uv run pytest -q          # 15 passing
+uv run anbarctl version   # anbar 0.1.0
 ```
 
-## Deploy (وقتی F2+ کامل شد)
+Run a local instance with the in-memory backend (no Telegram needed):
 
 ```bash
-cp .env.example .env   # توکن bot و دامنه را ویرایش کن
-cd docker && docker compose up -d
-# healthz:
+ANBAR_BACKEND=fake ANBAR_BASE_URL=http://127.0.0.1:8317 \
+  uv run uvicorn anbar.main:create_app --factory --port 8317
 curl http://127.0.0.1:8317/healthz
 ```
 
-Reverse proxy: `nginx/tglink.conf.example` برای Nginx موجود، یا Caddy خودکار.
+## Deploy (from F2 onward)
 
-## ساختار
-
-```
-src/tglink/
-├── main.py          # app factory
-├── config.py        # env-driven settings (pydantic-settings)
-├── db.py            # SQLite WAL — متادیتا فقط
-├── api/             # upload / download / admin routers
-├── storage/         # backend interface + fake (bot: F2, mtproto: F5)
-└── cli.py           # tglpctl
+```bash
+cp .env.example .env      # bot token, base URL, keys
+cd docker && docker compose up -d
+curl http://127.0.0.1:8317/healthz
 ```
 
-## فازها و Git
+Put Caddy or your existing Nginx in front (TLS). See [docs/DEPLOY.md](docs/DEPLOY.md).
 
-هر فاز = یک branch (`f1-skeleton` ... `f6-hardening`)، commit convention `fN: <what>`،
-هر merge به main با tag `v0.N.0`. CI: ruff + pytest + docker smoke.
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) — layers, data flow, chunking, storage locations
+- [API reference](docs/API.md) — every endpoint, auth matrix, error codes
+- [Deployment guide](docs/DEPLOY.md) — Docker, Caddy/Nginx, secrets, ops runbook
+- [Roadmap](docs/ROADMAP.md) — phase details, decisions, open questions
+
+## Git conventions
+
+- `main` is always deployable (CI green).
+- One branch per phase: `f2-bot-backend` … `f6-hardening`.
+- Commits: `fN: <imperative summary>` (prefix = phase).
+- Each merge to `main` is tagged `v0.N.0`; GA is `v1.0`.
+- CI (`.github/workflows/ci.yaml`): ruff + pytest + Docker smoke (healthz).
+- **Secrets never enter the repo** — only `.env.example` with placeholders.
+
+## Security notes (short version)
+
+- Links are guessable without auth → **auth is ON by default**.
+- HMAC URLs: secret rotation supported (`anbarctl rotate-secret`, F4).
+- Service binds to loopback only; reverse proxy adds TLS.
+- Container runs non-root with `no-new-privileges`.
+- API keys are redacted in logs (F4 checklist item).
+
+## Non-goals
+
+- Folder trees / drive-style UI (flat objects only)
+- Online editing, versioning, granular sharing
+- Full web dashboard (REST API + CLI first; dashboard later, if ever)

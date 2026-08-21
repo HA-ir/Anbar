@@ -1,4 +1,4 @@
-# tg-link-proxy — example reverse proxy (drop into your existing Nginx)
+# anbar — example reverse proxy (drop into your existing Nginx)
 # Adjust server_name / cert paths for your host.
 
 server {

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from tglink.storage import FakeBackend, ObjectRef
+from anbar.storage import FakeBackend, ObjectRef
 
 
 @pytest.mark.asyncio

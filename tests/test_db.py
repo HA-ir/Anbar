@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from tglink.db import Database
+from anbar.db import Database
 
 
 def _obj(id: str, **kw) -> dict:

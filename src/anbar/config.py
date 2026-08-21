@@ -21,7 +21,7 @@ class ChunkingMode(StrEnum):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="TGLINK_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="ANBAR_", env_file=".env", extra="ignore")
 
     # server
     host: str = "0.0.0.0"
@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     # storage
     backend: Backend = Backend.BOT
     bot_token: SecretStr | None = None
+    channel_id: str = ""  # private channel the bot administers (backend=bot)
     api_id: int | None = None
     api_hash: str = ""
     session_file: Path = Path("secrets/session.session")
@@ -55,7 +56,7 @@ class Settings(BaseSettings):
 
     # data
     data_dir: Path = Path("data")
-    db_path: Path = Path("data/tglink.db")
+    db_path: Path = Path("data/anbar.db")
 
     @field_validator("base_url")
     @classmethod

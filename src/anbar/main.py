@@ -1,4 +1,4 @@
-"""tg-link-proxy: Telegram-backed object storage (zero local file retention)."""
+"""anbar: Telegram-backed object storage (zero local file retention)."""
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -23,12 +23,12 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         yield
         db.close()
 
-    app = FastAPI(title="tg-link-proxy", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="anbar", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():
-        return {"status": "ok", "service": "tg-link-proxy", "version": "0.1.0"}
+        return {"status": "ok", "service": "anbar", "version": "0.1.0"}
 
     from .api import admin, download, upload  # noqa: PLC0415
 
@@ -47,9 +47,9 @@ def _default_backend(settings) -> StorageBackend:
     if settings.backend.value == "bot":
         raise RuntimeError(
             "BotBackend lands in F2. Until then, run tests (FakeBackend) or set "
-            "TGLINK_BACKEND=fake."
+            "ANBAR_BACKEND=fake."
         )
     raise RuntimeError(f"backend {settings.backend.value} not available yet")
 
 
-app = None  # created on demand: uvicorn tglink.main:create_app --factory
+app = None  # created on demand: uvicorn anbar.main:create_app --factory
