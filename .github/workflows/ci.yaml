@@ -28,10 +28,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build image
-        run: docker build -f docker/Dockerfile -t tg-link-proxy:ci .
+        run: docker build -f docker/Dockerfile -t anbar:ci .
       - name: Smoke — healthz
         run: |
-          docker run -d --name tglp -e TGLINK_BACKEND=fake -p 127.0.0.1:8317:8000 tg-link-proxy:ci
+          docker run -d --name tglp -e ANBAR_BACKEND=fake -p 127.0.0.1:8317:8000 anbar:ci
           for i in $(seq 1 15); do
             sleep 1
             if curl -fsS http://127.0.0.1:8317/healthz; then exit 0; fi

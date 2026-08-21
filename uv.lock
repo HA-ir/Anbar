@@ -467,7 +467,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tg-link-proxy"
+name = "anbar"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
