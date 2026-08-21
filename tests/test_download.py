@@ -1,4 +1,8 @@
-"""F3: download streaming + Range semantics against a real (fake) backend."""
+"""F3/F4: download streaming, Range semantics, and signed-URL access control.
+
+Downloads here go through a minted signed link (the public path), which also
+exercises the F4 signature verification on every request.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -13,19 +17,29 @@ PAYLOAD = (
 PAYLOAD = PAYLOAD[: 2 * CHUNK + 3 * 1024 * 1024]
 SHA = hashlib.sha256(PAYLOAD).hexdigest()
 
+AUTH = {"Authorization": "Bearer test-key"}
+ADMIN = {"Authorization": "Bearer test-admin-key"}
+
 
 def _upload(client) -> str:
     r = client.post(
         "/api/v1/upload",
         files={"file": ("three.bin", PAYLOAD, "application/octet-stream")},
+        headers=AUTH,
     )
     assert r.status_code == 200, r.text
     return r.json()["id"]
 
 
+def _signed_url(client, obj: str) -> str:
+    r = client.post(f"/f/{obj}/link", headers=AUTH)
+    assert r.status_code == 200, r.text
+    return r.json()["url"]
+
+
 def test_full_download(backend, client):
     obj = _upload(client)
-    r = client.get(f"/f/{obj}")
+    r = client.get(_signed_url(client, obj))
     assert r.status_code == 200
     assert r.headers["content-length"] == str(len(PAYLOAD))
     assert r.headers["accept-ranges"] == "bytes"
@@ -35,7 +49,8 @@ def test_full_download(backend, client):
 
 def test_range_inside_single_chunk(backend, client):
     obj = _upload(client)
-    r = client.get(f"/f/{obj}", headers={"Range": "bytes=100-199"})
+    url = _signed_url(client, obj)
+    r = client.get(url, headers={"Range": "bytes=100-199"})
     assert r.status_code == 206
     assert r.headers["content-range"] == f"bytes 100-199/{len(PAYLOAD)}"
     assert r.content == PAYLOAD[100:200]
@@ -43,9 +58,10 @@ def test_range_inside_single_chunk(backend, client):
 
 def test_range_across_two_chunks(backend, client):
     obj = _upload(client)
+    url = _signed_url(client, obj)
     start = CHUNK - 512
     end = CHUNK + 511
-    r = client.get(f"/f/{obj}", headers={"Range": f"bytes={start}-{end}"})
+    r = client.get(url, headers={"Range": f"bytes={start}-{end}"})
     assert r.status_code == 206
     assert r.headers["content-range"] == f"bytes {start}-{end}/{len(PAYLOAD)}"
     assert len(r.content) == 1024
@@ -54,17 +70,19 @@ def test_range_across_two_chunks(backend, client):
 
 def test_range_spanning_all_three_chunks(backend, client):
     obj = _upload(client)
+    url = _signed_url(client, obj)
     start = CHUNK - 1
     end = 2 * CHUNK
-    r = client.get(f"/f/{obj}", headers={"Range": f"bytes={start}-{end}"})
+    r = client.get(url, headers={"Range": f"bytes={start}-{end}"})
     assert r.status_code == 206
     assert r.content == PAYLOAD[start : end + 1]
 
 
 def test_open_ended_range(backend, client):
     obj = _upload(client)
+    url = _signed_url(client, obj)
     n = len(PAYLOAD)
-    r = client.get(f"/f/{obj}", headers={"Range": f"bytes={n - 10}-"})
+    r = client.get(url, headers={"Range": f"bytes={n - 10}-"})
     assert r.status_code == 206
     assert r.headers["content-range"] == f"bytes {n - 10}-{n - 1}/{n}"
     assert r.content == PAYLOAD[-10:]
@@ -72,17 +90,19 @@ def test_open_ended_range(backend, client):
 
 def test_suffix_range(backend, client):
     obj = _upload(client)
-    r = client.get(f"/f/{obj}", headers={"Range": "bytes=-42"})
+    url = _signed_url(client, obj)
+    r = client.get(url, headers={"Range": "bytes=-42"})
     assert r.status_code == 206
     assert r.content == PAYLOAD[-42:]
 
 
 def test_invalid_ranges(backend, client):
     obj = _upload(client)
-    assert client.get(f"/f/{obj}", headers={"Range": "bytes=99999999999-"}).status_code == 416
-    assert client.get(f"/f/{obj}", headers={"Range": "bytes=500-100"}).status_code == 416
-    assert client.get(f"/f/{obj}", headers={"Range": "nonsense"}).status_code == 416
-    assert client.get(f"/f/{obj}", headers={"Range": "bytes=-0"}).status_code == 416
+    url = _signed_url(client, obj)
+    assert client.get(url, headers={"Range": "bytes=99999999999-"}).status_code == 416
+    assert client.get(url, headers={"Range": "bytes=500-100"}).status_code == 416
+    assert client.get(url, headers={"Range": "nonsense"}).status_code == 416
+    assert client.get(url, headers={"Range": "bytes=-0"}).status_code == 416
 
 
 def test_download_not_found(backend, client):
@@ -103,11 +123,9 @@ def test_info(backend, client):
 
 
 def test_download_chunk_cache_reuse(backend, client):
-    """Two overlapping requests for the same object must not re-fetch
-    already-fetched chunks *within* a single request; across requests the
-    backend is hit again (by design — no persistence in F3)."""
+    """A range touching two chunks fetches each chunk exactly once."""
     obj = _upload(client)
+    url = _signed_url(client, obj)
     opens_before = backend.open_calls
-    client.get(f"/f/{obj}", headers={"Range": f"bytes={CHUNK - 100}-{CHUNK + 100}"})
-    # spans chunk 0 and chunk 1 → exactly 2 opens
+    client.get(url, headers={"Range": f"bytes={CHUNK - 100}-{CHUNK + 100}"})
     assert backend.open_calls == opens_before + 2

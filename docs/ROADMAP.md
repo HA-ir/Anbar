@@ -7,7 +7,7 @@
 | F1 | `f1-skeleton` | repo, config, SQLite, app factory, Docker, CI | `docker build` + healthz + 15 tests green | ✅ v0.1.0 |
 | F2 | `f2-bot-backend` | Bot storage backend (private channel), upload (multipart + raw), chunking + manifest, object ids | 10–15 MB file uploaded to Telegram, metadata correct, resume works | ✅ (resume → F3) |
 | F3 | `f3-download` | streaming download, Range (incl. multi-chunk), `/f/{id}/info`, Content-Disposition | curl Range returns exact bytes; sha256 matches upload | ✅ |
-| F4 | `f4-auth` | API keys, HMAC signed URLs (±expiry), runtime toggle, rate limits, DELETE, link minting, objects list | security checklist in DEPLOY passes; toggle on/off without restart | ⏳ |
+| F4 | `f4-auth` | API keys, HMAC signed URLs (±expiry), runtime toggle, DELETE, link minting, objects list, anbarctl CLI | security checklist in DEPLOY passes; toggle on/off without restart | ✅ (rate limits → F6) |
 | F5 | `f5-mtproto` | Telethon backend (dedicated account, Saved Messages), 2 GB, backend selection at runtime | file > 100 MB uploaded/downloaded; bot & mtproto coexist | ⏳ |
 | F6 | `f6-hardening` | full CLI (link/list/auth/rotate-secret), LRU cache wired, docs final, production deploy, load test | golden test end-to-end; `v1.0` tag | ⏳ |
 

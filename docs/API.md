@@ -12,16 +12,20 @@ status codes with a `{"detail": "..."}` body.
 |----------|----------|---------|
 | `POST /api/v1/upload` | uploader key | uploader key |
 | `POST /api/v1/upload/raw` | uploader key | uploader key |
-| `GET /f/{id}` | open | signed link (or admin) |
+| `GET /f/{id}` | open | signed link, or admin key |
 | `GET /f/{id}/info` | open | open (metadata only) |
-| `DELETE /f/{id}` | uploader key (owner) | uploader key (owner) |
-| `POST /api/v1/f/{id}/link` | uploader key | uploader key |
-| `GET /api/v1/objects` | admin key | admin key |
-| `POST /api/v1/auth/toggle` | admin key | admin key |
+| `POST /f/{id}/link?ttl=` | owner or admin key | owner or admin key |
+| `DELETE /f/{id}` | owner or admin key | owner or admin key |
+| `GET /api/v1/admin/objects` | admin key | admin key |
+| `POST /api/v1/admin/auth/toggle` | admin key | admin key |
+| `POST /api/v1/admin/auth/rotate-secret` | admin key | admin key |
 | `GET /api/v1/admin/status` | admin key | admin key |
 | `GET /healthz` | open | open |
 
-Keys are sent as `Authorization: Bearer <key>`.
+Keys are sent as `Authorization: Bearer ***`.
+`uploader key` = `ANBAR_API_KEY`; `admin key` = `ANBAR_ADMIN_KEY` (strictly
+higher privilege). When auth is ON, anonymous calls get `401`; the admin
+endpoints additionally reject the plain uploader key with `403`.
 
 ## Endpoints
 
@@ -95,30 +99,53 @@ Metadata without the body (open when useful, see matrix).
 
 ### `DELETE /f/{id}`  *(F4)*
 
-Removes remote blob(s) + the metadata row. `204` on success, `404` if absent.
+Removes the remote blob(s) (best-effort `deleteMessage`) + the metadata row.
+Owner or admin key. `200` with `{"deleted": true, "id": "…",
+"blobs_removed": 1}`, `404` if absent.
 
-### `POST /api/v1/f/{id}/link`  *(F4)*
+```bash
+curl -X DELETE https://h/f/k3xQ9aB2mN0p -H "Authorization: Bearer ***"
+```
 
-Mint a signed download link. Body: `{"ttl_seconds": 3600}` (omit for a
-permanent link). Returns `{"url": "https://h/f/<id>?e=…&s=…"}`.
+### `POST /f/{id}/link?ttl=3600`  *(F4)*
 
-### `GET /api/v1/objects`  *(F4)*
+Mint a signed download link (owner or admin). `ttl` is a query parameter in
+seconds (clamped to 60…604800, default 3600). Signature is
+`HMAC-SHA256(secret, "<id>:<exp>")`; the secret is the rotated value from
+`kv` or `ANBAR_HMAC_SECRET` as fallback.
 
-List metadata, newest first. Query: `?limit=50&offset=0`.
+```json
+{"url": "https://h/f/k3xQ9aB2mN0p?sig=59c2…&exp=1787300281",
+ "expires_at": 1787300281, "ttl_seconds": 3600}
+```
 
-### `POST /api/v1/auth/toggle`  *(F4)*
+### `GET /api/v1/admin/objects?limit=50&offset=0`  *(F4)*
 
-Body: `{"enabled": false}` (or `{}` to flip). Persists in `kv`. Returns the new
-state. Admin key only.
+Admin only. Metadata listing, newest first, with `chunks` count; the
+`uploader_key` and `manifest` are never exposed.
 
-## Rate limits (F4)
+### `POST /api/v1/admin/auth/toggle`  *(F4)*
 
-| Scope | Default | Reset |
-|-------|---------|-------|
-| Download per (IP, id) | 10 req/min | 60 s |
-| Upload per API key | 5/min | 60 s |
+Admin only. No body — flips the runtime auth switch (persisted in `kv`),
+no restart needed. Returns the new state:
 
-Exceeding → `429` with `Retry-After`. Counters live in SQLite (no Redis).
+```json
+{"auth_enabled": false}
+```
+
+`anbarctl auth on|off` is a convenience wrapper that reads current state and
+only toggles when needed (idempotent).
+
+### `POST /api/v1/admin/auth/rotate-secret`  *(F4)*
+
+Admin only. Generates a fresh HMAC signing secret; every previously minted
+signed link becomes invalid immediately. Returns the new secret so it can be
+recorded in your secret store. `anbarctl rotate-secret` wraps this.
+
+## Rate limits *(F6)*
+
+Not implemented in F4 — planned for the hardening phase (per-IP download and
+per-key upload counters in SQLite, `429` + `Retry-After`).
 
 ## Error model
 
@@ -126,10 +153,10 @@ Exceeding → `429` with `Retry-After`. Counters live in SQLite (no Redis).
 |------|---------|
 | 400 | malformed request (missing name, bad range) |
 | 401 | missing/unknown credential |
-| 403 | valid credential, not permitted (wrong role, tampered signature) |
+| 403 | valid credential, not permitted (wrong role, invalid signature) |
 | 404 | unknown object id |
 | 410 | signed link expired |
 | 413 | over configured upload ceiling |
-| 429 | rate limited (see `Retry-After`) |
+| 429 | rate limited (see `Retry-After`) — F6 |
 | 502 | upstream (Telegram) failure |
 | 503 | service degraded / backend unhealthy |

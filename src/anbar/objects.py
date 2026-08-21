@@ -26,6 +26,7 @@ class Chunk:
     index: int
     size: int
     file_id: str = ""  # filled by the storage layer
+    message_id: int | None = None  # bot backend: channel message holding the blob
 
 
 @dataclass
@@ -38,7 +39,10 @@ class Manifest:
     def to_json(self) -> str:
         import json
 
-        chunks = [{"i": c.index, "s": c.size, "f": c.file_id} for c in self.chunks]
+        chunks = [
+            {"i": c.index, "s": c.size, "f": c.file_id, "m": c.message_id}
+            for c in self.chunks
+        ]
         return json.dumps({"chunks": chunks, "size": self.total_size}, separators=(",", ":"))
 
     @classmethod
@@ -47,7 +51,11 @@ class Manifest:
 
         d = json.loads(raw)
         return cls(
-            chunks=[Chunk(index=c["i"], size=c["s"], file_id=c["f"]) for c in d["chunks"]],
+            chunks=[
+                Chunk(index=c["i"], size=c["s"], file_id=c["f"],
+                      message_id=c.get("m"))
+                for c in d["chunks"]
+            ],
             total_size=d["size"],
         )
 

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from . import __version__
 from .config import get_settings
 from .db import Database
 from .storage import StorageBackend
@@ -26,12 +27,12 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         if not injected:
             await app.state.backend.close()
 
-    app = FastAPI(title="anbar", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="anbar", version=__version__, lifespan=lifespan)
     app.state.settings = settings
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():
-        return {"status": "ok", "service": "anbar", "version": "0.3.0"}
+        return {"status": "ok", "service": "anbar", "version": __version__}
 
     from .api import admin, download, upload  # noqa: PLC0415
 

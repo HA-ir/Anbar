@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
+from ..auth import require_uploader
 from ..objects import Chunk, Manifest, chunk_stream, new_object_id
 from ..storage import ObjectRef, TelegramError
 
@@ -64,7 +65,8 @@ async def _store_stream(request: Request, stream, filename: str) -> tuple[Manife
     async def on_chunk(data: bytes) -> str:
         ref = await backend.store(data, f"{filename}.part")
         manifest.chunks.append(
-            Chunk(index=len(manifest.chunks), size=len(data), file_id=ref.file_id)
+            Chunk(index=len(manifest.chunks), size=len(data), file_id=ref.file_id,
+                  message_id=ref.message_id)
         )
         return ref.file_id
 
@@ -72,15 +74,17 @@ async def _store_stream(request: Request, stream, filename: str) -> tuple[Manife
         _, sha_hex = await chunk_stream(stream, settings.chunk_size, on_chunk)
     except TelegramError as e:
         for c in manifest.chunks:  # best-effort rollback of posted blobs
-            await backend.delete(ObjectRef(file_id=c.file_id, backend=backend.name))
+            await backend.delete(
+                ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=backend.name)
+            )
         raise HTTPException(502, f"telegram: {e.message}") from e
     return manifest, sha_hex
 
 
 @router.post("/upload")
-async def upload_multipart(request: Request, file: Annotated[UploadFile, File(...)],
-):
+async def upload_multipart(request: Request, file: Annotated[UploadFile, File(...)]):
     """Multipart upload (field `file`). Streams to the backend in chunks."""
+    require_uploader(request)
     settings = request.app.state.settings
     filename = file.filename or "upload.bin"
     content_type = file.content_type or "application/octet-stream"
@@ -97,6 +101,7 @@ async def upload_raw(request: Request):
     Filename via `X-File-Name` header (optional). Body is consumed as it
     arrives — never buffered whole.
     """
+    require_uploader(request)
     settings = request.app.state.settings
     filename = request.headers.get("x-file-name", "upload.bin")
     content_type = request.headers.get("content-type", "application/octet-stream")

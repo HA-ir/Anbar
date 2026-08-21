@@ -26,6 +26,11 @@ def _isolate_env(monkeypatch, tmp_path):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("ANBAR_DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.setenv("ANBAR_DATA_DIR", str(tmp_path))
+    # auth is ON by design — give tests stable, known keys
+    monkeypatch.setenv("ANBAR_API_KEY", "test-key")
+    monkeypatch.setenv("ANBAR_ADMIN_KEY", "test-admin-key")
+    monkeypatch.setenv("ANBAR_HMAC_SECRET", "test-hmac-secret")
+    monkeypatch.setenv("ANBAR_BASE_URL", "http://testserver")
     from anbar.config import get_settings
 
     get_settings.cache_clear()

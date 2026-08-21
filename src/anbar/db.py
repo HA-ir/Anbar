@@ -1,6 +1,7 @@
 """SQLite metadata store (WAL mode). Metadata only — files never live here."""
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 from pathlib import Path
@@ -69,11 +70,21 @@ class Database:
 
     def list_objects(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         rows = self._conn.execute(
-            "SELECT id, filename, size, backend, created_at, downloaded FROM objects "
-            "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            "SELECT id, filename, size, backend, created_at, downloaded, manifest "
+            "FROM objects ORDER BY created_at DESC LIMIT ? OFFSET ?",
             (limit, offset),
         ).fetchall()
-        return [dict(r) for r in rows]
+        out = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["chunks"] = len(json.loads(d["manifest"])["chunks"]) if d.get("manifest") else 0
+            except (json.JSONDecodeError, KeyError, TypeError):
+                d["chunks"] = 0
+            d.pop("manifest", None)
+            d.pop("uploader_key", None)  # credential — never listed
+            out.append(d)
+        return out
 
     def delete_object(self, obj_id: str) -> bool:
         cur = self._conn.execute("DELETE FROM objects WHERE id = ?", (obj_id,))
