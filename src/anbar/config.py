@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
 
+    @property
+    def chunk_size(self) -> int:
+        """Effective chunk size in bytes (capped by the 20 MB bot ceiling)."""
+        size = self.chunk_size_mb * 1024 * 1024
+        return min(size, 19 * 1024 * 1024)
+
 
 @lru_cache
 def get_settings() -> Settings:

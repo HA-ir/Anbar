@@ -18,17 +18,20 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         db = Database(settings.db_path)
         app.state.db = db
+        injected = backend is not None
         app.state.backend = backend or _default_backend(settings)
         app.state.settings = settings
         yield
         db.close()
+        if not injected:
+            await app.state.backend.close()
 
-    app = FastAPI(title="anbar", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="anbar", version="0.2.0", lifespan=lifespan)
     app.state.settings = settings
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():
-        return {"status": "ok", "service": "anbar", "version": "0.1.0"}
+        return {"status": "ok", "service": "anbar", "version": "0.2.0"}
 
     from .api import admin, download, upload  # noqa: PLC0415
 
@@ -39,17 +42,20 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
 
 
 def _default_backend(settings) -> StorageBackend:
-    """F1: FakeBackend for dev/CI. F2 wires BotBackend; F5 adds MTProto selection."""
+    """Wire the configured backend. F2: bot; F5: mtproto selection."""
     if settings.backend.value == "fake":
         from .storage import FakeBackend
 
         return FakeBackend()
     if settings.backend.value == "bot":
-        raise RuntimeError(
-            "BotBackend lands in F2. Until then, run tests (FakeBackend) or set "
-            "ANBAR_BACKEND=fake."
-        )
-    raise RuntimeError(f"backend {settings.backend.value} not available yet")
+        if not settings.bot_token or not settings.channel_id:
+            raise RuntimeError(
+                "backend=bot requires ANBAR_BOT_TOKEN and ANBAR_CHANNEL_ID "
+                "(see docs/DEPLOY.md 'Creating the channel')."
+            )
+        from .storage import BotBackend
 
-
-app = None  # created on demand: uvicorn anbar.main:create_app --factory
+        return BotBackend(settings.bot_token.get_secret_value(), settings.channel_id)
+    if settings.backend.value == "mtproto":
+        raise RuntimeError("MTProto backend lands in F5.")
+    raise RuntimeError(f"unknown backend {settings.backend!r}")
