@@ -12,9 +12,10 @@ router = APIRouter()
 async def status(request: Request):
     s = request.app.state.settings
     db = request.app.state.db
+    backend = request.app.state.backend
     return {
         "status": "ok",
-        "backend": s.backend.value,
+        "backend": getattr(backend, "name", s.backend.value),
         "auth_enabled": s.auth_enabled,
         "objects": len(db.list_objects(limit=1000)),
         "time": int(time.time()),
