@@ -56,9 +56,9 @@ def test_upload_roundtrip_fake(backend, client):
         assert len(data) == c.size
 
 
-def test_download_not_implemented_yet(client):
-    r = client.get("/f/abc123")
-    assert r.status_code == 501
+def test_download_unknown_object(client):
+    r = client.get("/f/nonexistent123")
+    assert r.status_code == 404
 
 
 class TestConfig:

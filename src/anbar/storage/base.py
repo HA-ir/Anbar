@@ -58,20 +58,26 @@ class FakeBackend(StorageBackend):
 
     def __init__(self) -> None:
         self._store: dict[str, bytes] = {}
+        self.open_calls = 0
+        self.store_calls = 0
         self._next_msg = 1
 
     async def store(self, data: bytes, name: str) -> ObjectRef:
+        self.store_calls += 1
         ref = f"fake-{len(self._store)}"
         self._store[ref] = bytes(data)
+        msg = self._next_msg
+        self._next_msg += 1
         return ObjectRef(
             file_id=ref,
             backend=self.name,
             size=len(data),
             name=name,
-            message_id=self._next_msg,
+            message_id=msg,
         )
 
     async def open(self, ref: ObjectRef) -> bytes:
+        self.open_calls += 1
         return self._store[ref.file_id]
 
     async def delete(self, ref: ObjectRef) -> bool:
