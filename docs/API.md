@@ -20,6 +20,10 @@ status codes with a `{"detail": "..."}` body.
 | `POST /api/v1/admin/auth/toggle` | admin key | admin key |
 | `POST /api/v1/admin/auth/rotate-secret` | admin key | admin key |
 | `GET /api/v1/admin/status` | admin key | admin key |
+| `GET /api/v1/admin/settings` | admin key | admin key |
+| `POST /api/v1/admin/settings` | admin key | admin key |
+| `POST /api/v1/admin/settings/reset` | admin key | admin key |
+| `POST /api/v1/admin/cache/purge` | admin key | admin key |
 | `GET /healthz` | open | open |
 
 Keys are sent as `Authorization: Bearer ***`.
@@ -141,6 +145,61 @@ only toggles when needed (idempotent).
 Admin only. Generates a fresh HMAC signing secret; every previously minted
 signed link becomes invalid immediately. Returns the new secret so it can be
 recorded in your secret store. `anbarctl rotate-secret` wraps this.
+
+### `GET /api/v1/admin/settings`  *(F8)*
+
+Admin only. Returns every tunable setting at its effective value
+(env default, or the persisted override if one is set):
+
+```json
+{"settings": {"rate_upload": 20, "rate_download": 30, "cache_mb": 512}}
+```
+
+### `POST /api/v1/admin/settings`  *(F8)*
+
+Admin only. Body: JSON object of settings to change (subset allowed):
+
+```json
+{"rate_upload": 40, "rate_download": 60, "cache_mb": 1024}
+```
+
+Values are validated against each setting's range (`0` disables rate
+limiters). Takes effect **immediately**, persists across restarts, and no
+restart is needed. Returns the changed mapping plus the new effective
+settings:
+
+```json
+{"changed": {"rate_upload": 40, "rate_download": 60, "cache_mb": 1024},
+ "settings": {"rate_upload": 40, "rate_download": 60, "cache_mb": 1024}}
+```
+
+> **`cache_mb` + master switch** — a `cache_mb` change re-sizes the LRU
+> cache only if `ANBAR_CACHE_ENABLED=true` (env, master switch). When the
+> master switch is off the value is stored but inert: no cache directory is
+> created and no file ever hits disk. `422` unknown setting / out of range.
+
+### `POST /api/v1/admin/settings/reset`  *(F8)*
+
+Admin only. Body: `{"keys": ["rate_upload", "cache_mb"]}` — drops the
+persisted override for each listed key, reverting to the env default.
+Omit `keys` (or send `{}`) to reset everything. Returns a per-key flag
+(`true` = an override existed and was removed) plus the new effective
+settings:
+
+```json
+{"reset": {"rate_upload": true, "cache_mb": false},
+ "settings": {"rate_upload": 20, "rate_download": 30, "cache_mb": 512}}
+```
+
+### `POST /api/v1/admin/cache/purge`  *(F8)*
+
+Admin only. Evicts every cached object from the LRU scratch space (no
+metadata change, no data loss). Returns the number of entries removed
+(`0` when the cache is disabled):
+
+```json
+{"purged": 3}
+```
 
 ## Rate limits
 

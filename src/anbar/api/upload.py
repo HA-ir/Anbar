@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
+from .. import runtime
 from ..auth import require_uploader
 from ..objects import Chunk, Manifest, chunk_stream, new_object_id
 from ..ratelimit import limit_upload
@@ -23,6 +24,17 @@ def _uploader_key(request: Request) -> str | None:
     if auth.lower().startswith("bearer "):
         return auth[7:]
     return None
+
+
+def _rate_upload(request: Request) -> int:
+    s = request.app.state.settings
+    return runtime.get_int(request.app.state.db, "rate_upload", s.rate_upload_per_min)
+
+
+def _max_upload_bytes(request: Request) -> int:
+    s = request.app.state.settings
+    mb = runtime.get_int(request.app.state.db, "max_upload_mb", s.max_upload_mb)
+    return mb * 1024 * 1024
 
 
 async def _commit(request: Request, manifest: Manifest, sha_hex: str, filename: str,
@@ -92,12 +104,10 @@ async def _store_stream(request: Request, stream, filename: str) -> tuple[Manife
 async def upload_multipart(request: Request, file: Annotated[UploadFile, File(...)]):
     """Multipart upload (field `file`). Streams to the backend in chunks."""
     require_uploader(request)
-    settings = request.app.state.settings
-    db = request.app.state.db
-    limit_upload(db, request, settings.rate_upload_per_min)
+    limit_upload(request.app.state.db, request, _rate_upload(request))
     filename = file.filename or "upload.bin"
     content_type = file.content_type or "application/octet-stream"
-    if (await _peek_size(file)) > settings.max_upload_bytes():
+    if (await _peek_size(file)) > _max_upload_bytes(request):
         raise HTTPException(413, "object exceeds configured ceiling")
     manifest, sha_hex = await _store_stream(request, _UploadFileReader(file), filename)
     return await _commit(request, manifest, sha_hex, filename, content_type)
@@ -111,14 +121,12 @@ async def upload_raw(request: Request):
     arrives — never buffered whole.
     """
     require_uploader(request)
-    settings = request.app.state.settings
-    db = request.app.state.db
-    limit_upload(db, request, settings.rate_upload_per_min)
+    limit_upload(request.app.state.db, request, _rate_upload(request))
     filename = request.headers.get("x-file-name", "upload.bin")
     content_type = request.headers.get("content-type", "application/octet-stream")
 
     declared = int(request.headers.get("content-length", "0") or 0)
-    if declared and declared > settings.max_upload_bytes():
+    if declared and declared > _max_upload_bytes(request):
         raise HTTPException(413, "object exceeds configured ceiling")
 
     manifest, sha_hex = await _store_stream(request, _RequestBodyReader(request), filename)

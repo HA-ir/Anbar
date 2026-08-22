@@ -1,11 +1,16 @@
-"""Admin endpoints (F4): status, auth toggle, secret rotation, object listing."""
+"""Admin endpoints (F4): status, auth toggle, secret rotation, object listing.
+
+F8 adds runtime settings (rate limits, size ceiling, session TTL, cache
+budget) and a cache purge.
+"""
 from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from .. import runtime
 from ..auth import (
     KV_AUTH,
     KV_HMAC_SECRET,
@@ -13,8 +18,20 @@ from ..auth import (
     new_secret,
     require_admin,
 )
+from ..cache import DiskLRU
 
 router = APIRouter()
+
+
+def _env_defaults(s) -> dict[str, int]:
+    return {
+        "rate_download": s.rate_download_per_min,
+        "rate_upload": s.rate_upload_per_min,
+        "rate_login": s.rate_login_per_min,
+        "max_upload_mb": s.max_upload_mb,
+        "web_session_ttl": s.web_session_ttl,
+        "cache_mb": s.cache_max_mb,
+    }
 
 
 @router.get("/admin/status")
@@ -23,6 +40,7 @@ async def status(request: Request):
     db = request.app.state.db
     backend = request.app.state.backend
     cache = getattr(request.app.state, "cache", None)
+    cache_mb = runtime.get_int(db, "cache_mb", s.cache_max_mb)
     return {
         "status": "ok",
         "backend": getattr(backend, "name", s.backend.value),
@@ -32,11 +50,106 @@ async def status(request: Request):
             {"enabled": False} if cache is None
             else {"enabled": True, "entries": cache.count(),
                   "bytes": cache.size(),
-                  "max_bytes": s.cache_max_mb * 1024 * 1024}
+                  "max_bytes": cache_mb * 1024 * 1024}
         ),
-        "max_upload_bytes": s.max_upload_bytes(),
+        # master switch from .env — UI shows "disabled" when false
+        "cache_master": s.cache_enabled,
+        "max_upload_bytes": runtime.get_int(db, "max_upload_mb", s.max_upload_mb)
+        * 1024 * 1024,
+        "settings": runtime.effective(db, _env_defaults(s)),
         "time": int(time.time()),
     }
+
+
+@router.get("/admin/settings")
+async def settings_get(request: Request):
+    """Effective settings + env defaults + override flags. Admin key required."""
+    require_admin(request)
+    db = request.app.state.db
+    s = request.app.state.settings
+    return {"settings": runtime.effective(db, _env_defaults(s))}
+
+
+@router.post("/admin/settings")
+async def settings_update(request: Request):
+    """Update any subset of the runtime settings. Admin key required.
+
+    Body: ``{"rate_download": 50, "cache_mb": 0, ...}`` — unknown keys or
+    out-of-range values → 422.
+    """
+    require_admin(request)
+    db = request.app.state.db
+    s = request.app.state.settings
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "expected JSON object") from None
+    if not isinstance(body, dict) or not body:
+        raise HTTPException(400, "expected non-empty JSON object")
+    changed = {}
+    for name, value in body.items():
+        if name not in runtime.SPEC:
+            raise HTTPException(422, f"unknown setting: {name}")
+        try:
+            changed[name] = runtime.set_int(db, name, value)
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from None
+    if "cache_mb" in changed:
+        _sync_cache(request.app, db)
+    return {"changed": changed,
+            "settings": runtime.effective(db, _env_defaults(s))}
+
+
+def _sync_cache(app, db) -> None:
+    """(Re)build or tear down the LRU cache instance.
+
+    ``ANBAR_CACHE_ENABLED`` is the master switch: when it is off, the disk
+    cache must stay off regardless of any ``cache_mb`` override, preserving
+    the zero-retention default.
+    """
+    s = app.state.settings
+    cache_mb = runtime.get_int(db, "cache_mb", s.cache_max_mb)
+    old = getattr(app.state, "cache", None)
+    if old is not None:
+        old.close()
+    app.state.cache = (
+        DiskLRU(s.cache_dir, cache_mb * 1024 * 1024)
+        if s.cache_enabled and cache_mb else None
+    )
+
+
+@router.post("/admin/settings/reset")
+async def settings_reset(request: Request):
+    """Drop overrides (back to .env defaults). Body: {"keys": [...]} or all."""
+    require_admin(request)
+    db = request.app.state.db
+    s = request.app.state.settings
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    keys = body.get("keys") if isinstance(body, dict) else None
+    names = [k for k in (keys or list(runtime.SPEC))]
+    unknown = [k for k in names if k not in runtime.SPEC]
+    if unknown:
+        raise HTTPException(422, f"unknown setting: {', '.join(unknown)}")
+    reset = {k: runtime.reset(db, k) for k in names}
+    if "cache_mb" in names:
+        _sync_cache(request.app, db)
+    return {"reset": reset,
+            "settings": runtime.effective(db, _env_defaults(s))}
+
+
+@router.post("/admin/cache/purge")
+async def cache_purge(request: Request):
+    """Evict all cached objects (scratch space only — nothing is lost)."""
+    require_admin(request)
+    db = request.app.state.db
+    app = request.app
+    old = getattr(app.state, "cache", None)
+    purged = old.count() if old is not None else 0
+    _sync_cache(app, db)  # rebuild empty, or tear down if disabled
+    return {"purged": purged}
 
 
 @router.post("/admin/auth/toggle")

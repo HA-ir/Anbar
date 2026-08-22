@@ -25,7 +25,7 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         app.state.settings = settings
         if hasattr(app.state.backend, "connect"):
             await app.state.backend.connect()
-        app.state.cache = _build_cache(settings)
+        app.state.cache = _build_cache(settings, db)
 
         async def _prune_rate_loop() -> None:
             """Drop finished rate windows so the table doesn't grow forever."""
@@ -92,10 +92,21 @@ def _default_backend(settings) -> StorageBackend:
     raise RuntimeError(f"unknown backend {settings.backend!r}")
 
 
-def _build_cache(settings):
-    """LRU object cache if enabled (F6); None otherwise (zero overhead)."""
+def _build_cache(settings, db=None):
+    """LRU object cache if enabled (F6); None otherwise (zero overhead).
+
+    Honours the persisted ``cache_mb`` runtime override when ``db`` is
+    given, but never the master switch: with ``ANBAR_CACHE_ENABLED=false``
+    the cache stays off no matter what.
+    """
     if not settings.cache_enabled:
+        return None
+    budget_mb = settings.cache_max_mb
+    if db is not None:
+        from . import runtime
+        budget_mb = runtime.get_int(db, "cache_mb", settings.cache_max_mb)
+    if budget_mb <= 0:
         return None
     from .cache import DiskLRU
 
-    return DiskLRU(settings.cache_dir, settings.cache_max_mb * 1024 * 1024)
+    return DiskLRU(settings.cache_dir, budget_mb * 1024 * 1024)

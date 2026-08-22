@@ -14,7 +14,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from .. import __version__
+from .. import __version__, runtime
 from ..auth import constant_time_equal, whoami
 from ..ratelimit import limit_login
 from ..webauth import COOKIE, issue_session
@@ -44,7 +44,7 @@ async def login(request: Request):
     is a personal owner tool: full list + delete + share)."""
     settings = request.app.state.settings
     db = request.app.state.db
-    limit_login(db, request, settings.rate_login_per_min)
+    limit_login(db, request, runtime.get_int(db, "rate_login", settings.rate_login_per_min))
     try:
         body = await request.json()
     except Exception:
@@ -53,7 +53,7 @@ async def login(request: Request):
     admin_key = settings.admin_key.get_secret_value() if settings.admin_key else None
     if not admin_key or not key or not constant_time_equal(key, admin_key):
         raise HTTPException(401, "invalid key")
-    ttl = settings.web_session_ttl
+    ttl = runtime.get_int(db, "session_ttl", settings.web_session_ttl)
     resp = JSONResponse({"ok": True, "role": "admin"})
     _set_session(resp, request, issue_session(db, ttl, "admin"), ttl)
     return resp

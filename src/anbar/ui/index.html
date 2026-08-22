@@ -3,235 +3,796 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>انبار — anbar</title>
+<title>anbar — object storage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0f1420;--card:#161d2b;--line:#26314a;--txt:#e7ecf5;--mut:#8b97ad;--acc:#5b8cff;--ok:#3ecf8e;--bad:#ff6b6b}
-  *{box-sizing:border-box}
-  body{margin:0;font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Tahoma,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
-  header{display:flex;align-items:center;gap:10px;padding:16px 22px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
-  header h1{font-size:20px;margin:0}
-  header .sub{color:var(--mut);font-size:13px}
-  header .left{margin-inline-start:auto;display:flex;gap:8px;align-items:center}
-  main{max-width:1000px;margin:0 auto;padding:22px 16px 60px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px}
-  .drop{border:2px dashed var(--line);border-radius:12px;padding:30px 20px;text-align:center;color:var(--mut);cursor:pointer;transition:.15s}
-  .drop.on{border-color:var(--acc);color:var(--txt);background:#1a2438}
-  .drop b{color:var(--acc)}
-  input[type=file]{display:none}
-  button{background:var(--acc);border:0;color:#fff;padding:9px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600;font-family:inherit}
-  button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
-  button.danger{background:#b03a48}
-  button.sm{padding:5px 11px;font-size:12.5px;border-radius:7px}
-  button:disabled{opacity:.5;cursor:not-allowed}
-  a.btn{display:inline-block;background:var(--acc);color:#fff;padding:5px 11px;border-radius:7px;font-size:12.5px;text-decoration:none;font-weight:600}
-  table{width:100%;border-collapse:collapse}
-  th,td{text-align:right;padding:10px 8px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle}
-  th{color:var(--mut);font-weight:600;font-size:12.5px;white-space:nowrap}
-  tr:last-child td{border-bottom:0}
-  .name{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .mut{color:var(--mut);font-size:12.5px}
-  .empty{text-align:center;color:var(--mut);padding:38px 0}
-  #loginCard{max-width:380px;margin:10vh auto 0}
-  #loginCard .logo{text-align:center;font-size:40px;margin-bottom:6px}
-  #loginCard label{display:block;font-size:13px;color:var(--mut);margin-bottom:7px}
-  input[type=password],input[type=text]{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:#0c111b;color:var(--txt);font-size:15px;font-family:inherit}
-  input:focus{outline:0;border-color:var(--acc)}
-  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:10px}
-  .bar i{display:block;height:100%;width:0;background:var(--acc);transition:.2s}
-  .msg{font-size:13.5px;margin-top:9px;min-height:20px}
-  .tag{font-size:11.5px;color:var(--mut);border:1px solid var(--line);padding:1px 8px;border-radius:20px;white-space:nowrap}
-  .hidden{display:none}
-  .stat{display:flex;gap:18px;flex-wrap:wrap}
-  .stat div{font-size:13px;color:var(--mut)}
-  .stat b{display:block;font-size:19px;color:var(--txt)}
-  .actions{white-space:nowrap}
-  .actions button,.actions a{margin-inline-start:4px}
-  .toast{position:fixed;bottom:22px;inset-inline-start:50%;transform:translateX(50%);background:#1f2a40;border:1px solid var(--line);color:var(--txt);padding:11px 20px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:9}
-  .toast.show{opacity:1}
-  @media (max-width:640px){th:nth-child(4),td:nth-child(4){display:none}.name{max-width:150px}}
+/* ============ design tokens ============ */
+:root{
+  --bg:#f5f7fa; --bg2:#ffffff; --bg3:#eef1f5; --hover:#e9edf3;
+  --tx:#1a2230; --tx2:#5a6578; --tx3:#8b95a8;
+  --line:#e3e8ef; --line2:#d3dae4;
+  --brand:#2f6bff; --brand2:#1d4ed8; --brand-soft:rgba(47,107,255,.10);
+  --ok:#16a34a; --ok-soft:rgba(22,163,74,.10);
+  --warn:#d97706; --err:#dc2626; --err-soft:rgba(220,38,38,.08);
+  --shadow:0 1px 3px rgba(16,24,40,.07),0 8px 24px rgba(16,24,40,.06);
+  --shadow-lg:0 4px 12px rgba(16,24,40,.10),0 20px 48px rgba(16,24,40,.14);
+  --r:12px; --r-sm:9px;
+  --font:'Inter','Vazirmatn',Tahoma,system-ui,sans-serif;
+}
+html[data-theme="dark"]{
+  --bg:#0d1117; --bg2:#161b26; --bg3:#1c2333; --hover:#212a3d;
+  --tx:#e8edf5; --tx2:#98a4b8; --tx3:#64708a;
+  --line:#232c3f; --line2:#2d3a52;
+  --brand:#4d82ff; --brand2:#3b6ef5; --brand-soft:rgba(77,130,255,.14);
+  --ok:#34d399; --ok-soft:rgba(52,211,153,.12);
+  --warn:#fbbf24; --err:#f87171; --err-soft:rgba(248,113,113,.10);
+  --shadow:0 1px 3px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+  --shadow-lg:0 4px 12px rgba(0,0,0,.5),0 20px 48px rgba(0,0,0,.55);
+}
+/* ============ base ============ */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);min-height:100vh;
+  transition:background .25s,color .25s;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:inherit}
+::selection{background:var(--brand-soft)}
+/* scrollbars */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px;border:2px solid var(--bg)}
+/* ============ login ============ */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(1200px 600px at 70% -10%,var(--brand-soft),transparent 60%),var(--bg)}
+.login-card{width:100%;max-width:400px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:20px;box-shadow:var(--shadow-lg);padding:38px 34px;animation:rise .4s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+.logo{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:6px}
+.logo-mark{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--brand),var(--brand2));box-shadow:0 4px 14px var(--brand-soft)}
+.logo-mark svg{width:24px;height:24px;fill:#fff}
+.login-title{font-size:21px;font-weight:700;letter-spacing:-.02em}
+.login-sub{color:var(--tx2);font-size:13.5px;text-align:center;margin:8px 0 26px}
+.field{position:relative;margin-bottom:16px}
+.field input{width:100%;padding:13px 44px 13px 15px;border:1.5px solid var(--line2);border-radius:var(--r-sm);
+  background:var(--bg3);color:var(--tx);font-size:14.5px;transition:border-color .15s,box-shadow .15s;outline:none}
+html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
+.field input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);background:var(--bg2)}
+.field .eye{position:absolute;top:50%;transform:translateY(-50%);inset-inline-end:10px;width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;border-radius:8px;color:var(--tx3);transition:.15s}
+.field .eye:hover{background:var(--hover);color:var(--tx)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:14px;
+  padding:11px 20px;border-radius:var(--r-sm);transition:.15s;user-select:none}
+.btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;width:100%;
+  box-shadow:0 2px 8px var(--brand-soft)}
+.btn-primary:hover{filter:brightness(1.07);transform:translateY(-1px)}
+.btn-primary:active{transform:none}
+.btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.login-err{color:var(--err);font-size:13px;text-align:center;min-height:18px;margin-top:12px;font-weight:500}
+.login-foot{margin-top:22px;text-align:center;color:var(--tx3);font-size:12px}
+/* ============ app shell ============ */
+.app{display:none;min-height:100vh}
+.app.on{display:block}
+.topbar{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg2) 82%,transparent);
+  backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1080px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+.topbar .logo{margin:0;gap:9px}
+.topbar .logo-mark{width:34px;height:34px;border-radius:10px}
+.topbar .logo-mark svg{width:18px;height:18px}
+.topbar .t{font-weight:700;font-size:16.5px;letter-spacing:-.02em}
+.topbar .v{font-size:11px;color:var(--tx3);font-weight:500}
+.topbar .sp{flex:1}
+.icon-btn{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  color:var(--tx2);border:1px solid transparent;transition:.15s;position:relative}
+.icon-btn:hover{background:var(--hover);color:var(--tx);border-color:var(--line)}
+.icon-btn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.seg{display:flex;background:var(--bg3);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.seg button{padding:5px 11px;border-radius:7px;font-size:12.5px;font-weight:600;color:var(--tx2);transition:.15s}
+.seg button.on{background:var(--bg2);color:var(--tx);box-shadow:var(--shadow)}
+/* ============ layout ============ */
+.wrap{max-width:1080px;margin:0 auto;padding:26px 20px 70px}
+/* dropzone */
+.drop{border:2px dashed var(--line2);border-radius:16px;background:var(--bg2);padding:34px 20px;text-align:center;
+  transition:.2s;cursor:pointer;margin-bottom:22px}
+.drop:hover{border-color:var(--brand);background:var(--brand-soft)}
+.drop.over{border-color:var(--brand);background:var(--brand-soft);transform:scale(1.004)}
+.drop .ic{width:52px;height:52px;margin:0 auto 12px;border-radius:14px;background:var(--brand-soft);
+  display:flex;align-items:center;justify-content:center}
+.drop .ic svg{width:26px;height:26px;fill:none;stroke:var(--brand);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.drop b{font-size:15px;font-weight:600}
+.drop small{display:block;color:var(--tx2);margin-top:5px;font-size:12.5px}
+.drop .lim{margin-top:10px;display:inline-block;font-size:11.5px;color:var(--tx3);background:var(--bg3);
+  border:1px solid var(--line);padding:3px 10px;border-radius:20px}
+/* queue */
+.queue{display:none;flex-direction:column;gap:10px;margin-bottom:22px}
+.qitem{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:13px 16px;box-shadow:var(--shadow);
+  animation:rise .3s ease}
+.qitem .row{display:flex;align-items:center;gap:12px}
+.qitem .nm{font-size:13.5px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+.qitem .sz{font-size:12px;color:var(--tx2);white-space:nowrap}
+.qbar{height:6px;background:var(--bg3);border-radius:6px;overflow:hidden;margin-top:10px}
+.qbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--brand2));
+  border-radius:6px;transition:width .25s ease}
+.qitem.done .qbar i{background:var(--ok)}
+.qitem.fail .qbar i{background:var(--err)}
+.qstat{font-size:11.5px;color:var(--tx2);margin-top:6px;display:flex;justify-content:space-between}
+.qstat .err{color:var(--err);font-weight:500}
+/* toolbar */
+.toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.toolbar h2{font-size:15.5px;font-weight:700;letter-spacing:-.01em;flex:1;display:flex;align-items:center;gap:9px}
+.count{font-size:11.5px;font-weight:600;color:var(--tx2);background:var(--bg3);border:1px solid var(--line);
+  padding:2px 9px;border-radius:20px}
+.btn-ghost{border:1px solid var(--line);background:var(--bg2);color:var(--tx2);font-size:13px;padding:8px 14px}
+.btn-ghost:hover{color:var(--tx);border-color:var(--line2);background:var(--hover)}
+/* table */
+.tbl-wrap{background:var(--bg2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);font-weight:600;
+  text-align:start;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--bg3)}
+td{padding:13px 16px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:var(--hover)}
+.fname{display:flex;align-items:center;gap:11px;min-width:0}
+.fic{width:34px;height:34px;flex:none;border-radius:9px;background:var(--brand-soft);display:flex;
+  align-items:center;justify-content:center}
+.fic svg{width:17px;height:17px;fill:none;stroke:var(--brand);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:13px;
+  font-family:ui-monospace,Menlo,Consolas,monospace}
+.empty{text-align:center;padding:60px 20px;color:var(--tx3)}
+.empty svg{width:44px;height:44px;fill:none;stroke:var(--line2);stroke-width:1.5;margin-bottom:12px}
+.empty p{font-size:14px}
+/* row actions */
+.acts{display:flex;gap:6px;justify-content:flex-end}
+.act{width:33px;height:33px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  color:var(--tx2);border:1px solid transparent;transition:.14s}
+.act:hover{background:var(--bg2);border-color:var(--line);color:var(--brand);box-shadow:var(--shadow)}
+.act.del:hover{color:var(--err)}
+.act svg{width:16.5px;height:16.5px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.tag{font-size:10.5px;font-weight:700;padding:2.5px 8px;border-radius:6px;letter-spacing:.03em}
+.tag.bot{background:var(--brand-soft);color:var(--brand)}
+.tag.mtproto{background:var(--ok-soft);color:var(--ok)}
+.num{font-variant-numeric:tabular-nums;color:var(--tx2);font-size:12.5px}
+/* ============ settings drawer ============ */
+.scrim{position:fixed;inset:0;background:rgba(8,12,20,.45);opacity:0;pointer-events:none;transition:.25s;z-index:90}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(430px,100%);background:var(--bg2);
+  border-inline-start:1px solid var(--line);z-index:95;transform:translateX(var(--sx,100%));transition:transform .3s cubic-bezier(.3,.9,.3,1);
+  display:flex;flex-direction:column;box-shadow:var(--shadow-lg)}
+html[dir="rtl"] .drawer{--sx:-100%}
+.drawer.on{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:18px 22px;border-bottom:1px solid var(--line)}
+.drawer-head b{font-size:15.5px;font-weight:700;flex:1}
+.drawer-body{flex:1;overflow-y:auto;padding:20px 22px 40px}
+.sec{margin-bottom:26px}
+.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3);font-weight:700;margin-bottom:13px}
+.set-row{display:flex;align-items:center;gap:12px;padding:10px 0}
+.set-row .lab{flex:1;font-size:13.5px;font-weight:500}
+.set-row .lab small{display:block;color:var(--tx3);font-size:11.5px;margin-top:2px;font-weight:400}
+.set-row input[type=number]{width:92px;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;
+  background:var(--bg3);color:var(--tx);font-size:13.5px;text-align:center;outline:none;font-variant-numeric:tabular-nums}
+.set-row input[type=number]:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.set-row .unit{font-size:11.5px;color:var(--tx3);width:44px}
+/* switch */
+.sw{width:42px;height:24px;flex:none;border-radius:20px;background:var(--line2);position:relative;transition:.2s;cursor:pointer}
+.sw.on{background:var(--ok)}
+.sw i{position:absolute;top:3px;inset-inline-start:3px;width:18px;height:18px;border-radius:50%;background:#fff;
+  transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.sw.on i{transform:translateX(18px)}
+html[dir="rtl"] .sw.on i{transform:translateX(-18px)}
+.drawer-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:10px}
+.btn-warn{background:var(--err-soft);color:var(--err);font-size:13px;padding:9px 14px}
+.btn-warn:hover{background:var(--err);color:#fff}
+/* toast */
+#toasts{position:fixed;bottom:22px;inset-inline-start:50%;transform:translateX(-50%);z-index:200;
+  display:flex;flex-direction:column;gap:9px;align-items:center}
+html[dir="rtl"] #toasts{transform:translateX(50%)}
+.toast{background:var(--bg2);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-lg);
+  padding:11px 18px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:9px;
+  animation:toastin .3s cubic-bezier(.2,.9,.3,1.2);max-width:90vw}
+.toast.ok{border-color:var(--ok)}
+.toast.err{border-color:var(--err)}
+.toast i{width:8px;height:8px;border-radius:50%;flex:none}
+.toast.ok i{background:var(--ok)}
+.toast.err i{background:var(--err)}
+@keyframes toastin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+/* link modal */
+.modal{position:fixed;inset:0;z-index:150;display:none;align-items:center;justify-content:center;
+  background:rgba(8,12,20,.5);padding:20px}
+.modal.on{display:flex}
+.modal-card{background:var(--bg2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);
+  width:100%;max-width:460px;padding:26px;animation:rise .3s ease}
+.modal-card h3{font-size:15.5px;font-weight:700;margin-bottom:6px}
+.modal-card p{font-size:12.5px;color:var(--tx2);margin-bottom:16px}
+.linkbox{display:flex;gap:8px}
+.linkbox code{flex:1;background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+  font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,Menlo,Consolas,monospace;
+  direction:ltr;text-align:left;user-select:all}
+.spin{width:15px;height:15px;border:2px solid var(--line2);border-top-color:var(--brand);border-radius:50%;
+  animation:sp .7s linear infinite;display:inline-block;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(max-width:640px){
+  .hide-sm{display:none}
+  th,td{padding:10px 10px}
+}
 </style>
 </head>
 <body>
-<header>
-  <h1>📦 انبار</h1>
-  <span class="tag" id="vtag">v__VERSION__</span>
-  <span class="sub" id="sub"></span>
-  <div class="left">
-    <button class="ghost sm hidden" id="logoutBtn" onclick="logout()">خروج</button>
-  </div>
-</header>
-<main>
-  <!-- LOGIN -->
-  <div class="card hidden" id="loginCard">
-    <div class="logo">📦</div>
-    <h2 style="margin:0 0 2px;text-align:center">ورود به انبار</h2>
-    <p class="mut" style="text-align:center;margin:0 0 16px">کلید admin را وارد کن</p>
-    <form id="loginForm">
-      <label for="pw">Key</label>
-      <input type="password" id="pw" autocomplete="off" required>
-      <div style="margin-top:14px"><button type="submit" id="loginBtn" style="width:100%">ورود</button></div>
-      <div class="msg" id="loginMsg"></div>
-    </form>
-  </div>
 
-  <!-- APP -->
-  <div id="app" class="hidden">
-    <div class="card stat" id="statCard"></div>
+<!-- ================= LOGIN ================= -->
+<div class="login-wrap" id="loginWrap">
+  <form class="login-card" id="loginForm">
+    <div class="logo">
+      <div class="logo-mark"><svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" opacity=".35"/><path d="M4 7l8 4 8-4M12 11v10" stroke="#fff" stroke-width="1.6" fill="none"/></svg></div>
+      <div class="login-title" data-i18n="title">anbar</div>
+    </div>
+    <div class="login-sub" data-i18n="loginSub">ورود به انبار — Object Storage تلگرامی</div>
+    <div class="field">
+      <input type="password" id="keyInput" data-i18n-ph="keyPh" placeholder="کلید ادمین" autocomplete="current-password">
+      <button type="button" class="eye" id="eyeBtn" aria-label="show">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+    <button class="btn btn-primary" id="loginBtn" type="submit" data-i18n="login">ورود</button>
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-foot">anbar v__VERSION__ · Telegram-backed storage</div>
+  </form>
+</div>
 
-    <div class="card">
-      <div class="drop" id="drop">
-        <div>فایل را اینجا رها کن یا <b>انتخاب کن</b></div>
-        <div class="mut" id="maxNote"></div>
-        <input type="file" id="file" multiple>
+<!-- ================= APP ================= -->
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="topbar-in">
+      <div class="logo">
+        <div class="logo-mark"><svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" opacity=".35"/><path d="M4 7l8 4 8-4M12 11v10" stroke="#fff" stroke-width="1.6" fill="none"/></svg></div>
+        <div>
+          <div class="t">anbar</div>
+        </div>
       </div>
-      <div class="bar hidden" id="uBar"><i></i></div>
-      <div class="msg" id="uMsg"></div>
+      <span class="v">v__VERSION__</span>
+      <div class="sp"></div>
+      <div class="seg" role="tablist" aria-label="language">
+        <button id="langFa" class="on">فا</button>
+        <button id="langEn">EN</button>
+      </div>
+      <button class="icon-btn" id="themeBtn" title="theme" aria-label="theme">
+        <svg id="themeIco" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+      <button class="icon-btn" id="setBtn" title="settings" aria-label="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h0a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h0a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v0a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
+      </button>
+      <button class="icon-btn" id="outBtn" title="logout" aria-label="logout">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- dropzone -->
+    <div class="drop" id="drop">
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg></div>
+      <b data-i18n="dropT">فایلها را اینجا رها کن یا کلیک کن</b>
+      <small data-i18n="dropS">چند فایلی · بدون ذخیره روی دیسک سرور — مستقیم در تلگرام</small>
+      <span class="lim" id="limTag"></span>
+      <input type="file" id="fileInput" multiple hidden>
     </div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between;margin-bottom:4px">
-        <b>فایل‌ها</b>
-        <button class="ghost sm" onclick="loadList()">↻ تازه‌سازی</button>
+    <!-- upload queue -->
+    <div class="queue" id="queue"></div>
+
+    <!-- files -->
+    <div class="toolbar">
+      <h2><span data-i18n="files">فایل‌ها</span><span class="count" id="cnt">0</span></h2>
+      <button class="btn btn-ghost" id="refBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"/></svg>
+        <span data-i18n="refresh">به‌روزرسانی</span>
+      </button>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th data-i18n="thName">نام فایل</th>
+          <th data-i18n="thSize">حجم</th>
+          <th data-i18n="thDate">تاریخ</th>
+          <th data-i18n="thDl">دانلود</th>
+          <th style="text-align:end" data-i18n="thAct">عملیات</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></svg>
+        <p data-i18n="empty">هنوز فایلی آپلود نکرده‌ای</p>
       </div>
-      <div id="list" style="overflow-x:auto"><div class="empty">در حال بارگذاری…</div></div>
     </div>
   </div>
-</main>
-<div class="toast" id="toast"></div>
+</div>
+
+<!-- ================= SETTINGS DRAWER ================= -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <b data-i18n="setT">تنظیمات ادمین</b>
+    <button class="icon-btn" id="setClose" aria-label="close">
+      <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <div class="sec">
+      <h3 data-i18n="secAuth">احراز هویت</h3>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="authLab">احراز هویت API</span><small data-i18n="authSub">با غیرفعال‌سازی، دانلود بدون کلید آزاد است</small></div>
+        <div class="sw" id="swAuth" role="switch"><i></i></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h3 data-i18n="secRate">محدودیت سرعت (در دقیقه)</h3>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="rDl">دانلود</span><small data-i18n="rDlS">به ازای هر IP + فایل · ۰ = بدون محدودیت</small></div>
+        <input type="number" min="0" id="s_rate_download" style="direction:ltr">
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="rUp">آپلود</span><small data-i18n="rUpS">به ازای هر کلید API</small></div>
+        <input type="number" min="0" id="s_rate_upload" style="direction:ltr">
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="rLn">ورود (UI)</span><small data-i18n="rLnS">به ازای هر IP — در برابر brute-force</small></div>
+        <input type="number" min="0" id="s_rate_login" style="direction:ltr">
+      </div>
+    </div>
+    <div class="sec">
+      <h3 data-i18n="secLimits">سقف‌ها</h3>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="maxUp">حداکثر سایز فایل</span><small data-i18n="maxUpS">در حال حاضر backend بوت: حداکثر ۲۰MB واقعی</small></div>
+        <input type="number" min="1" id="s_max_upload_mb" style="direction:ltr"><span class="unit">MB</span>
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="sessTtl">عمر نشست UI</span><small data-i18n="sessTtlS">cookie ورود چند ساعت باقی می‌ماند</small></div>
+        <input type="number" min="1" id="s_session_ttl_h" style="direction:ltr"><span class="unit">h</span>
+      </div>
+    </div>
+    <div class="sec">
+      <h3 data-i18n="secCache">کش دانلود</h3>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="cacheLab">حداکثر حجم کش</span><small data-i18n="cacheSub">روی volume data · LRU · ۰ = خالی شود</small></div>
+        <input type="number" min="0" id="s_cache_mb" style="direction:ltr"><span class="unit">MB</span>
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="cacheNow">حالا</span><small id="cacheNow" class="num">—</small></div>
+        <button class="btn btn-warn" id="purgeBtn" data-i18n="purge">پاک‌کردن کش</button>
+      </div>
+      <div class="set-row" id="cacheOff" hidden>
+        <div class="lab"><small data-i18n="cacheMasterOff" style="color:var(--warn)">غیرفعال — برای فعال‌سازی ANBAR_CACHE_ENABLED=true در .env و ری‌استارت لازم است</small></div>
+      </div>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn btn-primary" style="width:auto" id="saveBtn" data-i18n="save">ذخیره</button>
+  </div>
+</aside>
+
+<!-- link modal -->
+<div class="modal" id="linkModal">
+  <div class="modal-card">
+    <h3 data-i18n="linkT">لینک اشتراک‌گذاری</h3>
+    <p data-i18n="linkS">این لینک بدون نیاز به ورود کار می‌کند و بعد از ۲۴ ساعت منقضی می‌شود.</p>
+    <div class="linkbox">
+      <code id="linkUrl"></code>
+      <button class="btn btn-primary" style="width:auto" id="copyBtn" data-i18n="copy">کپی</button>
+    </div>
+    <div style="margin-top:14px;text-align:end">
+      <button class="btn btn-ghost" id="linkClose" data-i18n="close">بستن</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
 
 <script>
+/* ================= i18n ================= */
+const I18N={
+ fa:{
+  title:"anbar", loginSub:"ورود به انبار — Object Storage تلگرامی",
+  keyPh:"کلید ادمین (ANBAR_ADMIN_KEY)", login:"ورود", badKey:"کلید نادرست است",
+  dropT:"فایل‌ها را اینجا رها کن یا کلیک کن", dropS:"چند فایلی · بدون ذخیره روی دیسک سرور — مستقیم در تلگرام",
+  files:"فایل‌ها", refresh:"به‌روزرسانی",
+  thName:"نام فایل", thSize:"حجم", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
+  empty:"هنوز فایلی آپلود نکرده‌ای",
+  setT:"تنظیمات ادمین", secAuth:"احراز هویت", secRate:"محدودیت سرعت (در دقیقه)",
+  secLimits:"سقف‌ها", secCache:"کش دانلود",
+  authLab:"احراز هویت API", authSub:"با غیرفعال‌سازی، دانلود بدون کلید آزاد است",
+  rDl:"دانلود", rDlS:"به ازای هر IP + فایل · ۰ = بدون محدودیت",
+  rUp:"آپلود", rUpS:"به ازای هر کلید API",
+  rLn:"ورود (UI)", rLnS:"به ازای هر IP — در برابر brute-force",
+  maxUp:"حداکثر سایز فایل", maxUpS:"در حال حاضر backend بوت: حداکثر ۲۰MB واقعی",
+  sessTtl:"عمر نشست UI", sessTtlS:"cookie ورود چند ساعت باقی می‌ماند",
+  cacheLab:"حداکثر حجم کش", cacheSub:"روی volume data · LRU · ۰ = خالی شود",
+  cacheNow:"حالا", purge:"پاک‌کردن کش", save:"ذخیره",
+  cacheMasterOff:"غیرفعال — برای فعال‌سازی ANBAR_CACHE_ENABLED=true در .env و ری‌استارت لازم است",
+  linkT:"لینک اشتراک‌گذاری", linkS:"این لینک بدون نیاز به ورود کار می‌کند و بعد از ۲۴ ساعت منقضی می‌شود.",
+  copy:"کپی", copied:"کپی شد", close:"بستن",
+  tUp:"آپلود…", tDone:"آپلود شد", tFail:"خطا",
+  saved:"تنظیمات ذخیره شد", purgeOk:"کش پاک شد", purgeFail:"پاک‌شدن کش خطا داشت",
+  delQ:"این فایل برای همیشه حذف شود؟", delOk:"حذف شد", delFail:"حذف خطا داشت",
+  dlStart:"دانلود شروع شد", sizeOver:"بزرگ‌تر از سقف مجاز است", uploading:"در صف…",
+  logoutOk:"خارج شد", youUp:"آپلود به تلگرام در حال انجام است…",
+  loading:"در حال بارگیری…", limit:"سقف: ",
+  now:"اکنون", minAgo:"دقیقه پیش", hrAgo:"ساعت پیش", dayAgo:"روز پیش"
+ },
+ en:{
+  title:"anbar", loginSub:"Sign in to anbar — Telegram-backed object storage",
+  keyPh:"Admin key (ANBAR_ADMIN_KEY)", login:"Sign in", badKey:"Invalid key",
+  dropT:"Drop files here or click to browse", dropS:"Multiple files · never stored on server disk — straight to Telegram",
+  files:"Files", refresh:"Refresh",
+  thName:"File name", thSize:"Size", thDate:"Date", thDl:"Downloads", thAct:"Actions",
+  empty:"No files yet",
+  setT:"Admin settings", secAuth:"Authentication", secRate:"Rate limits (per minute)",
+  secLimits:"Limits", secCache:"Download cache",
+  authLab:"API authentication", authSub:"When off, downloads are open without a key",
+  rDl:"Downloads", rDlS:"per IP + file · 0 = unlimited",
+  rUp:"Uploads", rUpS:"per API key",
+  rLn:"Logins (UI)", rLnS:"per IP — brute-force protection",
+  maxUp:"Max file size", maxUpS:"Bot backend currently: ~20 MB real cap",
+  sessTtl:"UI session lifetime", sessTtlS:"how long the login cookie lasts",
+  cacheLab:"Cache size limit", cacheSub:"on data volume · LRU · 0 to flush",
+  cacheNow:"Now", purge:"Purge cache", save:"Save",
+  cacheMasterOff:"Disabled — set ANBAR_CACHE_ENABLED=true in .env and restart to enable",
+  linkT:"Share link", linkS:"Works without login; expires in 24 hours.",
+  copy:"Copy", copied:"Copied", close:"Close",
+  tUp:"Uploading…", tDone:"Uploaded", tFail:"Error",
+  saved:"Settings saved", purgeOk:"Cache purged", purgeFail:"Purge failed",
+  delQ:"Delete this file permanently?", delOk:"Deleted", delFail:"Delete failed",
+  dlStart:"Download started", sizeOver:"exceeds the size limit", uploading:"Queued…",
+  logoutOk:"Signed out", youUp:"Uploading to Telegram…",
+  loading:"Loading…", limit:"Limit: ",
+  now:"now", minAgo:"m ago", hrAgo:"h ago", dayAgo:"d ago"
+ }
+};
+let lang=localStorage.getItem("anbar-lang")||(navigator.language.startsWith("fa")?"fa":"fa");
+let theme=localStorage.getItem("anbar-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");
+
 const $=s=>document.querySelector(s);
-let VERSION='__VERSION__';
-let authed=false, role=null, maxBytes=0;
+const t=k=>(I18N[lang]&&I18N[lang][k])||I18N.en[k]||k;
 
-function human(n){n=+n||0;const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return n.toFixed(n<10&&i>0?1:0)+' '+u[i]}
-function fmtDate(ts){return new Date(ts*1000).toLocaleString('fa-IR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}
-function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2600)}
-
-async function jfetch(u,opt){
-  const r=await fetch(u,Object.assign({credentials:'same-origin'},opt||{}));
-  let j=null; try{j=await r.json()}catch(e){}
-  if(!r.ok){const e=new Error((j&&j.detail)||r.status);e.status=r.status;e.body=j;throw e}
-  return j;
+function applyI18n(){
+  document.documentElement.lang=lang;
+  document.documentElement.dir=lang==="fa"?"rtl":"ltr";
+  document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));
+  document.querySelectorAll("[data-i18n-ph]").forEach(el=>el.placeholder=t(el.dataset.i18nPh));
+  $("#langFa").classList.toggle("on",lang==="fa");
+  $("#langEn").classList.toggle("on",lang==="en");
+  updateLimTag(); renderRows(); renderThemeIcon();
 }
+function setLang(l){lang=l;localStorage.setItem("anbar-lang",l);applyI18n();}
+$("#langFa").onclick=()=>setLang("fa");
+$("#langEn").onclick=()=>setLang("en");
 
-function show(which){
-  $('#loginCard').classList.toggle('hidden',which!=='login');
-  $('#app').classList.toggle('hidden',which!=='app');
-  $('#logoutBtn').classList.toggle('hidden',which!=='login');
-  $('#sub').textContent=which==='app'?'storage: telegram · local: none':'';
+function setTheme(th){
+  theme=th;localStorage.setItem("anbar-theme",th);
+  document.documentElement.dataset.theme=th;
+  renderThemeIcon();
 }
-
-async function login(key){
-  $('#loginMsg').textContent='';$('#loginBtn').disabled=true;
-  try{
-    await jfetch('/ui/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
-    role='admin';authed=true;
-    show('app');await loadList();
-  }catch(e){$('#loginMsg').textContent=e.status===429?'تلاش‌های زیادی بود، یک دقیقه صبر کن':'کلید اشتباه است'}
-  finally{$('#loginBtn').disabled=false}
+function renderThemeIcon(){
+  $("#themeIco").innerHTML=theme==="dark"
+   ?'<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/>'
+   :'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
 }
+$("#themeBtn").onclick=()=>setTheme(theme==="dark"?"light":"dark");
 
-async function logout(){
-  try{await fetch('/ui/logout',{method:'POST',credentials:'same-origin'})}catch(e){}
-  authed=false;show('login');$('#pw').value='';
+/* ================= toasts ================= */
+function toast(msg,kind="ok"){
+  const d=document.createElement("div");
+  d.className="toast "+kind;d.innerHTML="<i></i><span>"+esc(msg)+"</span>";
+  $("#toasts").appendChild(d);
+  setTimeout(()=>{d.style.opacity="0";d.style.transition=".3s";setTimeout(()=>d.remove(),320)},2800);
 }
+function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML;}
 
-async function loadStatus(){
-  try{
-    const st=await jfetch('/api/v1/admin/status');
-    maxBytes=st.max_upload_bytes||0;
-    $('#maxNote').textContent=maxBytes?('حداکثر آپلود: '+human(maxBytes)):'';
-    const el=$('#statCard');
-    el.innerHTML='<div><b>'+st.objects+'</b>فایل</div>'
-      +'<div><b>'+esc(st.backend)+'</b>backend</div>'
-      +'<div><b>'+(st.auth_enabled?'ON':'OFF')+'</b>auth</div>'
-      +'<div><b>'+(st.cache&&st.cache.enabled?human(st.cache.bytes):'OFF')+'</b>cache</div>';
-  }catch(e){/* authed=false → login screen */}
+/* ================= formatting ================= */
+function humanSize(b){
+  if(b==null)return"—";
+  const u=["B","KB","MB","GB"];let i=0;
+  while(b>=1024&&i<3){b/=1024;i++}
+  return(b>=100?b.toFixed(0):b.toFixed(1))+" "+u[i];
 }
-
-async function loadList(){
-  const box=$('#list');
-  let rows;
-  try{
-    const j=await jfetch('/api/v1/admin/objects?limit=500');
-    rows=j.objects||[];
-  }catch(e){box.innerHTML='<div class="empty">خطا در دریافت لیست</div>';return}
-  if(!rows.length){box.innerHTML='<div class="empty">هنوز فایلی نیست — اولین فایل را بالا آپلود کن.</div>';return}
-  let h='<table><tr><th>Filename</th><th>Size</th><th>Backend</th><th>Uploaded</th><th>DL</th><th>Actions</th></tr>';
-  for(const o of rows){
-    h+='<tr><td class="name" title="'+esc(o.filename)+'">'+esc(o.filename)+'</td>'
-      +'<td>'+human(o.size)+'</td>'
-      +'<td><span class="tag">'+esc(o.backend)+'</span></td>'
-      +'<td class="mut">'+fmtDate(o.created_at)+'</td>'
-      +'<td class="mut">'+(o.downloaded||0)+'</td>'
-      +'<td class="actions">'
-      +'<a class="btn" href="/f/'+o.id+'" title="دانلود">⬇ دانلود</a>'
-      +'<button class="sm" onclick="shareLink(\''+o.id+'\')">🔗 لینک</button> '
-      +'<button class="sm ghost" onclick="rm(\''+o.id+'\',\''+esc(o.filename)+'\')">🗑</button>'
-      +'</td></tr>';
+function humanDate(ts){
+  if(!ts)return"—";
+  const d=new Date(ts*1000);
+  if(lang==="fa"){
+    const f=new Intl.DateTimeFormat("fa-IR",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"});
+    return f.format(d);
   }
-  box.innerHTML=h+'</table>';
+  const f=new Intl.DateTimeFormat("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
+  return f.format(d);
 }
 
-async function shareLink(id){
+/* ================= api ================= */
+async function api(path,opt={}){
+  const r=await fetch(path,{credentials:"same-origin",
+    headers:opt.body&&!(opt.body instanceof FormData)?{"Content-Type":"application/json"}:{},
+    ...opt});
+  if(!r.ok){
+    let msg=r.status;
+    try{msg=(await r.json()).detail||msg}catch(e){}
+    throw new Error(typeof msg==="string"?msg:JSON.stringify(msg));
+  }
+  return r.status===204?null:r.json();
+}
+
+/* ================= session ================= */
+let authed=false,maxUploadBytes=20*1024*1024;
+async function boot(){
+  applyI18n();setTheme(theme);
   try{
-    const j=await jfetch('/f/'+id+'/link?ttl=86400',{method:'POST'});
-    await navigator.clipboard.writeText(j.url);
-    toast('لینک ۲۴ ساعته کپی شد ✓');
-  }catch(e){toast('خطا در ساخت لینک: '+e.message)}
+    const me=await api("/ui/me");
+    if(me.authed){authed=true;showApp();}
+  }catch(e){authed=false;}
 }
-
-async function rm(id,fname){
-  if(!confirm('فایل «'+fname+'» برای همیشه حذف شود؟'))return;
+function showLogin(){$("#loginWrap").style.display="flex";$("#app").classList.remove("on");}
+function showApp(){
+  $("#loginWrap").style.display="none";$("#app").classList.add("on");
+  refresh();
+}
+$("#loginForm").onsubmit=async ev=>{
+  ev.preventDefault();
+  const btn=$("#loginBtn");btn.disabled=true;
   try{
-    await jfetch('/f/'+id,{method:'DELETE'});
-    toast('حذف شد');loadList();loadStatus();
-  }catch(e){toast('خطا: '+e.message)}
-}
+    const r=await fetch("/ui/login",{method:"POST",credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({key:$("#keyInput").value.trim()})});
+    if(!r.ok)throw 0;
+    authed=true;$("#keyInput").value="";$("#loginErr").textContent="";showApp();
+  }catch(e){$("#loginErr").textContent=t("badKey");}
+  finally{btn.disabled=false;}
+};
+$("#eyeBtn").onclick=()=>{
+  const i=$("#keyInput");i.type=i.type==="password"?"text":"password";
+};
+$("#outBtn").onclick=async()=>{
+  try{await api("/ui/logout",{method:"POST"})}catch(e){}
+  authed=false;showLogin();toast(t("logoutOk"));
+};
 
-function upload(files){
-  const bar=$('#uBar'),fill=bar.querySelector('i'),msg=$('#uMsg');
-  let done=0;bar.classList.remove('hidden');msg.innerHTML='';
-  files.forEach(f=>{
-    const fd=new FormData();fd.append('file',f);
+/* ================= files ================= */
+let files=[];
+function updateLimTag(){
+  $("#limTag").textContent=t("limit")+humanSize(maxUploadBytes);
+}
+async function refresh(){
+  try{
+    const st=await api("/api/v1/admin/status");
+    maxUploadBytes=st.max_upload_bytes||maxUploadBytes;
+    updateLimTag();
+    cacheInfo(st);
+  }catch(e){}
+  try{
+    const r=await api("/api/v1/admin/objects");
+    files=r.objects||[];
+  }catch(e){files=[];}
+  renderRows();
+}
+function cacheInfo(st){
+  const c=st.cache||{};
+  const el=$("#cacheNow");
+  if(!st.cache_master){
+    el.textContent="";
+    el.className="";
+    $("#s_cache_mb").disabled=true;
+    $("#purgeBtn").disabled=true;
+    const w=$("#cacheOff");
+    if(w)w.hidden=false;
+    return;
+  }
+  const w=$("#cacheOff");
+  if(w)w.hidden=true;
+  $("#s_cache_mb").disabled=false;
+  $("#purgeBtn").disabled=false;
+  el.textContent=c.enabled
+   ?humanSize(c.bytes)+" / "+humanSize(c.max_bytes)+" · "+(c.entries||0)+" obj"
+   :"—";
+}
+function renderRows(){
+  const tb=$("#rows");
+  $("#cnt").textContent=files.length;
+  $("#empty").style.display=files.length?"none":"block";
+  tb.innerHTML="";
+  files.forEach(o=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=
+      '<td><div class="fname"><span class="fic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>'
+      +'<span class="fn" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</span></div></td>'
+      +'<td class="num">'+humanSize(o.size)+'</td>'
+      +'<td class="num hide-sm">'+humanDate(o.created_at)+'</td>'
+      +'<td class="num hide-sm">'+(o.downloaded??0)+'</td>'
+      +'<td><div class="acts">'
+      +'<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
+      +'<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></button>'
+      +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>'
+      +'</div></td>';
+    tr.querySelector('[data-a=dl]').onclick=()=>{
+      toast(t("dlStart"));
+      const a=document.createElement("a");
+      a.href="/f/"+o.id;document.body.appendChild(a);a.click();a.remove();
+    };
+    tr.querySelector('[data-a=ln]').onclick=()=>shareLink(o);
+    tr.querySelector('[data-a=del]').onclick=()=>delObj(o);
+    tb.appendChild(tr);
+  });
+}
+async function shareLink(o){
+  try{
+    const r=await api("/f/"+o.id+"/link?ttl=86400",{method:"POST"});
+    $("#linkUrl").textContent=r.url;
+    $("#linkModal").classList.add("on");
+  }catch(e){toast(e.message,"err");}
+}
+$("#copyBtn").onclick=async()=>{
+  try{await navigator.clipboard.writeText($("#linkUrl").textContent);toast(t("copied"));}
+  catch(e){$("#linkUrl").select?null:0;toast("copy failed","err");}
+};
+$("#linkClose").onclick=()=>$("#linkModal").classList.remove("on");
+$("#linkModal").onclick=e=>{if(e.target.id==="linkModal")$("#linkModal").classList.remove("on");};
+async function delObj(o){
+  if(!confirm(t("delQ")))return;
+  try{
+    await api("/f/"+o.id,{method:"DELETE"});
+    toast(t("delOk"));refresh();
+  }catch(e){toast(t("delFail")+": "+e.message,"err");}
+}
+$("#refBtn").onclick=()=>{refresh();};
+
+/* ================= upload ================= */
+const drop=$("#drop"),fileInput=$("#fileInput");
+let queue=[],uploading=false;
+drop.onclick=()=>fileInput.click();
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over")}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over")}));
+drop.addEventListener("drop",e=>{
+  const fs=[...(e.dataTransfer?.files||[])];
+  if(fs.length)enqueue(fs);
+});
+fileInput.onchange=()=>{enqueue([...fileInput.files]);fileInput.value="";};
+
+function enqueue(list){
+  for(const f of list){
+    if(f.size>maxUploadBytes){toast(f.name+" — "+t("sizeOver"),"err");continue;}
+    const id="q"+Math.random().toString(36).slice(2,8);
+    queue.push({id,file:f,prog:0,state:"wait"});
+  }
+  renderQueue();pump();
+}
+function renderQueue(){
+  const q=$("#queue");
+  q.style.display=queue.length?"flex":"none";
+  q.innerHTML="";
+  for(const it of queue){
+    const d=document.createElement("div");
+    d.className="qitem "+(it.state==="done"?"done":it.state==="fail"?"fail":"");
+    d.dataset.id=it.id;
+    d.innerHTML='<div class="row"><span class="nm">'+esc(it.file.name)+'</span>'
+      +'<span class="sz">'+humanSize(it.file.size)+'</span></div>'
+      +'<div class="qbar"><i style="width:'+it.prog+'%"></i></div>'
+      +'<div class="qstat"><span>'+(it.state==="fail"?'<span class="err">'+esc(it.err||"")+'</span>'
+        :it.state==="done"?t("tDone"):it.state==="up"?t("tUp"):t("uploading"))
+        +'</span><span>'+(it.state==="up"?Math.floor(it.prog)+"%":"")+'</span></div>';
+    q.appendChild(d);
+  }
+}
+async function pump(){
+  if(uploading)return;
+  const it=queue.find(q=>q.state==="wait");
+  if(!it)return;
+  uploading=true;it.state="up";renderQueue();
+  try{
+    await uploadOne(it);
+    it.state="done";it.prog=100;
+  }catch(e){
+    it.state="fail";it.err=e.message;
+  }
+  renderQueue();
+  uploading=false;
+  // auto-remove finished items after a bit
+  setTimeout(()=>{
+    const done=queue.filter(q=>q.state==="done");
+    if(done.length===queue.length)queue=[];
+    else queue=queue.filter(q=>q.state!=="done");
+    renderQueue();
+  },4000);
+  refresh();
+  const next=queue.find(q=>q.state==="wait");
+  if(next)pump();
+}
+function uploadOne(it){
+  return new Promise((res,rej)=>{
+    const fd=new FormData();fd.append("file",it.file,it.file.name);
     const xhr=new XMLHttpRequest();
-    const total=f.size;
-    xhr.open('POST','/api/v1/upload');
-    xhr.upload.onprogress=e=>{if(e.lengthComputable){
-      fill.style.width=(Math.min(100,(done+(e.loaded/total))/files.length*100)).toFixed(1)+'%'}};
-    xhr.onload=()=>{done++;fill.style.width=Math.min(100,done/files.length*100)+'%';
-      msg.innerHTML=xhr.status===200
-        ?'<span style="color:var(--ok)">✔ '+esc(f.name)+' آپلود شد</span>'
-        :'<span style="color:var(--bad)">✖ '+esc(f.name)+': '+xhr.status+'</span>';
-      if(done===files.length)setTimeout(()=>{bar.classList.add('hidden');loadList();loadStatus()},700)};
-    xhr.onerror=()=>{done++;msg.innerHTML='<span style="color:var(--bad)">✖ '+esc(f.name)+' (خطای شبکه)</span>';
-      if(done===files.length)bar.classList.add('hidden')};
+    xhr.open("POST","/api/v1/upload");
+    xhr.upload.onprogress=e=>{
+      if(e.lengthComputable){
+        it.prog=Math.round(e.loaded/e.total*100);
+        const el=document.querySelector('.qitem[data-id="'+it.id+'"]');
+        if(el){
+          el.querySelector(".qbar i").style.width=it.prog+"%";
+          el.querySelector(".qstat span:last-child").textContent=Math.floor(it.prog)+"%";
+        }
+      }
+    };
+    xhr.onload=()=>{
+      if(xhr.status>=200&&xhr.status<300)res(JSON.parse(xhr.responseText));
+      else{try{rej(new Error(JSON.parse(xhr.responseText).detail||xhr.status))}catch(e){rej(new Error("HTTP "+xhr.status))}}
+    };
+    xhr.onerror=()=>rej(new Error("network"));
     xhr.send(fd);
   });
 }
 
-const drop=$('#drop'),fileInput=$('#file');
-drop.onclick=()=>fileInput.click();
-fileInput.onchange=()=>{if(fileInput.files.length)upload([...fileInput.files]);fileInput.value=''};
-['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('on')}));
-['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('on')}));
-drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length)upload([...e.dataTransfer.files])});
-$('#loginForm').onsubmit=e=>{e.preventDefault();login($('#pw').value.trim())};
-
-async function boot(){
-  let me=null;
-  try{me=await jfetch('/ui/me')}catch(e){}
-  if(me&&me.authed){
-    authed=true;role=me.role;show('app');
-    loadList();loadStatus();
-  }else{
-    show('login');
-  }
+/* ================= settings drawer ================= */
+const drawer=$("#drawer"),scrim=$("#scrim");
+$("#setBtn").onclick=openDrawer;
+$("#setClose").onclick=closeDrawer;
+scrim.onclick=closeDrawer;
+function openDrawer(){
+  drawer.classList.add("on");scrim.classList.add("on");
+  loadSettings();
 }
-document.addEventListener('DOMContentLoaded',boot);
+function closeDrawer(){drawer.classList.remove("on");scrim.classList.remove("on");}
+let curSettings=null,authOn=null;
+async function loadSettings(){
+  try{
+    const st=await api("/api/v1/admin/status");
+    authOn=st.auth_enabled;
+    const sw=$("#swAuth");sw.classList.toggle("on",!!authOn);
+    cacheInfo(st);
+  }catch(e){}
+  try{
+    const r=await api("/api/v1/admin/settings");
+    curSettings=r.settings;
+    const s=r.settings;
+    const v=k=>(s[k]&&s[k].value)??"";
+    $("#s_rate_download").value=v("rate_download");
+    $("#s_rate_upload").value=v("rate_upload");
+    $("#s_rate_login").value=v("rate_login");
+    $("#s_max_upload_mb").value=v("max_upload_mb");
+    $("#s_session_ttl_h").value=Math.round(v("web_session_ttl")/3600);
+    $("#s_cache_mb").value=v("cache_mb");
+  }catch(e){toast(e.message,"err");}
+}
+$("#swAuth").onclick=async()=>{
+  const sw=$("#swAuth");sw.style.opacity=".5";
+  try{
+    const r=await api("/api/v1/admin/auth/toggle",{method:"POST"});
+    authOn=r.auth_enabled;
+    sw.classList.toggle("on",!!authOn);
+  }catch(e){toast(e.message,"err");}
+  finally{sw.style.opacity="";}
+};
+$("#saveBtn").onclick=async()=>{
+  const body={
+    rate_download:+$("#s_rate_download").value,
+    rate_upload:+$("#s_rate_upload").value,
+    rate_login:+$("#s_rate_login").value,
+    max_upload_mb:+$("#s_max_upload_mb").value,
+    web_session_ttl:Math.round(+$("#s_session_ttl_h").value*3600),
+    cache_mb:+$("#s_cache_mb").value
+  };
+  try{
+    const r=await api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify(body)});
+    curSettings=r.settings;
+    toast(t("saved"));
+    // session ttl change affects new logins only
+    refresh();
+  }catch(e){toast(e.message,"err");}
+};
+$("#purgeBtn").onclick=async()=>{
+  try{
+    await api("/api/v1/admin/cache/purge",{method:"POST"});
+    toast(t("purgeOk"));
+    setTimeout(refresh,500);
+  }catch(e){toast(t("purgeFail")+": "+e.message,"err");}
+};
+
+/* go */
+boot();
 </script>
 </body>
 </html>

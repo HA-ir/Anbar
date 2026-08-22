@@ -20,6 +20,7 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 | F5 | MTProto backend (up to 2 GB, user-selectable) | ✅ `v0.5.0` |
 | F6 | Hardening: rate limiting, LRU cache, load test, docs, production deploy | ✅ `v0.6.0` — deployed |
 | F7 | Web UI (RTL): login → signed session cookie; list / upload / download / delete / share | ✅ `v0.7.0` |
+| F8 | Bilingual UI (fa/en), dark/light theme, runtime settings panel, speed-test docs, cache master-switch fix | ✅ `v0.8.1` |
 
 ## Why
 
@@ -58,6 +59,74 @@ A minimal RTL (Persian) single page at the site root (`/`):
 - **Stateless sessions** — the cookie is `HMAC-SHA256(secret, exp:tag)`, so a
   tampered cookie fails the signature check and the login endpoint is
   rate-limited per IP. Logout clears the cookie server-side.
+
+## Runtime settings (F8)
+
+Operational settings can be changed **without a restart** — from the Web UI
+settings panel or the admin API — and are persisted in SQLite (`kv` table),
+so they survive container restarts.
+
+- **Settings panel** (`/` → تنظیمات) — bilingual (Persian / English) UI with a
+  dark/light theme toggle. Changing a value POSTs to the settings API; the
+  panel shows the effective value and can reset any key to its default.
+- **Admin API** — `GET /api/v1/admin/settings` (defaults, persisted
+  overrides, effective values), `POST /api/v1/admin/settings`
+  (`{"rate_upload": 20, ...}`), `POST /api/v1/admin/settings/reset`
+  (`{"keys": [...]}`) — all admin-key only.
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| `rate_upload` | 20 | uploads / min per API key; `0` = unlimited |
+| `rate_download` | 30 | downloads / min per (IP, object); `0` = unlimited |
+| `cache_mb` | (env) | LRU cache budget; only takes effect when the cache master switch is ON (below) |
+
+### Cache master switch (F8 fix)
+
+`ANBAR_CACHE_ENABLED` (env, `.env`) is the **master switch** for the on-disk
+LRU cache. When it is `false`, no cache is ever created — not at startup and
+not when `cache_mb` is changed at runtime. Runtime `cache_mb` changes only
+re-size the cache **if the master switch is on**; otherwise they are stored
+but inert, and the Web UI shows the cache section as disabled. This
+preserves the zero-retention guarantee: with the default configuration anbar
+writes **nothing** to disk except the SQLite metadata database.
+
+## Speed test (v0.8.1, bot backend)
+
+Measured **2026-08-22** on a production deployment
+(`anbar.example.com`, nginx + Cloudflare, `bot` backend, one Telegram account,
+16 MB chunk ceiling) with a Python client directly on `127.0.0.1:8317`.
+**Cache OFF** throughout (master switch default) — every number below is a
+real Telegram round-trip.
+
+| Size | Upload | Download 1st GET | Download 2nd GET |
+|------|--------|------------------|------------------|
+| 0.5 MB | 0.25 s — 2.0 MB/s | 0.40 s — 1.2 MB/s | 0.05 s — 10.4 MB/s |
+| 1.9 MB | 0.32 s — 5.9 MB/s | 0.75 s — 2.5 MB/s | 0.10 s — 18.3 MB/s |
+| 8 MB | 0.74 s — 10.8 MB/s | 2.11 s — 3.8 MB/s | 0.10 s — 82.2 MB/s |
+| 19 MB (2 chunks) | 1.27 s — 15.0 MB/s | 1.86 s — 10.2 MB/s | 0.20 s — 95.7 MB/s |
+| 45 MB (3 chunks) | 1.97 s — 22.9 MB/s | 5.63 s — 8.0 MB/s | 0.46 s — 98.9 MB/s |
+| 4 × 8 MB parallel | 2.19 s — 14.6 MB/s agg | — | — |
+
+Through the public HTTPS path (Cloudflare + TLS + nginx), signed share links:
+0.5 MB → 0.27 s (1.9 MB/s), 8 MB → 1.20 s (6.6 MB/s).
+
+**How to read this**
+
+- **Upload** tops out around **15–23 MB/s**: each ≤16 MB chunk is a separate
+  Telegram `upload` round-trip, so multi-chunk files add a fixed per-chunk
+  latency on top of the wire time.
+- **First download** is the cold Telegram CDN path: 1.2–10 MB/s depending on
+  size (small files pay the fixed round-trip; large files stream).
+- **Second download** looks fast, but with the cache OFF it is *not* anbar
+  caching — it is **Telegram's own CDN** serving the blob it just delivered
+  (same account, warm edge). The two numbers bound the real-world range:
+  cold ≈ 1–10 MB/s, warm-CDN up to ~100 MB/s on this link.
+- **Parallel uploads** (4 × 8 MB): 4/4 succeeded, 14.6 MB/s aggregate.
+  Telegram rate-limits per *account*, not per server, so a single bot account
+  caps sustained concurrency — bursty workloads above ~4 in flight can hit
+  `FloodWait` and anbar maps that to `502`. The `mtproto` backend (F5) does
+  not have this per-request API ceiling.
+- SHA-256 verified on every downloaded object (all `sha_ok=true`).
 
 ## Core concepts
 

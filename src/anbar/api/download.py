@@ -21,6 +21,7 @@ import time
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from .. import runtime
 from ..auth import (
     effective_auth_enabled,
     effective_hmac_secret,
@@ -95,7 +96,8 @@ async def download(request: Request, obj_id: str):
     db = request.app.state.db
     backend = request.app.state.backend
     # rate limit before auth: an anonymous hammerer gets 429, not endless 401s
-    limit_download(db, request, obj_id, settings.rate_download_per_min)
+    limit_download(db, request, obj_id,
+                   runtime.get_int(db, "rate_download", settings.rate_download_per_min))
     row = db.get_object(obj_id)
     if row is None:
         raise HTTPException(404, "object not found")
@@ -128,7 +130,7 @@ async def download(request: Request, obj_id: str):
         cache is not None
         and start is None  # full downloads only; ranges stay on the backend path
         and total > 0
-        and total <= settings.cache_max_mb * 1024 * 1024
+        and total <= runtime.get_int(db, "cache_mb", settings.cache_max_mb) * 1024 * 1024
     )
 
     if use_cache and (path := cache.get(obj_id)) is not None:
