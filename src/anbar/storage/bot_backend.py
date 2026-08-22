@@ -14,7 +14,14 @@ Two mechanisms keep large files (64+ chunks) working:
   and 1 GB only pays for the excess;
 - **unbounded FloodWait retry** inside a per-call budget
   (`flood_budget_s`, ~40 min): a stalled chunk waits out the 429 window
-  instead of giving up after a fixed 5 attempts.
+  instead of giving up after a fixed 5 attempts;
+- **wall-clock cap per send** (`send_timeout_s`, ~5 min, v0.8.4):
+  httpx's per-op timeout does NOT bound the whole upload — a
+  half-dead TCP connection to Telegram (peer trickling ACKs during a
+  heavy burst) keeps individual writes "timely" while the transfer is
+  frozen, and a stuck send would otherwise wedge the request forever
+  with no log trail. `asyncio.wait_for` hard-caps each sendDocument;
+  a hit is a transient 502, so the flood-retry loop retries the chunk.
 """
 from __future__ import annotations
 
@@ -59,6 +66,7 @@ class BotBackend(StorageBackend):
     # flood management knobs (v0.8.3)
     send_gap_s = 1.1  # inter-send pacing; keeps bursts inside the 429 window
     flood_budget_s = 2400.0  # max seconds one send() waits out 429s (~40 min)
+    send_timeout_s = 300.0  # wall-clock cap per sendDocument (v0.8.4)
 
     def __init__(
         self,
@@ -66,11 +74,15 @@ class BotBackend(StorageBackend):
         channel_id: str,
         send_gap_s: float | None = None,
         flood_budget_s: float | None = None,
+        send_timeout_s: float | None = None,
     ) -> None:
         self._channel = channel_id
         self.send_gap_s = send_gap_s if send_gap_s is not None else self.send_gap_s
         self.flood_budget_s = (
             flood_budget_s if flood_budget_s is not None else self.flood_budget_s
+        )
+        self.send_timeout_s = (
+            send_timeout_s if send_timeout_s is not None else self.send_timeout_s
         )
         self._http = httpx.AsyncClient(
             base_url=f"{API_BASE}/bot{bot_token}",
@@ -106,7 +118,21 @@ class BotBackend(StorageBackend):
 
     async def _call_multipart(self, method: str, fields: dict, files: dict) -> dict:
         try:
-            r = await self._http.post(f"/{method}", data=fields, files=files)
+            # Wall-clock cap on the WHOLE send: httpx's per-op timeout does not
+            # bound a slow-drip/half-dead connection (each tiny write is
+            # "timely" while the transfer is frozen), which wedged the 500 MB
+            # upload on its 29th chunk with no log trail. A hit here is a
+            # transient 502 → the flood-retry loop in store() re-sends it.
+            r = await asyncio.wait_for(
+                self._http.post(f"/{method}", data=fields, files=files),
+                timeout=self.send_timeout_s,
+            )
+        except TimeoutError:
+            raise TelegramError(
+                502,
+                f"telegram transport: no response within {self.send_timeout_s:.0f}s",
+                http_status=502,
+            ) from None
         except httpx.HTTPError as e:
             raise TelegramError(502, f"telegram transport: {e.__class__.__name__}",
                                 http_status=502) from e
@@ -146,6 +172,7 @@ class BotBackend(StorageBackend):
                     continue
                 raise
             fid = result["document"]["file_id"]
+            log.info("chunk sent ok: %s (%d bytes)", name, len(data))
             return ObjectRef(
                 file_id=fid,
                 backend=self.name,

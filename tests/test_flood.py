@@ -200,3 +200,38 @@ def test_flood_budget_counts_cumulative_waits(monkeypatch):
             await b.store(b"q" * 10, "e.bin")
 
     asyncio.run(main())
+
+
+def test_stuck_send_hits_wall_clock_cap(monkeypatch):
+    """A half-dead sendDocument (httpx per-op timeout never trips) must be
+    hard-capped by wait_for and surface as a transient 502 (v0.8.4).
+
+    This is the 500 MB wedge: chunk 29's POST never returned for 10+ min
+    while the connection sat ESTAB; wait_for turns the infinite wedge into
+    a retriable 502 the flood loop re-sends.
+    """
+    b = BotBackend("123:TEST", "-100999")
+    b.send_timeout_s = 0.2  # tiny cap so the test is fast
+
+    async def main():
+        started = True
+
+        async def frozen_post(*a, **k):  # never completes (stuck socket)
+            nonlocal started
+            assert started
+            await REAL_SLEEP(3600)
+
+        b._http.post = frozen_post
+        with pytest.raises(TelegramError) as ei:
+            await b._call_multipart(
+                "sendDocument",
+                fields={"chat_id": "-100999"},
+                files={"document": ("big.part", b"x" * 10, "application/octet-stream")},
+            )
+        assert ei.value.http_status == 502
+        assert "no response within" in ei.value.message
+        # a transient 502 must be classified as rate-limitable so store()
+        # retries the chunk instead of failing the whole upload
+        assert b._is_rate_limited(ei.value)
+
+    asyncio.run(main())

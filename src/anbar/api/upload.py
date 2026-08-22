@@ -5,6 +5,8 @@ ownership (used by DELETE in F4).
 """
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
@@ -17,6 +19,11 @@ from ..ratelimit import limit_upload
 from ..storage import FloodBudgetExceeded, ObjectRef, TelegramError
 
 router = APIRouter()
+log = logging.getLogger("anbar.upload")
+
+
+class BodyReadTimeout(Exception):
+    """Client stopped sending the body it declared (Content-Length)."""
 
 
 def _uploader_key(request: Request) -> str | None:
@@ -85,6 +92,18 @@ async def _store_stream(request: Request, stream, filename: str) -> tuple[Manife
 
     try:
         _, sha_hex = await chunk_stream(stream, settings.chunk_size, on_chunk)
+    except BodyReadTimeout as e:
+        for c in manifest.chunks:  # best-effort rollback of posted blobs
+            try:
+                await backend.delete(
+                    ObjectRef(file_id=c.file_id, message_id=c.message_id,
+                              backend=backend.name)
+                )
+            except Exception:  # noqa: BLE001
+                pass
+        log.warning("upload aborted: %s (%d chunks rolled back)",
+                    e, len(manifest.chunks))
+        raise HTTPException(408, f"client stalled: {e}") from e
     except Exception as e:
         for c in manifest.chunks:  # best-effort rollback of posted blobs
             try:
@@ -131,7 +150,11 @@ async def upload_raw(request: Request):
     if declared and declared > _max_upload_bytes(request):
         raise HTTPException(413, "object exceeds configured ceiling")
 
-    manifest, sha_hex = await _store_stream(request, _RequestBodyReader(request), filename)
+    manifest, sha_hex = await _store_stream(
+        request, _RequestBodyReader(
+            request, request.app.state.settings.body_idle_timeout_s
+        ), filename
+    )
     return await _commit(request, manifest, sha_hex, filename, content_type)
 
 
@@ -156,18 +179,31 @@ class _RequestBodyReader:
 
     Pulls from `request.stream()` only as much as the chunker asks — memory
     stays bounded by chunk size, not file size.
+
+    An **idle timeout** (`body_idle_timeout_s`, v0.8.4) bounds each read:
+    if the client stalls mid-body (crashed sender, broken pipe, or — as in
+    the 500 MB bench bug — a client that declared more Content-Length than
+    it actually sends), the request is aborted with 408 instead of hanging
+    forever with no log trail.
     """
 
-    def __init__(self, request: Request):
+    def __init__(self, request: Request, idle_timeout_s: float = 300.0):
         self._iter = request.stream().__aiter__()
         self._buf = b""
         self._eof = False
+        self._timeout = idle_timeout_s
 
     async def read(self, n: int) -> bytes:
         while len(self._buf) < n and not self._eof:
             try:
-                self._buf += await self._iter.__anext__()
+                self._buf += await asyncio.wait_for(
+                    self._iter.__anext__(), timeout=self._timeout
+                )
             except StopAsyncIteration:
                 self._eof = True
+            except TimeoutError as e:
+                raise BodyReadTimeout(
+                    f"client stalled mid-body: no bytes for {self._timeout:.0f}s"
+                ) from e
         out, self._buf = self._buf[:n], self._buf[n:]
         return out

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -12,9 +13,27 @@ from .db import Database
 from .storage import StorageBackend
 
 
+def _configure_logging(level_name: str) -> None:
+    """Basic stderr logging for anbar loggers.
+
+    Without this the `anbar.*` loggers fall back to the root logger's
+    last-resort WARNING handler and every INFO line (flood waits, chunk
+    sends, rollback notices) is silently dropped — which made the 500 MB
+    hang undiagnosable in production (v0.8.4).
+    """
+    import logging
+
+    logging.basicConfig(
+        level=getattr(logging, level_name.upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        stream=sys.stderr,
+    )
+
+
 def create_app(backend: StorageBackend | None = None) -> FastAPI:
     """App factory. `backend` injectable for tests (FakeBackend)."""
     settings = get_settings()
+    _configure_logging(settings.log_level)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -80,6 +99,7 @@ def _default_backend(settings) -> StorageBackend:
             settings.channel_id,
             send_gap_s=settings.flood_send_gap_s,
             flood_budget_s=settings.flood_budget_s,
+            send_timeout_s=settings.send_timeout_s,
         )
     if settings.backend.value == "mtproto":
         if not settings.api_id or not settings.api_hash:

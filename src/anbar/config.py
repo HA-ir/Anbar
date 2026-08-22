@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)
     base_url: str = "http://127.0.0.1:8000"  # used to build returned links
+    log_level: str = Field(default="INFO", pattern=r"^(DEBUG|INFO|WARNING|ERROR)$")
 
     # storage
     backend: Backend = Backend.BOT
@@ -46,6 +47,10 @@ class Settings(BaseSettings):
     # flood pacing (v0.8.3, bot backend)
     flood_send_gap_s: float = Field(default=1.1, ge=0)  # min gap between sends
     flood_budget_s: float = Field(default=2400, ge=10)  # max cumulative 429 waits
+    # wall-clock cap per sendDocument (v0.8.4) — see bot_backend module docstring
+    send_timeout_s: float = Field(default=300, ge=5)
+    # client body-stall cap (v0.8.4): abort upload if no bytes arrive this long
+    body_idle_timeout_s: float = Field(default=300, ge=5)
 
     # auth
     admin_key: SecretStr | None = None
