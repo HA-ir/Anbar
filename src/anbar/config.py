@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     send_timeout_s: float = Field(default=300, ge=5)
     # client body-stall cap (v0.8.4): abort upload if no bytes arrive this long
     body_idle_timeout_s: float = Field(default=300, ge=5)
+    # URL ingest (v0.8.5): per-request timeout for pulling from the origin
+    ingest_read_timeout_s: float = Field(default=600, ge=30)
 
     # auth
     admin_key: SecretStr | None = None

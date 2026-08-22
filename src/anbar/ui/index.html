@@ -33,7 +33,8 @@ html[data-theme="dark"]{
 /* ============ base ============ */
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--tx);min-height:100vh;
-  transition:background .25s,color .25s;-webkit-font-smoothing:antialiased}
+  transition:background .25s,color .25s,opacity .12s ease;-webkit-font-smoothing:antialiased}
+body.lang-fade{opacity:.55}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input{font-family:inherit}
 ::selection{background:var(--brand-soft)}
@@ -102,6 +103,18 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .drop small{display:block;color:var(--tx2);margin-top:5px;font-size:12.5px}
 .drop .lim{margin-top:10px;display:inline-block;font-size:11.5px;color:var(--tx3);background:var(--bg3);
   border:1px solid var(--line);padding:3px 10px;border-radius:20px}
+/* url ingest */
+.urlbox{background:var(--bg2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+  padding:16px 18px;margin-bottom:22px}
+.url-head{display:flex;align-items:center;gap:9px;margin-bottom:11px;font-size:13.5px;font-weight:600;color:var(--tx2)}
+.url-ic{width:30px;height:30px;border-radius:9px;background:var(--ok-soft);display:flex;align-items:center;justify-content:center;flex:none}
+.url-ic svg{width:15px;height:15px;fill:none;stroke:var(--ok);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.url-form{display:flex;gap:10px}
+.url-form input{flex:1;padding:11px 14px;border:1.5px solid var(--line2);border-radius:var(--r-sm);
+  background:var(--bg3);color:var(--tx);font-size:13.5px;outline:none;transition:border-color .15s,box-shadow .15s;
+  direction:ltr;text-align:left;min-width:0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+.url-form input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);background:var(--bg2)}
+.url-prog{margin-top:12px}
 /* queue */
 .queue{display:none;flex-direction:column;gap:10px;margin-bottom:22px}
 .qitem{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:13px 16px;box-shadow:var(--shadow);
@@ -215,6 +228,34 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
   .hide-sm{display:none}
   th,td{padding:10px 10px}
 }
+/* ============ responsive table → cards ============ */
+@media(max-width:720px){
+  .wrap{padding:18px 12px 70px}
+  .topbar-in{padding:10px 12px;gap:8px}
+  .topbar .v{display:none}
+  .drop{padding:24px 14px;margin-bottom:16px;border-radius:13px}
+  /* table collapses into stacked "cards": thead hidden, each td labelled
+     via its data-th attribute — no horizontal scroll, fully responsive */
+  .tbl-wrap{border-radius:13px;background:transparent;border:none;box-shadow:none}
+  table{display:block}
+  thead{display:none}
+  tbody{display:flex;flex-direction:column;gap:10px}
+  tr{display:block;background:var(--bg2);border:1px solid var(--line);border-radius:13px;
+    box-shadow:var(--shadow);padding:4px 6px}
+  tbody tr:hover{background:var(--bg2)}
+  td{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    border-bottom:1px dashed var(--line);padding:9px 8px;font-size:13px}
+  td:last-child{border-bottom:none}
+  td::before{content:attr(data-th);color:var(--tx3);font-size:11.5px;
+    text-transform:uppercase;letter-spacing:.05em;flex:none}
+  td .fname{flex:1;min-width:0}
+  td:first-child::before{display:none}  /* file row is self-describing */
+  td .acts{justify-content:flex-end}
+  .num{font-size:13px;color:var(--tx)}
+  .modal-card{padding:20px 16px}
+  .drawer{width:100%}
+  .btn-ghost{padding:8px 11px;font-size:12.5px}
+}
 </style>
 </head>
 <body>
@@ -275,6 +316,19 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
       <small data-i18n="dropS">چند فایلی · بدون ذخیره روی دیسک سرور — مستقیم در تلگرام</small>
       <span class="lim" id="limTag"></span>
       <input type="file" id="fileInput" multiple hidden>
+    </div>
+
+    <!-- url ingest -->
+    <div class="urlbox">
+      <div class="url-ic"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></div>
+      <form id="urlForm" class="url-form">
+        <input type="url" id="urlInput" data-i18n-ph="urlPh" placeholder="https://example.com/file.zip …" autocomplete="off" spellcheck="false">
+        <button class="btn btn-primary" id="urlBtn" type="submit" style="width:auto" data-i18n="urlBtn">دریافت</button>
+      </form>
+      <div class="url-prog" id="urlProg" style="display:none">
+        <div class="qbar"><i id="urlBar" style="width:0%"></i></div>
+        <div class="qstat"><span id="urlStat"></span><span id="urlPct"></span></div>
+      </div>
     </div>
 
     <!-- upload queue -->
@@ -417,7 +471,10 @@ const I18N={
   dlStart:"دانلود شروع شد", sizeOver:"بزرگ‌تر از سقف مجاز است", uploading:"در صف…",
   logoutOk:"خارج شد", youUp:"آپلود به تلگرام در حال انجام است…",
   loading:"در حال بارگیری…", limit:"سقف: ",
-  now:"اکنون", minAgo:"دقیقه پیش", hrAgo:"ساعت پیش", dayAgo:"روز پیش"
+  now:"اکنون", minAgo:"دقیقه پیش", hrAgo:"ساعت پیش", dayAgo:"روز پیش",
+  urlT:"افزودن از لینک", urlPh:"https://example.com/file.zip …",
+  urlBtn:"دریافت", urlBad:"لینک معتبر وارد کن", urlStart:"دانلود از مبدا شروع شد",
+  urlDone:"از لینک ذخیره شد", urlFail:"دریافت از لینک خطا داشت", urlPulling:"در حال دانلود از مبدا…"
  },
  en:{
   title:"anbar", loginSub:"Sign in to anbar — Telegram-backed object storage",
@@ -445,7 +502,10 @@ const I18N={
   dlStart:"Download started", sizeOver:"exceeds the size limit", uploading:"Queued…",
   logoutOk:"Signed out", youUp:"Uploading to Telegram…",
   loading:"Loading…", limit:"Limit: ",
-  now:"now", minAgo:"m ago", hrAgo:"h ago", dayAgo:"d ago"
+  now:"now", minAgo:"m ago", hrAgo:"h ago", dayAgo:"d ago",
+  urlT:"Add from URL", urlPh:"https://example.com/file.zip …",
+  urlBtn:"Fetch", urlBad:"Enter a valid URL", urlStart:"Pulling from origin…",
+  urlDone:"Saved from link", urlFail:"Fetch failed", urlPulling:"Downloading from origin…"
  }
 };
 let lang=localStorage.getItem("anbar-lang")||(navigator.language.startsWith("fa")?"fa":"fa");
@@ -461,9 +521,29 @@ function applyI18n(){
   document.querySelectorAll("[data-i18n-ph]").forEach(el=>el.placeholder=t(el.dataset.i18nPh));
   $("#langFa").classList.toggle("on",lang==="fa");
   $("#langEn").classList.toggle("on",lang==="en");
-  updateLimTag(); renderRows(); renderThemeIcon();
+  updateLimTag();
+  // NOTE: renderRows() intentionally NOT called here — it rebuilds the DOM
+  // and made the whole page flicker on every language switch (v0.8.5 fix).
+  // Date cells carry data-ts; update their text in place instead:
+  document.querySelectorAll("[data-ts]").forEach(el=>{
+    el.textContent=humanDate(parseFloat(el.dataset.ts));
+  });
+  // static table headers re-render through data-i18n above.
+  renderThemeIcon();
 }
-function setLang(l){lang=l;localStorage.setItem("anbar-lang",l);applyI18n();}
+let langSwitching=false;
+function setLang(l){
+  if(l===lang||langSwitching)return;
+  langSwitching=true;
+  document.body.classList.add("lang-fade");
+  // swap after the fade-out so text never visibly "jumps"
+  setTimeout(()=>{
+    lang=l;localStorage.setItem("anbar-lang",l);applyI18n();
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      document.body.classList.remove("lang-fade");langSwitching=false;
+    }));
+  },120);
+}
 $("#langFa").onclick=()=>setLang("fa");
 $("#langEn").onclick=()=>setLang("en");
 
@@ -599,12 +679,12 @@ function renderRows(){
   files.forEach(o=>{
     const tr=document.createElement("tr");
     tr.innerHTML=
-      '<td><div class="fname"><span class="fic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>'
+      '<td data-th="'+t("thName")+'"><div class="fname"><span class="fic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>'
       +'<span class="fn" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</span></div></td>'
-      +'<td class="num">'+humanSize(o.size)+'</td>'
-      +'<td class="num hide-sm">'+humanDate(o.created_at)+'</td>'
-      +'<td class="num hide-sm">'+(o.downloaded??0)+'</td>'
-      +'<td><div class="acts">'
+      +'<td class="num" data-th="'+t("thSize")+'">'+humanSize(o.size)+'</td>'
+      +'<td class="num" data-th="'+t("thDate")+'" data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</td>'
+      +'<td class="num" data-th="'+t("thDl")+'">'+(o.downloaded??0)+'</td>'
+      +'<td data-th="'+t("thAct")+'"><div class="acts">'
       +'<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
       +'<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></button>'
       +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>'
@@ -640,6 +720,54 @@ async function delObj(o){
   }catch(e){toast(t("delFail")+": "+e.message,"err");}
 }
 $("#refBtn").onclick=()=>{refresh();};
+
+/* ================= url ingest ================= */
+$("#urlForm").onsubmit=async ev=>{
+  ev.preventDefault();
+  const inp=$("#urlInput"),btn=$("#urlBtn");
+  const url=inp.value.trim();
+  if(!/^https?:\/\//i.test(url)){toast(t("urlBad"),"err");return;}
+  btn.disabled=true;inp.disabled=true;
+  try{
+    const r=await api("/api/v1/upload/url",{method:"POST",body:JSON.stringify({url})});
+    toast(t("urlStart"));
+    pollIngest(r.job_id);
+  }catch(e){toast(t("urlFail")+": "+e.message,"err");btn.disabled=false;inp.disabled=false;}
+};
+async function pollIngest(jobId){
+  const box=$("#urlProg"),bar=$("#urlBar"),stat=$("#urlStat"),pct=$("#urlPct");
+  box.style.display="block";
+  bar.style.width="0%";bar.style.background="";
+  stat.textContent=t("urlPulling");pct.textContent="";
+  const t0=Date.now();
+  while(true){
+    await new Promise(r=>setTimeout(r,1200));
+    let j;
+    try{j=await api("/api/v1/upload/url/"+jobId);}
+    catch(e){stat.textContent=e.message;$("#urlBtn").disabled=false;$("#urlInput").disabled=false;return;}
+    if(j.state==="error"){
+      stat.textContent=t("urlFail")+": "+(j.error||"");
+      stat.style.color="var(--err)";pct.textContent="";
+      $("#urlBtn").disabled=false;$("#urlInput").disabled=false;
+      setTimeout(()=>box.style.display="none",4000);
+      return;
+    }
+    if(j.state==="done"){
+      bar.style.width="100%";bar.style.background="var(--ok)";
+      stat.textContent=t("urlDone")+" — "+esc(j.object.filename)+" ("+humanSize(j.object.size)+")";
+      stat.style.color="var(--ok)";pct.textContent="";
+      toast(t("urlDone"));
+      refresh();
+      setTimeout(()=>{box.style.display="none";stat.style.color="";},5000);
+      $("#urlBtn").disabled=false;$("#urlInput").disabled=false;$("#urlInput").value="";
+      return;
+    }
+    const secs=Math.round((Date.now()-t0)/1000);
+    stat.textContent=t("urlPulling")+" · "+humanSize(j.bytes)+" · "+j.chunks+" chunk · "+secs+"s";
+    // indeterminate shimmer while chunk count grows
+    bar.style.width=(j.chunks*4%90+8)+"%";
+  }
+}
 
 /* ================= upload ================= */
 const drop=$("#drop"),fileInput=$("#fileInput");

@@ -74,6 +74,8 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
     from .api import admin, download, upload, web  # noqa: PLC0415
 
     app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
+    from .api import ingest  # local import: optional URL-ingest feature
+    app.include_router(ingest.router, prefix="/api/v1", tags=["ingest"])
     app.include_router(download.router, prefix="/f", tags=["download"])
     app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
     app.include_router(web.router, tags=["web ui"])
