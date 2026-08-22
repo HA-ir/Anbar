@@ -75,7 +75,12 @@ def _default_backend(settings) -> StorageBackend:
             )
         from .storage import BotBackend
 
-        return BotBackend(settings.bot_token.get_secret_value(), settings.channel_id)
+        return BotBackend(
+            settings.bot_token.get_secret_value(),
+            settings.channel_id,
+            send_gap_s=settings.flood_send_gap_s,
+            flood_budget_s=settings.flood_budget_s,
+        )
     if settings.backend.value == "mtproto":
         if not settings.api_id or not settings.api_hash:
             raise RuntimeError(

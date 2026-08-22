@@ -90,7 +90,7 @@ but inert, and the Web UI shows the cache section as disabled. This
 preserves the zero-retention guarantee: with the default configuration anbar
 writes **nothing** to disk except the SQLite metadata database.
 
-## Speed test (v0.8.1, bot backend)
+## Speed test (v0.8.3, bot backend)
 
 Measured **2026-08-22** on a production deployment
 (`anbar.example.com`, nginx + Cloudflare, `bot` backend, one Telegram account,
@@ -106,7 +106,7 @@ real Telegram round-trip.
 | 19 MB (2 chunks) | 1.27 s — 15.0 MB/s | 1.86 s — 10.2 MB/s | 0.20 s — 95.7 MB/s |
 | 45 MB (3 chunks) | 1.97 s — 22.9 MB/s | 5.63 s — 8.0 MB/s | 0.46 s — 98.9 MB/s |
 | 100 MB (7 chunks) | 7.60 s — 13.2 MB/s | 8.56 s — 11.7 MB/s | 1.29 s — 77.8 MB/s |
-| 1 GB (64 chunks) | ⚠️ failed (see below) | — | — |
+| 1 GB (64 chunks) | 206.4 s — 4.96 MB/s | 101.4 s — 10.1 MB/s | 12.1 s — 84.9 MB/s |
 | 4 × 8 MB parallel | 2.19 s — 14.6 MB/s agg | — | — |
 
 Through the public HTTPS path (Cloudflare + TLS + nginx), signed share links:
@@ -125,23 +125,23 @@ Through the public HTTPS path (Cloudflare + TLS + nginx), signed share links:
   cold ≈ 1–10 MB/s, warm-CDN up to ~100 MB/s on this link.
 - **Parallel uploads** (4 × 8 MB): 4/4 succeeded, 14.6 MB/s aggregate.
   Telegram rate-limits per *account*, not per server, so a single bot account
-  caps sustained concurrency — bursty workloads above ~4 in flight can hit
-  `FloodWait` and anbar maps that to `502`. The `mtproto` backend (F5) does
+  caps sustained concurrency — heavy concurrency hits `FloodWait`, which
+  v0.8.3 absorbs by waiting (see below). The `mtproto` backend (F5) does
   not have this per-request API ceiling.
 - **100 MB** (7 chunks) uploads cleanly at 13.2 MB/s and the cold download
   runs at 11.7 MB/s — the multi-chunk path scales fine in this range.
-- **1 GB does NOT upload on the `bot` backend** (see below). It is a
-  Telegram-side limit, not an anbar defect: the `mtproto` backend (F5)
-  handles 1–2 GB single-blob.
+- **1 GB now uploads on the `bot` backend** (v0.8.3 flood pacing, below):
+  206 s at 4.96 MB/s sustained, cold download 10.1 MB/s, warm CDN 84.9 MB/s.
+  It works because anbar now *waits out* the account's flood window instead
+  of giving up — the cost is that the sustained rate drops to ~5 MB/s.
 - SHA-256 verified on every downloaded object (all `sha_ok=true`).
 
-### Why 1 GB fails on the `bot` backend
+### Large-file uploads on the `bot` backend (v0.8.3 flood pacing)
 
 A 1 GB object is 64 × 16 MB `sendDocument` calls into the **same channel**
 on the **same bot account**. Telegram rate-limits messages per *chat*:
 after ~20 consecutive posts the API starts answering
 `429 Too Many Requests: retry after 30–33 s` for a sustained window.
-
 Measured on the live channel (2026-08-22):
 
 - 20 consecutive 16 MB posts: all accepted, but individual calls stalled up
@@ -149,19 +149,34 @@ Measured on the live channel (2026-08-22):
   rate window.
 - Continuing past 20: every further chunk fails with 429
   (`retry_after` 33 → 9 s over ~25 attempts).
+- Telegram's own transient **502/500** responses (sometimes
+  description-less) also occur mid-burst.
 
-Anbar retries each chunk up to 5 times with the given backoff, which is
-enough for occasional floods (normal traffic) but not for a sustained
-64-chunk burst — after 5 retries the chunk gives up and the upload returns
-`502 telegram: …`. Even in the best case the 64 chunks would take
-~15–25 minutes of accumulated flood-waits. Conclusion:
+**v0.8.3 makes this survivable** instead of failing it:
 
-> **Rule of thumb (bot backend): keep objects under ~200–400 MB.**
-> Files in the 1 GB range should go through the `mtproto` backend, which
-> uses a single MTProto session (2 GB ceiling, no per-message API ceiling).
+1. **Pacing** — each `sendDocument` waits at least `ANBAR_FLOOD_SEND_GAP_S`
+   (default 1.1 s) after the previous one, so chunks are spread instead of
+   bursting, which shortens the 429 windows.
+2. **Patient flood waits** — a 429/402 (and transient 500/502) no longer
+   fails the chunk after 5 tries. Anbar honours `retry_after` and keeps
+   waiting until a per-upload budget `ANBAR_FLOOD_BUDGET_S` (default
+   2400 s) is exhausted *cumulatively*; only then does the upload fail,
+   with a **504** (retryable) plus rollback of the already-posted chunks.
+3. **Rollback** — on any mid-way failure the posted `file_id`s are deleted
+   from the channel, so a failed 1 GB upload leaves no orphan blobs.
 
-This also sets the practical ceiling for `max_upload_mb` deployments on the
-bot backend.
+Measured 1 GB upload on the live channel: **206 s ≈ 3.5 min** sustained
+(4.96 MB/s) — 64 chunks at a ~3 s average post + flood waits. The first
+~20 chunks go near line rate (15–23 MB/s); the tail runs at whatever pace
+the account's flood window allows. Downloads are unaffected (64 ×
+`getFile` pulls do not hit the per-chat send limit): cold 10.1 MB/s,
+warm CDN 84.9 MB/s.
+
+> **Rule of thumb (bot backend):** any size up to `max_upload_mb` now
+> works; expect **~3.5 min per GB** of sustained upload time. If you need
+> higher sustained throughput, the `mtproto` backend (F5) uses a single
+> MTProto session (2 GB ceiling, no per-message API ceiling) and is the
+> faster path for large files.
 
 ## Core concepts
 

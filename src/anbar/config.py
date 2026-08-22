@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     chunking: ChunkingMode = ChunkingMode.AUTO
     chunk_size_mb: int = Field(default=16, ge=1, le=1024)
 
+    # flood pacing (v0.8.3, bot backend)
+    flood_send_gap_s: float = Field(default=1.1, ge=0)  # min gap between sends
+    flood_budget_s: float = Field(default=2400, ge=10)  # max cumulative 429 waits
+
     # auth
     admin_key: SecretStr | None = None
     api_key: SecretStr | None = None

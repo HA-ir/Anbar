@@ -14,7 +14,7 @@ from .. import runtime
 from ..auth import require_uploader
 from ..objects import Chunk, Manifest, chunk_stream, new_object_id
 from ..ratelimit import limit_upload
-from ..storage import ObjectRef, TelegramError
+from ..storage import FloodBudgetExceeded, ObjectRef, TelegramError
 
 router = APIRouter()
 
@@ -94,6 +94,8 @@ async def _store_stream(request: Request, stream, filename: str) -> tuple[Manife
                 )
             except Exception:  # noqa: BLE001
                 pass
+        if isinstance(e, FloodBudgetExceeded):
+            raise HTTPException(504, f"telegram: {e.message}") from e
         if isinstance(e, TelegramError):
             raise HTTPException(502, f"telegram: {e.message}") from e
         raise HTTPException(502, f"storage error: {e}") from e
