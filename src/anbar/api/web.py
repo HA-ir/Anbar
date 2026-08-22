@@ -30,12 +30,19 @@ def _is_https(request: Request) -> bool:
 
 def _set_session(response: JSONResponse, request: Request, value: str | None,
                  max_age: int) -> None:
-    response.delete_cookie(COOKIE, httponly=True, samesite="lax", secure=_is_https(request))
+    # NOTE: never pair delete_cookie with set_cookie on the same response —
+    # some browsers/CDN paths apply the deletion (Max-Age=0) LAST and the
+    # fresh session is wiped before it is ever stored, so login "succeeds"
+    # but every following request is anonymous. Setting the cookie alone
+    # overwrites any old value anyway.
     if value:
         response.set_cookie(
             COOKIE, value, max_age=max_age, httponly=True, samesite="lax",
             secure=_is_https(request), path="/",
         )
+    else:
+        response.delete_cookie(COOKIE, httponly=True, samesite="lax",
+                               secure=_is_https(request))
 
 
 @router.post("/ui/login")
