@@ -105,6 +105,8 @@ real Telegram round-trip.
 | 8 MB | 0.74 s — 10.8 MB/s | 2.11 s — 3.8 MB/s | 0.10 s — 82.2 MB/s |
 | 19 MB (2 chunks) | 1.27 s — 15.0 MB/s | 1.86 s — 10.2 MB/s | 0.20 s — 95.7 MB/s |
 | 45 MB (3 chunks) | 1.97 s — 22.9 MB/s | 5.63 s — 8.0 MB/s | 0.46 s — 98.9 MB/s |
+| 100 MB (7 chunks) | 7.60 s — 13.2 MB/s | 8.56 s — 11.7 MB/s | 1.29 s — 77.8 MB/s |
+| 1 GB (64 chunks) | ⚠️ failed (see below) | — | — |
 | 4 × 8 MB parallel | 2.19 s — 14.6 MB/s agg | — | — |
 
 Through the public HTTPS path (Cloudflare + TLS + nginx), signed share links:
@@ -126,7 +128,40 @@ Through the public HTTPS path (Cloudflare + TLS + nginx), signed share links:
   caps sustained concurrency — bursty workloads above ~4 in flight can hit
   `FloodWait` and anbar maps that to `502`. The `mtproto` backend (F5) does
   not have this per-request API ceiling.
+- **100 MB** (7 chunks) uploads cleanly at 13.2 MB/s and the cold download
+  runs at 11.7 MB/s — the multi-chunk path scales fine in this range.
+- **1 GB does NOT upload on the `bot` backend** (see below). It is a
+  Telegram-side limit, not an anbar defect: the `mtproto` backend (F5)
+  handles 1–2 GB single-blob.
 - SHA-256 verified on every downloaded object (all `sha_ok=true`).
+
+### Why 1 GB fails on the `bot` backend
+
+A 1 GB object is 64 × 16 MB `sendDocument` calls into the **same channel**
+on the **same bot account**. Telegram rate-limits messages per *chat*:
+after ~20 consecutive posts the API starts answering
+`429 Too Many Requests: retry after 30–33 s` for a sustained window.
+
+Measured on the live channel (2026-08-22):
+
+- 20 consecutive 16 MB posts: all accepted, but individual calls stalled up
+  to **133 s** (server-side throttling) — 20 posts already consume a full
+  rate window.
+- Continuing past 20: every further chunk fails with 429
+  (`retry_after` 33 → 9 s over ~25 attempts).
+
+Anbar retries each chunk up to 5 times with the given backoff, which is
+enough for occasional floods (normal traffic) but not for a sustained
+64-chunk burst — after 5 retries the chunk gives up and the upload returns
+`502 telegram: …`. Even in the best case the 64 chunks would take
+~15–25 minutes of accumulated flood-waits. Conclusion:
+
+> **Rule of thumb (bot backend): keep objects under ~200–400 MB.**
+> Files in the 1 GB range should go through the `mtproto` backend, which
+> uses a single MTProto session (2 GB ceiling, no per-message API ceiling).
+
+This also sets the practical ceiling for `max_upload_mb` deployments on the
+bot backend.
 
 ## Core concepts
 
