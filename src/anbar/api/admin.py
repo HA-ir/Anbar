@@ -14,9 +14,12 @@ from .. import runtime
 from ..auth import (
     KV_AUTH,
     KV_HMAC_SECRET,
+    add_api_key,
     effective_auth_enabled,
+    list_api_keys,
     new_secret,
     require_admin,
+    revoke_api_key,
 )
 from ..cache import DiskLRU
 
@@ -187,3 +190,34 @@ async def objects(request: Request, limit: int = 50, offset: int = 0):
     limit = max(1, min(limit, 500))
     rows = db.list_objects(limit=limit, offset=max(0, offset))
     return {"objects": rows, "count": len(rows)}
+
+
+# ── API key management (v0.8.7) ──────────────────────────────────────────────
+@router.get("/admin/api-keys")
+async def api_keys_list(request: Request):
+    require_admin(request)
+    keys = list_api_keys(request.app.state.db)
+    # never echo full keys after creation — only id/name/created_at
+    return {"keys": [{k: v for k, v in k_.items() if k != "key"} for k_ in keys]}
+
+
+@router.post("/admin/api-keys")
+async def api_keys_create(request: Request):
+    require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    name = (body or {}).get("name", "") if isinstance(body, dict) else ""
+    entry = add_api_key(request.app.state.db, name or "")
+    return {"id": entry["id"], "name": entry["name"], "key": entry["key"],
+            "note": "copy this key now — it is not shown again"}
+
+
+@router.delete("/admin/api-keys/{key_id}")
+async def api_keys_revoke(request: Request, key_id: str):
+    require_admin(request)
+    ok = revoke_api_key(request.app.state.db, key_id)
+    if not ok:
+        raise HTTPException(404, "unknown key id")
+    return {"revoked": key_id}

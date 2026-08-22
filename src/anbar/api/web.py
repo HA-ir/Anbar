@@ -78,6 +78,30 @@ async def index(request: Request):
     return HTMLResponse(_render())
 
 
+@router.get("/manifest.webmanifest", include_in_schema=False)
+async def manifest():
+    from fastapi.responses import Response
+
+    p = _ui_dir() / "manifest.webmanifest"
+    return Response(
+        content=p.read_text(encoding="utf-8") if p.exists() else "{}",
+        media_type="application/manifest+json",
+    )
+
+
+@router.get("/icon.svg", include_in_schema=False)
+async def icon():
+    from fastapi.responses import Response
+
+    p = _ui_dir() / "icon.svg"
+    return Response(content=p.read_text(encoding="utf-8") if p.exists() else "",
+                    media_type="image/svg+xml")
+
+
+def _ui_dir() -> Path:
+    return Path(__file__).parent.parent / "ui"
+
+
 def _render() -> str:
     tpl = (Path(__file__).parent.parent / "ui" / "index.html").read_text(encoding="utf-8")
     return tpl.replace("__VERSION__", __version__)

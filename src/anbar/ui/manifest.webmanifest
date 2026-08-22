@@ -1,0 +1,17 @@
+{
+  "name": "anbar",
+  "short_name": "anbar",
+  "description": "Telegram-backed object storage",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#2f6bff",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

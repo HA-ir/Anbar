@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2f6bff">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="manifest" href="/manifest.webmanifest">
 <title>anbar — object storage</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -210,6 +213,11 @@ html[dir="rtl"] .sw.on i{transform:translateX(-18px)}
 .drawer-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:10px}
 .btn-warn{background:var(--err-soft);color:var(--err);font-size:13px;padding:9px 14px}
 .btn-warn:hover{background:var(--err);color:#fff}
+/* api key rows */
+.keyrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.keyrow:last-child{border-bottom:none}
+.keyrow .kn{flex:1;font-size:13px;font-weight:600;font-family:ui-monospace,Menlo,Consolas,monospace;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:start}
 /* toast */
 #toasts{position:fixed;bottom:22px;inset-inline-start:50%;transform:translateX(-50%);z-index:200;
   display:flex;flex-direction:column;gap:9px;align-items:center}
@@ -450,6 +458,14 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
       </div>
     </div>
     <div class="sec">
+      <h3 data-i18n="secKeys">کلیدهای API</h3>
+      <div class="set-row">
+        <input type="text" id="newKeyName" data-i18n-ph="keyNamePh" placeholder="نام کلید (مثلاً ci-bot)" maxlength="60" style="flex:1;direction:ltr">
+        <button class="btn btn-ghost" id="mkKeyBtn" data-i18n="mkKey">ساخت کلید</button>
+      </div>
+      <div id="keyList"></div>
+    </div>
+    <div class="sec">
       <h3 data-i18n="secCache">کش دانلود</h3>
       <div class="set-row">
         <div class="lab"><span data-i18n="cacheLab">حداکثر حجم کش</span><small data-i18n="cacheSub">روی volume data · LRU · ۰ = خالی شود</small></div>
@@ -472,7 +488,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 <!-- link modal -->
 <div class="modal" id="linkModal">
   <div class="modal-card">
-    <h3 data-i18n="linkT">لینک اشتراک‌گذاری</h3>
+    <h3 data-i18n="linkT" id="linkT_h">لینک اشتراک‌گذاری</h3>
     <p data-i18n="linkS">این لینک بدون نیاز به ورود کار می‌کند و بعد از ۲۴ ساعت منقضی می‌شود.</p>
     <div class="linkbox">
       <code id="linkUrl"></code>
@@ -537,7 +553,10 @@ const I18N={
   urlDone:"از لینک ذخیره شد", urlFail:"دریافت از لینک خطا داشت", urlPulling:"در حال دانلود از مبدا…",
   searchPh:"جستجو در نام فایل…", sNew:"جدیدترین", sOld:"قدیمی‌ترین",
   sBig:"حجم: بیشتر", sSmall:"حجم: کمتر", sDl:"پردانلودترین", sName:"نام",
-  noMatch:"فایلی مطابق جستجو نیست", retry:"تلاش مجدد"
+  noMatch:"فایلی مطابق جستجو نیست", retry:"تلاش مجدد",
+  secKeys:"کلیدهای API", keyNamePh:"نام کلید (مثلاً ci-bot)", mkKey:"ساخت کلید",
+  keyOnce:"این کلید را الان کپی کن — دوباره نمایش داده نمیشود", revoke:"لغو",
+  revOk:"کلید لغو شد", noKeys:"هنوز کلیدی نساخته‌ای"
  },
  en:{
   title:"anbar", loginSub:"Sign in to anbar — Telegram-backed object storage",
@@ -571,7 +590,10 @@ const I18N={
   urlDone:"Saved from link", urlFail:"Fetch failed", urlPulling:"Downloading from origin…",
   searchPh:"Search by filename…", sNew:"Newest", sOld:"Oldest",
   sBig:"Size: largest", sSmall:"Size: smallest", sDl:"Most downloaded", sName:"Name",
-  noMatch:"No files match your search", retry:"Retry"
+  noMatch:"No files match your search", retry:"Retry",
+  secKeys:"API keys", keyNamePh:"key name (e.g. ci-bot)", mkKey:"Create key",
+  keyOnce:"Copy this key now — it will not be shown again", revoke:"Revoke",
+  revOk:"Key revoked", noKeys:"No keys yet"
  }
 };
 let lang=localStorage.getItem("anbar-lang")||(navigator.language.startsWith("fa")?"fa":"fa");
@@ -1032,7 +1054,7 @@ $("#setClose").onclick=closeDrawer;
 scrim.onclick=closeDrawer;
 function openDrawer(){
   drawer.classList.add("on");scrim.classList.add("on");
-  loadSettings();
+  loadSettings();renderKeys();
 }
 function closeDrawer(){drawer.classList.remove("on");scrim.classList.remove("on");}
 let curSettings=null,authOn=null;
@@ -1089,6 +1111,40 @@ $("#purgeBtn").onclick=async()=>{
     setTimeout(refresh,500);
   }catch(e){toast(t("purgeFail")+": "+e.message,"err");}
 };
+
+/* ================= api keys ================= */
+async function renderKeys(){
+  const el=$("#keyList");
+  let keys=[];
+  try{keys=(await api("/api/v1/admin/api-keys")).keys;}catch(e){el.innerHTML="";return;}
+  if(!keys.length){el.innerHTML='<div class="keyrow"><small style="color:var(--tx3)">'+esc(t("noKeys"))+'</small></div>';return;}
+  el.innerHTML="";
+  for(const k of keys){
+    const d=document.createElement("div");
+    d.className="keyrow";
+    d.innerHTML='<span class="kn">'+esc(k.name||k.id)+'</span>'
+      +'<button class="btn btn-warn krev" data-id="'+esc(k.id)+'" style="padding:5px 12px;font-size:11.5px">'+esc(t("revoke"))+'</button>';
+    d.querySelector(".krev").onclick=async()=>{
+      try{await api("/api/v1/admin/api-keys/"+k.id,{method:"DELETE"});toast(t("revOk"));renderKeys();}
+      catch(e){toast(e.message,"err");}
+    };
+    el.appendChild(d);
+  }
+}
+$("#mkKeyBtn").onclick=async()=>{
+  const name=$("#newKeyName").value.trim();
+  try{
+    const r=await api("/api/v1/admin/api-keys",{method:"POST",body:JSON.stringify({name})});
+    $("#newKeyName").value="";
+    // one-time display: reuse the link modal to show the key with a copy button
+    $("#linkT_h").textContent=t("secKeys");
+    $("#linkS").textContent=t("keyOnce");
+    $("#linkUrl").textContent=r.key;
+    $("#linkModal").classList.add("on");
+    renderKeys();
+  }catch(e){toast(e.message,"err");}
+};
+
 
 /* go */
 boot();

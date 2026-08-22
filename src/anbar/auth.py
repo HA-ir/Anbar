@@ -66,6 +66,46 @@ def new_secret(nbytes: int = 32) -> str:
 
 
 # ── FastAPI dependencies ────────────────────────────────────────────────────
+def list_api_keys(db) -> list[dict]:
+    """All dynamic uploader keys (v0.8.7): [{id, key, name, created_at}]."""
+    import json as _json
+    try:
+        return _json.loads(db.kv_get("api_keys", "[]") or "[]")
+    except Exception:  # noqa: BLE001 - corrupted value behaves like "none"
+        return []
+
+
+def add_api_key(db, name: str) -> dict:
+    entry = {
+        "id": secrets.token_hex(4),
+        "key": new_secret(24),
+        "name": (name or "key").strip()[:60],
+        "created_at": int(time.time()),
+    }
+    keys = list_api_keys(db)
+    keys.append({k: v for k, v in entry.items() if k != "key"} | {"key": entry["key"]})
+    db.kv_set("api_keys", __import__("json").dumps(keys))
+    return entry
+
+
+def revoke_api_key(db, key_id: str) -> bool:
+    keys = list_api_keys(db)
+    kept = [k for k in keys if k.get("id") != key_id]
+    if len(kept) == len(keys):
+        return False
+    db.kv_set("api_keys", __import__("json").dumps(kept))
+    return True
+
+
+def _match_dynamic_key(key: str, db) -> bool:
+    """Constant-time match against every stored uploader key."""
+    for k in list_api_keys(db):
+        stored = k.get("key", "")
+        if stored and constant_time_equal(key, stored):
+            return True
+    return False
+
+
 def whoami(request) -> str:
     """Resolve the caller: 'admin' | 'uploader' | 'anon' (constant-time).
 
@@ -79,7 +119,10 @@ def whoami(request) -> str:
     api_key = settings.api_key.get_secret_value() if settings.api_key else None
     if key and admin_key and constant_time_equal(key, admin_key):
         return "admin"
-    if key and api_key and constant_time_equal(key, api_key):
+    if key and (
+        (api_key and constant_time_equal(key, api_key))
+        or _match_dynamic_key(key, request.app.state.db)
+    ):
         return "uploader"
     # F7: signed web session cookie (no key in the cookie)
     cookie = request.cookies.get("anbar_session")
