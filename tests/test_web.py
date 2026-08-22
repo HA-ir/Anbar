@@ -61,7 +61,12 @@ def test_tampered_cookie_rejected(client):
     cookie = client.cookies.get("anbar_session")
     exp, tag, sig = cookie.split(":")
     bad = f"{exp}:{tag}:{'0' * len(sig)}"
-    client.cookies.set("anbar_session", bad)
+    # replace (not add): a browser jar holds ONE anbar_session; a second
+    # .set() would append another cookie and the dup-tolerant whoami would
+    # accept the still-valid first occurrence.
+    for ck in [c_ for c_ in list(client.cookies.jar) if c_.name == "anbar_session"]:
+        client.cookies.jar.clear(ck.domain, ck.path, ck.name)
+    client.cookies.set("anbar_session", bad, domain="testserver", path="/")
     assert client.get("/ui/me").json()["authed"] is False
     assert client.get("/api/v1/admin/objects").status_code == 401
 

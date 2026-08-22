@@ -124,15 +124,25 @@ def whoami(request) -> str:
         or _match_dynamic_key(key, request.app.state.db)
     ):
         return "uploader"
-    # F7: signed web session cookie (no key in the cookie)
-    cookie = request.cookies.get("anbar_session")
-    if cookie:
-        try:
-            role = webauth.verify_session(request.app.state.db, cookie)
-        except Exception:  # pragma: no cover - bad cookie must never 500
-            role = None
-        if role:
-            return role
+    # F7: signed web session cookie (no key in the cookie). Browsers can hold
+    # DUPLICATE anbar_session cookies (e.g. one created pre-Secure, or via a
+    # redirect) and send them all in creation order; Starlette's
+    # request.cookies keeps only the LAST. If the stale invalid one sorts
+    # last, the user is anonymous forever until they clear cookies by hand.
+    # Try every occurrence instead — any valid session wins.
+    cookie_header = request.headers.get("cookie", "")
+    if cookie_header and "anbar_session=" in cookie_header:
+        db = request.app.state.db
+        for pair in cookie_header.split(";"):
+            pair = pair.strip()
+            if not pair.startswith("anbar_session="):
+                continue
+            try:
+                role = webauth.verify_session(db, pair.split("=", 1)[1])
+            except Exception:  # pragma: no cover - bad cookie must never 500
+                role = None
+            if role:
+                return role
     return "anon"
 
 
