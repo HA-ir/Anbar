@@ -112,12 +112,22 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .url-head{display:flex;align-items:center;gap:9px;margin-bottom:11px;font-size:13.5px;font-weight:600;color:var(--tx2)}
 .url-ic{width:30px;height:30px;border-radius:9px;background:var(--ok-soft);display:flex;align-items:center;justify-content:center;flex:none}
 .url-ic svg{width:15px;height:15px;fill:none;stroke:var(--ok);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.url-form{display:flex;gap:10px}
+.url-form{display:flex;gap:10px;align-items:center}
+.url-form .url-ic{margin:0}
 .url-form input{flex:1;padding:11px 14px;border:1.5px solid var(--line2);border-radius:var(--r-sm);
   background:var(--bg3);color:var(--tx);font-size:13.5px;outline:none;transition:border-color .15s,box-shadow .15s;
   direction:ltr;text-align:left;min-width:0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
 .url-form input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);background:var(--bg2)}
+.url-form button{flex:none}
+@media(max-width:720px){
+  .url-form{flex-wrap:nowrap}
+  .url-form .url-ic{display:none}
+}
 .url-prog{margin-top:12px}
+/* indeterminate progress stripe (origin without Content-Length) */
+.qbar i.ind{background:linear-gradient(90deg,var(--brand-soft),var(--brand),var(--brand-soft));
+  background-size:200% 100%;animation:indslide 1.4s linear infinite}
+@keyframes indslide{to{background-position:-200% 0}}
 /* queue */
 .queue{display:none;flex-direction:column;gap:10px;margin-bottom:22px}
 .qitem{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:13px 16px;box-shadow:var(--shadow);
@@ -356,8 +366,8 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 
     <!-- url ingest -->
     <div class="urlbox">
-      <div class="url-ic"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></div>
       <form id="urlForm" class="url-form">
+        <span class="url-ic"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>
         <input type="url" id="urlInput" data-i18n-ph="urlPh" placeholder="https://example.com/file.zip …" autocomplete="off" spellcheck="false">
         <button class="btn btn-primary" id="urlBtn" type="submit" style="width:auto" data-i18n="urlBtn">دریافت</button>
       </form>
@@ -597,8 +607,6 @@ const I18N={
  }
 };
 let lang=localStorage.getItem("anbar-lang")||(navigator.language.startsWith("fa")?"fa":"fa");
-fSortMode=localStorage.getItem("anbar-sort")||"new";
-document.addEventListener("DOMContentLoaded",()=>{const s=$("#fSort");if(s)s.value=fSortMode;});
 let theme=localStorage.getItem("anbar-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");
 
 const $=s=>document.querySelector(s);
@@ -728,7 +736,7 @@ let files=[];
 function updateLimTag(){
   $("#limTag").textContent=t("limit")+humanSize(maxUploadBytes);
 }
-let fQuery="",fSortMode="new";
+let fQuery="",fSortMode=localStorage.getItem("anbar-sort")||"new";
 function visibleFiles(){
   let list=files;
   if(fQuery){
@@ -752,6 +760,10 @@ $("#fSearch").oninput=e=>{
 };
 $("#fClear").onclick=()=>{fQuery="";$("#fSearch").value="";$("#fClear").hidden=true;renderRows();};
 $("#fSort").onchange=e=>{fSortMode=e.target.value;localStorage.setItem("anbar-sort",fSortMode);renderRows();};
+{  // restore saved sort selection once the DOM is parsed
+  const s=document.getElementById("fSort");
+  if(s)s.value=fSortMode;
+}
 async function refresh(){
   try{
     const st=await api("/api/v1/admin/status");
@@ -941,10 +953,25 @@ async function pollIngest(jobId){
       $("#urlBtn").disabled=false;$("#urlInput").disabled=false;$("#urlInput").value="";
       return;
     }
-    const secs=Math.round((Date.now()-t0)/1000);
-    stat.textContent=t("urlPulling")+" · "+humanSize(j.bytes)+" · "+j.chunks+" chunk · "+secs+"s";
-    // indeterminate shimmer while chunk count grows
-    bar.style.width=(j.chunks*4%90+8)+"%";
+    // real progress: percent (when origin sent Content-Length), speed, ETA
+    const secs=(Date.now()-t0)/1000;
+    const speed=j.bytes/Math.max(secs,.5);          // bytes/s
+    const spd=" · "+humanSize(speed)+"/s";
+    if(j.total>0){
+      const p=Math.min(100,j.bytes/j.total*100);
+      bar.style.width=p+"%";
+      bar.classList.remove("ind");
+      let eta="";
+      if(speed>0&&p<100)eta=" · ETA "+Math.max(1,Math.round((j.total-j.bytes)/speed))+"s";
+      stat.textContent=t("urlPulling")+" · "+humanSize(j.bytes)+" / "+humanSize(j.total)
+        +" · "+j.chunks+" chunk"+spd+eta;
+      pct.textContent=Math.floor(p)+"%";
+    }else{
+      // unknown size: indeterminate stripe + bytes so far
+      bar.style.width="40%";bar.classList.add("ind");
+      stat.textContent=t("urlPulling")+" · "+humanSize(j.bytes)+" · "+j.chunks+" chunk"+spd;
+      pct.textContent="";
+    }
   }
 }
 

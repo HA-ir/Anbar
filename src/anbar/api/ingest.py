@@ -108,6 +108,7 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                     decl = int(resp.headers.get("content-length", "0") or 0)
                     if decl and decl > settings.max_upload_mb * 1024 * 1024:
                         raise RuntimeError("remote file exceeds configured ceiling")
+                    job["total"] = decl  # 0 = unknown → indeterminate progress
 
                     reader = _UrlReader(resp, IDLE_TIMEOUT)
                     total_in = 0
@@ -192,7 +193,7 @@ async def upload_url(request: Request):
 
     job_id = uuid.uuid4().hex[:12]
     JOBS[job_id] = {
-        "state": "pulling", "bytes": 0, "chunks": 0,
+        "state": "pulling", "bytes": 0, "chunks": 0, "total": 0,
         "started": time.time(), "key": None,
         "object": None, "error": None,
     }
