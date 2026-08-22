@@ -125,7 +125,7 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                     # _store_stream's rollback semantics
                     from ..objects import chunk_stream
 
-                    async def put(data: bytes) -> None:
+                    async def put(data: bytes, media: bool = False) -> None:
                         ref = await on_chunk(data)
                         manifest.chunks.append(
                             Chunk(index=len(manifest.chunks), size=len(data),

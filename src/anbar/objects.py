@@ -93,10 +93,14 @@ async def chunk_stream(
     stream,
     chunk_size: int,
     on_chunk,
+    is_first_chunk_media: bool = False,
 ) -> tuple[int, str]:
     """Drain an async byte stream, calling `on_chunk(bytes) -> file_id` per part.
 
     Returns (total_size, sha256_hex). Memory usage is bounded by chunk_size.
+    `is_first_chunk_media`: hint the backend that the FIRST chunk carries the
+    real file content-type (media-aware backends send it as video/audio so
+    Telegram shows a player; continuation chunks stay plain documents).
     """
     h = hashlib.sha256()
     total = 0
@@ -110,7 +114,7 @@ async def chunk_stream(
             buf.extend(piece)
         if not buf:
             break
-        await on_chunk(bytes(buf))
+        await on_chunk(bytes(buf), media=(index == 0 and is_first_chunk_media))
         h.update(buf)
         total += len(buf)
         index += 1

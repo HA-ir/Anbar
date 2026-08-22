@@ -145,16 +145,32 @@ class BotBackend(StorageBackend):
         return e.code in (429, 402, 500, 502)
 
     # ── StorageBackend contract ─────────────────────────────────────
-    async def store(self, data: bytes, name: str) -> ObjectRef:
+    async def store(self, data: bytes, name: str,
+                    content_type: str | None = None) -> ObjectRef:
         """Post one blob to the channel, return its file_id ref.
 
         Paced by a single send queue and retried through FloodWait up to
         `flood_budget_s`; see module docstring for why.
+
+        v0.8.6: media-aware — video goes via sendVideo (inline player +
+        thumbnail in the channel), audio via sendAudio, everything else
+        stays a plain document.
         """
+        method = "sendDocument"
+        mime = content_type or "application/octet-stream"
+        low = name.lower().removesuffix(".part")  # chunks are stored as <name>.part
+        if mime.startswith("video/") or low.endswith(
+            (".mp4", ".webm", ".mkv", ".mov", ".avi", ".m4v")
+        ):
+            method = "sendVideo"
+        elif mime.startswith("audio/") or low.endswith(
+            (".mp3", ".ogg", ".wav", ".flac", ".m4a", ".opus", ".aac")
+        ):
+            method = "sendAudio"
         deadline = asyncio.get_running_loop().time() + self.flood_budget_s
         while True:
             try:
-                result = await self._paced_multipart("sendDocument", name, data)
+                result = await self._paced_multipart(method, name, data)
             except TelegramError as e:
                 if self._is_rate_limited(e):
                     wait_s = (e.retry_after or 3) + 0.5
@@ -171,8 +187,8 @@ class BotBackend(StorageBackend):
                     await asyncio.sleep(wait_s)
                     continue
                 raise
-            fid = result["document"]["file_id"]
-            log.info("chunk sent ok: %s (%d bytes)", name, len(data))
+            fid = self._extract_file_id(result, method)
+            log.info("chunk sent ok: %s (%d bytes) via %s", name, len(data), method)
             return ObjectRef(
                 file_id=fid,
                 backend=self.name,
@@ -181,18 +197,36 @@ class BotBackend(StorageBackend):
                 message_id=result.get("message_id"),
             )
 
+    @staticmethod
+    def _extract_file_id(result: dict, method: str) -> str:
+        """Pull the file_id out of whichever media type was sent."""
+        for key in ("document", "video", "audio", "animation"):
+            if key in result:
+                return result[key]["file_id"]
+        raise KeyError(f"no file payload in {method} response")
+
     async def _paced_multipart(self, method: str, name: str, data: bytes) -> dict:
-        """One sendDocument through the pacing queue (gap between sends)."""
+        """One media/document post through the pacing queue (gap between sends)."""
         async with self._send_lock:
             now = asyncio.get_running_loop().time()
             gap = self._last_send_at + self.send_gap_s - now
             if gap > 0:
                 await asyncio.sleep(gap)
             try:
+                field = {"sendVideo": "video", "sendAudio": "audio"}.get(
+                    method, "document"
+                )
+                mime = {
+                    "sendVideo": "video/mp4",
+                    "sendAudio": "audio/mpeg",
+                }.get(method, "application/octet-stream")
+                fields: dict = {"chat_id": self._channel}
+                if method == "sendVideo":
+                    fields["supports_streaming"] = "true"
                 return await self._call_multipart(
                     method,
-                    fields={"chat_id": self._channel},
-                    files={"document": (name, data, "application/octet-stream")},
+                    fields=fields,
+                    files={field: (name, data, mime)},
                 )
             finally:
                 self._last_send_at = asyncio.get_running_loop().time()

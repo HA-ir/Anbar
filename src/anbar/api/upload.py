@@ -6,6 +6,7 @@ ownership (used by DELETE in F4).
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Annotated
 
@@ -76,22 +77,70 @@ async def _commit(request: Request, manifest: Manifest, sha_hex: str, filename: 
     )
 
 
-async def _store_stream(request: Request, stream, filename: str) -> tuple[Manifest, str]:
-    """Drive the chunker over `stream`; return (manifest, sha256)."""
+async def _store_stream(request: Request, stream, filename: str,
+                        content_type: str | None = None,
+                        upload_id: str | None = None,
+                        resume_from: int = 0,
+                        ) -> tuple[Manifest, str]:
+    """Drive the chunker over `stream`; return (manifest, sha256).
+
+    With `upload_id` set, every stored chunk bumps the kv checkpoint
+    `upres:<upload_id>` so a dropped connection can resume past stored
+    chunks (they are drained, not re-posted). Checkpoints expire in 24h.
+    """
     settings = request.app.state.settings
     backend = request.app.state.backend
+    db = request.app.state.db
     manifest = Manifest(chunks=[], total_size=0)
+    ck_key = f"upres:{upload_id}" if upload_id else None
+    prior: list[dict] = []
+    if ck_key and resume_from:
+        try:
+            prior = json.loads(db.kv_get(ck_key, "[]") or "[]")
+        except json.JSONDecodeError:
+            prior = []
+        if resume_from > len(prior):
+            raise HTTPException(
+                409,
+                f"cannot resume from {resume_from}: only {len(prior)} "
+                "chunks are checkpointed for this upload id",
+            )
+        # pre-seed the manifest with the already-stored chunks
+        for i, c in enumerate(prior[:resume_from]):
+            manifest.chunks.append(
+                Chunk(index=i, size=c["s"], file_id=c["f"],
+                      message_id=c.get("m"))
+            )
+    skip_remaining = resume_from
 
-    async def on_chunk(data: bytes) -> str:
-        ref = await backend.store(data, f"{filename}.part")
+    def _checkpoint() -> None:
+        if ck_key:
+            db.kv_set(ck_key, json.dumps(
+                [{"s": c.size, "f": c.file_id, "m": c.message_id}
+                 for c in manifest.chunks], separators=(",", ":")
+            ))
+
+    async def on_chunk(data: bytes, media: bool = False) -> str:
+        nonlocal skip_remaining
+        if skip_remaining > 0:
+            skip_remaining -= 1  # duplicate of an already-stored chunk: drain
+            return ""
+        ref = await backend.store(
+            data, f"{filename}.part",
+            content_type=content_type if media else None,
+        )
         manifest.chunks.append(
             Chunk(index=len(manifest.chunks), size=len(data), file_id=ref.file_id,
                   message_id=ref.message_id)
         )
+        _checkpoint()
         return ref.file_id
 
     try:
-        _, sha_hex = await chunk_stream(stream, settings.chunk_size, on_chunk)
+        _, sha_hex = await chunk_stream(
+            stream, settings.chunk_size, on_chunk,
+            is_first_chunk_media=bool(content_type),
+        )
     except BodyReadTimeout as e:
         for c in manifest.chunks:  # best-effort rollback of posted blobs
             try:
@@ -130,7 +179,10 @@ async def upload_multipart(request: Request, file: Annotated[UploadFile, File(..
     content_type = file.content_type or "application/octet-stream"
     if (await _peek_size(file)) > _max_upload_bytes(request):
         raise HTTPException(413, "object exceeds configured ceiling")
-    manifest, sha_hex = await _store_stream(request, _UploadFileReader(file), filename)
+    manifest, sha_hex = await _store_stream(
+        request, _UploadFileReader(file), filename,
+        content_type=file.content_type,
+    )
     return await _commit(request, manifest, sha_hex, filename, content_type)
 
 
@@ -140,6 +192,12 @@ async def upload_raw(request: Request):
 
     Filename via `X-File-Name` header (optional). Body is consumed as it
     arrives — never buffered whole.
+
+    Resume (v0.8.6): send `X-Upload-Id` (any client-generated id) to make
+    an upload resumable. If the connection drops, re-send with the same
+    id + `X-Resume-From: <chunks-done>`; already-stored chunks are drained
+    (not re-posted) and storage continues from chunk chunks-done+1. State
+    lives in kv for 24h.
     """
     require_uploader(request)
     limit_upload(request.app.state.db, request, _rate_upload(request))
@@ -150,10 +208,19 @@ async def upload_raw(request: Request):
     if declared and declared > _max_upload_bytes(request):
         raise HTTPException(413, "object exceeds configured ceiling")
 
+    upload_id = request.headers.get("x-upload-id", "").strip() or None
+    resume_from = 0
+    if upload_id:
+        try:
+            resume_from = max(0, int(request.headers.get("x-resume-from", "0") or 0))
+        except ValueError:
+            raise HTTPException(400, "X-Resume-From must be an integer") from None
+
     manifest, sha_hex = await _store_stream(
         request, _RequestBodyReader(
             request, request.app.state.settings.body_idle_timeout_s
-        ), filename
+        ), filename, content_type=content_type,
+        upload_id=upload_id, resume_from=resume_from,
     )
     return await _commit(request, manifest, sha_hex, filename, content_type)
 
