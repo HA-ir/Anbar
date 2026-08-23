@@ -108,10 +108,10 @@ the ratios (2nd GET ≫ 1st GET) are what matter.
 
 | Size | Upload | Download 1st GET | Download 2nd GET |
 |------|--------|------------------|------------------|
-| 1 MB | 0.29 s — 3.4 MB/s | 0.98 s — 1.0 MB/s | 0.25 s — 4.0 MB/s |
-| 8 MB | 0.77 s — 10.4 MB/s | 1.91 s — 4.2 MB/s | 0.32 s — 24.6 MB/s |
-| 45 MB | 7.10 s — 6.3 MB/s | 23.18 s — 1.9 MB/s | 0.77 s — 58.1 MB/s |
-| 100 MB | 19.39 s — 5.2 MB/s | 25.03 s — 4.0 MB/s | 2.03 s — 49.3 MB/s |
+| 1 MB | 0.35 s — 2.8 MB/s | 0.59 s — 1.7 MB/s | 0.18 s — 5.7 MB/s |
+| 8 MB | 0.85 s — 9.4 MB/s | 1.86 s — 4.3 MB/s | 0.32 s — 25.2 MB/s |
+| 45 MB | 4.06 s — 11.1 MB/s | 5.11 s — 8.8 MB/s | 0.90 s — 49.8 MB/s |
+| 100 MB | 12.37 s — 8.1 MB/s | 9.94 s — 10.1 MB/s | 1.88 s — 53.3 MB/s |
 
 Re-run it against your own instance:
 
@@ -120,57 +120,24 @@ export ANBAR_BASE_URL=http://127.0.0.1:8567 ANBAR_ADMIN_KEY=***
 .venv/bin/python scripts/bench.py --sizes 1 8 45
 ```
 
-Historical v0.10.5 run (2026-08-23, same setup):
-
-| Size | Upload | Download 1st GET | Download 2nd GET |
-|------|--------|------------------|------------------|
-| 1 MB | 0.28 s — 3.6 MB/s | 0.57 s — 1.7 MB/s | 0.18 s — 5.6 MB/s |
-| 8 MB | 0.83 s — 9.6 MB/s | 1.20 s — 6.6 MB/s | 0.40 s — 20.0 MB/s |
-| 45 MB (3 chunks) | 5.03 s — 9.0 MB/s | 4.21 s — 10.7 MB/s | 0.82 s — 54.8 MB/s |
-
-Historical v0.8.3 run (2026-08-22, same setup):
-
-| Size | Upload | Download 1st GET | Download 2nd GET |
-|------|--------|------------------|------------------|
-| 0.5 MB | 0.25 s — 2.0 MB/s | 0.40 s — 1.2 MB/s | 0.05 s — 10.4 MB/s |
-| 1.9 MB | 0.32 s — 5.9 MB/s | 0.75 s — 2.5 MB/s | 0.10 s — 18.3 MB/s |
-| 8 MB | 0.74 s — 10.8 MB/s | 2.11 s — 3.8 MB/s | 0.10 s — 82.2 MB/s |
-| 19 MB (2 chunks) | 1.27 s — 15.0 MB/s | 1.86 s — 10.2 MB/s | 0.20 s — 95.7 MB/s |
-| 45 MB (3 chunks) | 1.97 s — 22.9 MB/s | 5.63 s — 8.0 MB/s | 0.46 s — 98.9 MB/s |
-| 100 MB (7 chunks) | 7.60 s — 13.2 MB/s | 8.56 s — 11.7 MB/s | 1.29 s — 77.8 MB/s |
-| 1 GB (64 chunks) | 206.4 s — 4.96 MB/s | 101.4 s — 10.1 MB/s | 12.1 s — 84.9 MB/s |
-| 4 × 8 MB parallel | 2.19 s — 14.6 MB/s agg | — | — |
-
-Through the public HTTPS path (Cloudflare + TLS + nginx), signed share links:
-0.5 MB → 0.27 s (1.9 MB/s), 8 MB → 1.20 s (6.6 MB/s).
-
 **How to read this**
 
-- **Upload** tops out around **15–23 MB/s**: each ≤16 MB chunk is a separate
-  Telegram `upload` round-trip, so multi-chunk files add a fixed per-chunk
-  latency on top of the wire time.
-- **First download** is the cold Telegram CDN path: 1.2–10 MB/s depending on
+- **Upload** runs at **~3–11 MB/s** on the `bot` backend: each ≤16 MB chunk is
+  a separate Telegram `sendDocument` round-trip plus the flood-pacing gap, so
+  multi-chunk files add fixed per-chunk latency on top of wire time.
+- **First download** is the cold Telegram CDN path: ~2–10 MB/s depending on
   size (small files pay the fixed round-trip; large files stream).
 - **Second download** looks fast, but with the cache OFF it is *not* anbar
   caching — it is **Telegram's own CDN** serving the blob it just delivered
   (same account, warm edge). The two numbers bound the real-world range:
-  cold ≈ 1–10 MB/s, warm-CDN up to ~100 MB/s on this link.
-- **Parallel uploads** (4 × 8 MB): 4/4 succeeded, 14.6 MB/s aggregate.
-  Telegram rate-limits per *account*, not per server, so a single bot account
-  caps sustained concurrency — heavy concurrency hits `FloodWait`, which
-  v0.8.3 absorbs by waiting (see below). The `mtproto` backend (F5) does
-  not have this per-request API ceiling.
-- **100 MB** (7 chunks) uploads cleanly at 13.2 MB/s and the cold download
-  runs at 11.7 MB/s — the multi-chunk path scales fine in this range.
-- **1 GB now uploads on the `bot` backend** (v0.8.3 flood pacing, below):
-  206 s at 4.96 MB/s sustained, cold download 10.1 MB/s, warm CDN 84.9 MB/s.
-  It works because anbar now *waits out* the account's flood window instead
-  of giving up — the cost is that the sustained rate drops to ~5 MB/s.
-- SHA-256 verified on every downloaded object (all `sha_ok=true`).
+  cold ≈ 2–10 MB/s, warm-CDN up to ~50 MB/s on this link.
+- The multi-chunk path scales fine: 100 MB (7 chunks) uploads at 8.1 MB/s
+  and downloads cold at 10.1 MB/s.
+- SHA-256 verified on every downloaded object by the harness.
 
-### Large-file uploads on the `bot` backend (v0.8.3 flood pacing)
+### Large-file uploads on the `bot` backend (flood pacing)
 
-A 1 GB object is 64 × 16 MB `sendDocument` calls into the **same channel**
+A large object is many ≤16 MB `sendDocument` calls into the **same channel**
 on the **same bot account**. Telegram rate-limits messages per *chat*:
 after ~20 consecutive posts the API starts answering
 `429 Too Many Requests: retry after 30–33 s` for a sustained window.
@@ -184,7 +151,7 @@ Measured on the live channel (2026-08-22):
 - Telegram's own transient **502/500** responses (sometimes
   description-less) also occur mid-burst.
 
-**v0.8.3 makes this survivable** instead of failing it:
+**Flood pacing makes this survivable** instead of failing it:
 
 1. **Pacing** — each `sendDocument` waits at least `ANBAR_FLOOD_SEND_GAP_S`
    (default 1.1 s) after the previous one, so chunks are spread instead of
@@ -199,10 +166,9 @@ Measured on the live channel (2026-08-22):
 
 Measured 1 GB upload on the live channel: **206 s ≈ 3.5 min** sustained
 (4.96 MB/s) — 64 chunks at a ~3 s average post + flood waits. The first
-~20 chunks go near line rate (15–23 MB/s); the tail runs at whatever pace
-the account's flood window allows. Downloads are unaffected (64 ×
-`getFile` pulls do not hit the per-chat send limit): cold 10.1 MB/s,
-warm CDN 84.9 MB/s.
+~20 chunks go near line rate; the tail runs at whatever pace the account's
+flood window allows. Downloads are unaffected (many `getFile` pulls do not
+hit the per-chat send limit): cold ~10 MB/s, warm CDN up to ~85 MB/s.
 
 > **Rule of thumb (bot backend):** any size up to `max_upload_mb` now
 > works; expect **~3.5 min per GB** of sustained upload time. If you need
