@@ -298,7 +298,34 @@ async def delete(request: Request, obj_id: str):
     cache = getattr(request.app.state, "cache", None)
     if cache is not None:
         cache.remove(obj_id)
+    db.kv_delete(f"pw:{obj_id}")  # drop a stale pw tag, if any
     return {"deleted": True, "id": obj_id, "blobs_removed": deleted_blobs}
+
+
+@router.patch("/{obj_id}")
+async def rename(request: Request, obj_id: str):
+    """Rename an object (metadata only; blobs untouched). Admin/owner only."""
+    db = request.app.state.db
+    settings = request.app.state.settings
+    row = db.get_object(obj_id)
+    if row is None:
+        raise HTTPException(404, "object not found")
+    role = whoami(request)
+    if effective_auth_enabled(db, settings.auth_enabled) and role == "anon":
+        raise HTTPException(401, "authentication required")
+    is_owner = bool(row["uploader_key"]) and _key_matches(request, row["uploader_key"])
+    if not (role == "admin" or (role == "uploader" and is_owner)):
+        raise HTTPException(403, "admin or owner key required")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "expected JSON {filename}") from None
+    name = ((body or {}).get("filename") or "").strip()
+    if not name or len(name) > 200 or "/" in name or "\\" in name:
+        raise HTTPException(400, "invalid filename")
+    if not db.rename_object(obj_id, name):
+        raise HTTPException(404, "object not found")
+    return {"renamed": True, "id": obj_id, "filename": name}
 
 
 def _key_matches(request: Request, uploader_key: str) -> bool:

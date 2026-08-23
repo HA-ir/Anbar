@@ -173,6 +173,8 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
   padding:2px 9px;border-radius:20px}
 .btn-ghost{border:1px solid var(--line);background:var(--bg2);color:var(--tx2);font-size:13px;padding:8px 14px}
 .btn-ghost:hover{color:var(--tx);border-color:var(--line2);background:var(--hover)}
+.btn-danger{border:1px solid var(--err);background:transparent;color:var(--err);font-size:13px;padding:8px 14px}
+.btn-danger:hover{background:var(--err);color:#fff}
 /* table */
 .tbl-wrap{background:var(--bg2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
 table{width:100%;border-collapse:collapse}
@@ -395,10 +397,15 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <!-- files -->
     <div class="toolbar">
       <h2><span data-i18n="files">فایل‌ها</span><span class="count" id="cnt">0</span></h2>
+      <button class="btn btn-ghost" id="selAllBtn" style="width:auto" data-i18n="selAll">همه</button>
       <button class="btn btn-ghost" id="refBtn">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"/></svg>
         <span data-i18n="refresh">به‌روزرسانی</span>
       </button>
+    </div>
+    <div id="selBar" style="display:none;align-items:center;gap:10px;margin:-8px 0 14px;padding:8px 14px;background:var(--brand-soft);border:1px solid var(--line2);border-radius:10px;font-size:13px">
+      <strong id="selCnt">0</strong>
+      <button class="btn btn-danger" id="selDelBtn" style="width:auto;padding:7px 12px" data-i18n="delSel">حذف انتخاب‌شده‌ها</button>
     </div>
 
     <div class="filterbar">
@@ -556,6 +563,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <div class="fm-actions">
       <button class="btn btn-primary" style="width:auto" id="fmDl" data-i18n="thAct">…</button>
       <button class="btn btn-ghost" style="width:auto" id="fmShare" data-i18n="linkT">…</button>
+      <button class="btn btn-ghost" style="width:auto" id="fmRename" data-i18n="renameT">…</button>
     </div>
     <div style="margin-top:12px;text-align:end">
       <button class="btn btn-ghost" id="fmClose" data-i18n="close">بستن</button>
@@ -605,7 +613,9 @@ const I18N={
   keyOnce:"این کلید را الان کپی کن — دوباره نمایش داده نمیشود", revoke:"لغو",
   revOk:"کلید لغو شد", noKeys:"هنوز کلیدی نساخته‌ای", pasteT:"چسباندن از کلیپ‌بورد",
   linkOptT:"گزینه‌های اشتراک", linkTtl:"انقضا", linkPwLab:"رمز عبور (اختیاری)",
-  mkLink:"ساخت لینک", linkPw:"لینک رمزدار شد — رمز:"
+  mkLink:"ساخت لینک", linkPw:"لینک رمزدار شد — رمز:",
+  renameT:"تغییر نام", renameOk:"نام تغییر کرد", selAll:"همه", selNone:"هیچ",
+  delSel:"حذف انتخاب‌شده‌ها", nSelected:"انتخاب‌شده",
  },
  en:{
   title:"anbar", loginSub:"Sign in to anbar — Telegram-backed object storage",
@@ -644,7 +654,9 @@ const I18N={
   keyOnce:"Copy this key now — it will not be shown again", revoke:"Revoke",
   revOk:"Key revoked", noKeys:"No keys yet", pasteT:"Paste from clipboard",
   linkOptT:"Share options", linkTtl:"Expiry", linkPwLab:"Password (optional)",
-  mkLink:"Create link", linkPw:"Password-protected link — password:"
+  mkLink:"Create link", linkPw:"Password-protected link — password:",
+  renameT:"Rename", renameOk:"Renamed", selAll:"All", selNone:"None",
+  delSel:"Delete selected", nSelected:"selected"
  }
 };
 let lang=localStorage.getItem("anbar-lang")||(navigator.language.startsWith("fa")?"fa":"fa");
@@ -860,10 +872,13 @@ function renderRows(){
   }
   if(nm)nm.style.display="none";
   tb.innerHTML="";
+  const selBar=$("#selBar");
+  if(selBar)updateSelBar();
   list.forEach(o=>{
     const tr=document.createElement("tr");
     tr.innerHTML=
-      '<td data-th="'+t("thName")+'"><div class="fname"><span class="fic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>'
+      '<td data-th="'+t("thName")+'"><div class="fname"><input type="checkbox" class="selbox" data-id="'+o.id+'" style="display:none;margin-inline-end:8px;vertical-align:-2px">'
+      +'<span class="fic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>'
       +'<span class="fn" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</span></div></td>'
       +'<td class="num" data-th="'+t("thSize")+'">'+humanSize(o.size)+'</td>'
       +'<td class="num" data-th="'+t("thDate")+'" data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</td>'
@@ -882,8 +897,48 @@ function renderRows(){
     tr.querySelector(".fname").style.cursor="pointer";
     tr.querySelector('[data-a=ln]').onclick=()=>shareLink(o);
     tr.querySelector('[data-a=del]').onclick=()=>delObj(o);
+    tr.querySelector(".selbox").onchange=e=>{
+      if(e.target.checked)selSet.add(o.id);else selSet.delete(o.id);
+      updateSelBar();
+    };
+    if(selSet.has(o.id))tr.querySelector(".selbox").checked=true;
     tb.appendChild(tr);
   });
+}
+/* multi-select (v0.9) */
+const selSet=new Set();
+function updateSelBar(){
+  const bar=$("#selBar");
+  if(!bar)return;
+  const n=selSet.size;
+  bar.style.display=n?"flex":"none";
+  if(n)$("#selCnt").textContent=n+" "+t("nSelected");
+}
+$("#selAllBtn").onclick=()=>{
+  const list=visibleFiles();
+  if(selSet.size>=list.length){selSet.clear();}
+  else list.forEach(o=>selSet.add(o.id));
+  renderRows();
+};
+$("#selDelBtn").onclick=async()=>{
+  if(!selSet.size)return;
+  if(!confirm(t("delSel")+" ("+selSet.size+")؟"))return;
+  const ids=[...selSet];
+  let ok=0;
+  for(const id of ids){
+    try{await api("/f/"+id,{method:"DELETE"});ok++;}catch(e){}
+  }
+  selSet.clear();toast(ok+" ✓");refresh();
+};
+async function renameObj(o){
+  const name=prompt(t("renameT"),o.filename||"");
+  if(name===null)return;
+  const nn=name.trim();
+  if(!nn||nn===o.filename)return;
+  try{
+    await api("/f/"+o.id,{method:"PATCH",body:JSON.stringify({filename:nn})});
+    toast(t("renameOk"));refresh();
+  }catch(e){toast(e.message,"err");}
 }
 /* file detail modal */
 function extOf(name){const m=/\.([a-z0-9]{1,5})$/i.exec(name||"");return m?m[1].toLowerCase():"";}
@@ -940,6 +995,12 @@ $("#fmShare").onclick=async()=>{
   shareTarget=fmObj;
   $("#sharePw").value="";
   $("#shareOptsModal").classList.add("on");
+};
+$("#fmRename").onclick=async()=>{
+  if(!fmObj)return;
+  const o=fmObj;
+  $("#fmClose").onclick();
+  await renameObj(o);
 };
 
 async function shareLink(o,opts){

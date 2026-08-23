@@ -96,6 +96,12 @@ class Database:
         self._conn.commit()
         return cur.rowcount > 0
 
+    def rename_object(self, obj_id: str, filename: str) -> bool:
+        cur = self._conn.execute(
+            "UPDATE objects SET filename = ? WHERE id = ?", (filename, obj_id))
+        self._conn.commit()
+        return cur.rowcount > 0
+
     def bump_downloads(self, obj_id: str) -> None:
         self._conn.execute("UPDATE objects SET downloaded = downloaded + 1 WHERE id = ?",
                            (obj_id,))
@@ -111,6 +117,10 @@ class Database:
             "INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v",
             (key, value),
         )
+        self._conn.commit()
+
+    def kv_delete(self, key: str) -> None:
+        self._conn.execute("DELETE FROM kv WHERE k = ?", (key,))
         self._conn.commit()
 
     # -- rate limiting (fixed windows in SQLite) ------------------------------
