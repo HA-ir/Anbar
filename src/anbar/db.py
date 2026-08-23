@@ -123,6 +123,11 @@ class Database:
         self._conn.execute("DELETE FROM kv WHERE k = ?", (key,))
         self._conn.commit()
 
+    def kv_all(self) -> list[tuple[str, str]]:
+        """All kv pairs (small table; used for slug cleanup on delete)."""
+        rows = self._conn.execute("SELECT k, v FROM kv").fetchall()
+        return [(r["k"], r["v"]) for r in rows]
+
     # -- rate limiting (fixed windows in SQLite) ------------------------------
     def rate_check(self, key: str, window_s: int, limit: int) -> tuple[bool, int, int]:
         """Atomically check+count one request in a fixed window.

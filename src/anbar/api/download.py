@@ -38,7 +38,9 @@ from ..storage import ObjectRef
 router = APIRouter()
 
 _RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
+_SLUG_RE = re.compile(r"[a-z0-9][a-z0-9-_]{0,63}")  # pretty link names
 DEFAULT_LINK_TTL = 3600  # seconds
+TTL_NEVER = 100 * 365 * 86400  # "never": ~100 years, signed but practically permanent
 
 
 def _parse_range(header: str | None, total: int) -> tuple[int | None, int | None]:
@@ -109,6 +111,11 @@ async def download(request: Request, obj_id: str):
     settings = request.app.state.settings
     db = request.app.state.db
     backend = request.app.state.backend
+    # pretty-link names (v0.9.5): /f/<slug> resolves to the real object id
+    if not db.get_object(obj_id):
+        resolved = db.kv_get(f"slug:{obj_id}")
+        if resolved:
+            obj_id = resolved
     # rate limit before auth: an anonymous hammerer gets 429, not endless 401s
     limit_download(db, request, obj_id,
                    runtime.get_int(db, "rate_download", settings.rate_download_per_min))
@@ -210,7 +217,9 @@ async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL,
                     password: str = "", max_dl: int = 0):
     """Mint a signed download link: `{base_url}/f/{id}?sig=...&exp=...`.
 
-    `ttl` is the validity window in seconds (default 1 h, capped at 7 d).
+    `ttl` is the validity window in seconds (default 1 h, capped at 7 d;
+    ttl=0 means "never" — signed for ~100 years). `slug` (optional) gives
+    the link a pretty name: `{base}/f/<slug>` serves the same object.
     `password` (optional): the link then requires `?pw=<password>` too —
     stored as an HMAC tag, never in plaintext. `max_dl` > 0 caps the
     number of downloads; the counter lives in kv and hits return 410.
@@ -228,12 +237,29 @@ async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL,
     secret = effective_hmac_secret(db, configured)
     if not secret:
         raise HTTPException(500, "hmac secret not configured")
-    ttl = max(60, min(ttl, 7 * 86400))
+    ttl = max(60, min(ttl, 7 * 86400)) if ttl else TTL_NEVER  # ttl=0 → never
+
+    # -- custom link name (slug) ------------------------------------------
+    # `slug` maps a pretty path /f/<slug> to this object: kv holds
+    # `slug:<name>` → obj_id. Names are unique, lowercase-safe.
+    slug = (request.query_params.get("slug") or "").strip().strip("/")
+    if slug:
+        if not _SLUG_RE.fullmatch(slug):
+            raise HTTPException(
+                400, "invalid slug: use 1-64 chars of [a-z0-9-_] (no leading '-')")
+        owner = db.kv_get(f"slug:{slug}")
+        if owner and owner != obj_id:
+            raise HTTPException(409, "link name already taken")
+        db.kv_set(f"slug:{slug}", obj_id)
+
     exp = int(time.time()) + ttl
     sig = sign(obj_id, exp, secret)
     base = settings.base_url.rstrip("/")
     url = f"{base}/f/{obj_id}?sig={sig}&exp={exp}"
     out: dict = {"url": url, "expires_at": exp, "ttl_seconds": ttl}
+    if slug:
+        out["slug"] = slug
+        out["pretty_url"] = f"{base}/f/{slug}"
     if password.strip():
         pw_tag = hmac.new(secret.encode(), f"pw:{obj_id}:{password.strip()}".encode(),
                           hashlib.sha256).hexdigest()[:32]
@@ -307,6 +333,10 @@ async def delete(request: Request, obj_id: str):
         except Exception:  # noqa: BLE001 - best-effort remote cleanup
             pass
     db.delete_object(obj_id)
+    # drop any per-object kv tags (pw, download cap, pretty-link slugs)
+    for k, v in list(db.kv_all()):
+        if v == obj_id and k.startswith("slug:"):
+            db.kv_delete(k)
     # drop any cached copy of this object (and its chunks, if chunked ids share
     # the prefix) so a re-upload under a new id never serves stale bytes
     cache = getattr(request.app.state, "cache", None)

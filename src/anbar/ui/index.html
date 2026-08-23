@@ -288,8 +288,8 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 .modal-card p{font-size:12.5px;color:var(--tx2);margin-bottom:16px}
 .linkbox{display:flex;gap:8px}
 .linkbox code{flex:1;background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:10px 12px;
-  font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,Menlo,Consolas,monospace;
-  direction:ltr;text-align:left;user-select:all}
+  font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;
+  direction:ltr;text-align:left;user-select:all;max-height:40vh;overflow-y:auto}
 /* file detail modal */
 .file-card{max-width:560px}
 .fm-preview{border-radius:12px;background:var(--bg3);margin-bottom:14px;min-height:64px;
@@ -435,6 +435,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     </div>
     <div id="selBar" style="display:none;align-items:center;gap:10px;margin:-8px 0 14px;padding:8px 14px;background:var(--brand-soft);border:1px solid var(--line2);border-radius:10px;font-size:13px">
       <strong id="selCnt">0</strong>
+      <button class="btn btn-ghost" id="selShareBtn" style="width:auto;padding:7px 12px" data-i18n="shareSel">اشتراک انتخاب‌شده‌ها</button>
       <button class="btn btn-danger" id="selDelBtn" style="width:auto;padding:7px 12px" data-i18n="delSel">حذف انتخاب‌شده‌ها</button>
     </div>
 
@@ -550,12 +551,20 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <h3 data-i18n="linkOptT">گزینه‌های اشتراک</h3>
     <form id="shareOpts">
       <div class="set-row" style="margin:10px 0">
+        <label class="lab"><span data-i18n="linkNameLab">نام لینک (اختیاری)</span></label>
+        <div style="flex:1.2;display:flex;align-items:center;gap:6px;direction:ltr">
+          <span id="slugBase" style="font-size:12px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+          <input type="text" id="shareSlug" autocomplete="off" placeholder="report-2026" style="flex:1;min-width:80px;padding:9px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);color:var(--tx);font-family:ui-monospace,monospace;font-size:13px;direction:ltr">
+        </div>
+      </div>
+      <div class="set-row" style="margin:10px 0">
         <label class="lab"><span data-i18n="linkTtl">انقضا</span></label>
         <select id="shareTtl" style="flex:1;padding:9px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg2);color:var(--tx);font-family:inherit;direction:ltr">
           <option value="3600">1 hour</option>
           <option value="86400" selected>24 hours</option>
           <option value="604800">7 days</option>
           <option value="6048000">70 days</option>
+          <option value="0" data-i18n="ttlNever">هرگز (بدون انقضا)</option>
         </select>
       </div>
       <div class="set-row" style="margin:10px 0">
@@ -648,6 +657,8 @@ const I18N={
   revOk:"کلید لغو شد", noKeys:"هنوز کلیدی نساخته‌ای", pasteT:"چسباندن از کلیپ‌بورد",
   linkOptT:"گزینه‌های اشتراک", linkTtl:"انقضا", linkPwLab:"رمز عبور (اختیاری)",
   mkLink:"ساخت لینک", linkPw:"لینک رمزدار شد — رمز:",
+  linkNameLab:"نام لینک (اختیاری)", ttlNever:"هرگز (بدون انقضا)",
+  shareSel:"اشتراک انتخاب‌شده‌ها",
   renameT:"تغییر نام", renameOk:"نام تغییر کرد", selAll:"همه", selNone:"هیچ",
   delSel:"حذف انتخاب‌شده‌ها", nSelected:"انتخاب‌شده",
   maxDlLab:"سقف تعداد دانلود (۰ = بی‌نهایت)"
@@ -690,6 +701,8 @@ const I18N={
   revOk:"Key revoked", noKeys:"No keys yet", pasteT:"Paste from clipboard",
   linkOptT:"Share options", linkTtl:"Expiry", linkPwLab:"Password (optional)",
   mkLink:"Create link", linkPw:"Password-protected link — password:",
+  linkNameLab:"Link name (optional)", ttlNever:"Never (no expiry)",
+  shareSel:"Share selected",
   renameT:"Rename", renameOk:"Renamed", selAll:"All", selNone:"None",
   delSel:"Delete selected", nSelected:"selected",
   maxDlLab:"Download cap (0 = unlimited)"
@@ -951,7 +964,7 @@ function renderRows(){
       const a=document.createElement("a");
       a.href="/f/"+o.id;document.body.appendChild(a);a.click();a.remove();
     };
-    tr.querySelector('[data-a=ln]').onclick=()=>shareLink(o);
+    tr.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
     tr.querySelector('[data-a=del]').onclick=()=>delObj(o);
     // click anywhere on the row toggles selection; the name still opens
     tr.onclick=e=>{
@@ -1019,9 +1032,11 @@ function renderGallery(list){
       +'<div class="gsub">'+humanSize(o.size)+' · '+(o.downloaded??0)+'⬇</div>'
       +'<input type="checkbox" class="selbox" data-id="'+o.id+'">'
       +'<div class="gacts">'
+      +'<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>'
       +'<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
       +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
       +'</div>';
+    cell.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
     cell.querySelector('[data-a=dl]').onclick=()=>{toast(t("dlStart"));const a=document.createElement("a");a.href=url;document.body.appendChild(a);a.click();a.remove();};
     cell.querySelector('[data-a=del]').onclick=()=>delObj(o);
     // whole card toggles selection; thumb opens the modal
@@ -1071,6 +1086,38 @@ $("#selDelBtn").onclick=async()=>{
   }
   selSet.clear();toast(ok+" ✓");refresh();
 };
+/* bulk share: mint one link per selected object with the chosen options,
+   then show every URL in the link modal (copy-all friendly) */
+$("#selShareBtn").onclick=()=>{
+  if(!selSet.size)return;
+  openShareOpts(null); // reuse the options form; shareTarget=null marks bulk
+};
+$("#shareOpts").addEventListener("submit",async ev=>{
+  // bulk branch runs only when nothing is targeted
+  if(shareTarget||!selSet.size)return;
+  ev.preventDefault();
+  const pw=$("#sharePw").value.trim();
+  const ttlRaw=parseInt($("#shareTtl").value);
+  const ttl=Number.isFinite(ttlRaw)&&ttlRaw>=0?ttlRaw:86400;
+  const max=$("#shareMax")?Math.max(0,parseInt($("#shareMax").value)||0):0;
+  $("#shareOptsModal").classList.remove("on");
+  const urls=[];
+  let ok=0;
+  for(const id of selSet){
+    let q="ttl="+ttl;
+    if(pw)q+="&password="+encodeURIComponent(pw);
+    if(max>0)q+="&max_dl="+max;
+    try{
+      const r=await api("/f/"+id+"/link?"+q,{method:"POST"});
+      urls.push(r.pretty_url||r.url);ok++;
+    }catch(e){urls.push("✗ "+id+": "+e.message);}
+  }
+  $("#linkT_h").textContent=t("shareSel")+" ("+ok+")";
+  $("#linkS").textContent="";
+  $("#linkUrl").textContent=urls.join("\n");
+  const qr=$("#linkQr");qr.style.display="none";
+  $("#linkModal").classList.add("on");
+},{once:false});
 async function renameObj(o){
   const name=prompt(t("renameT"),o.filename||"");
   if(name===null)return;
@@ -1133,10 +1180,21 @@ $("#fmDl").onclick=()=>{
 $("#fmShare").onclick=async()=>{
   if(!fmObj)return;
   $("#fmClose").onclick();
-  shareTarget=fmObj;
-  $("#sharePw").value="";
-  $("#shareOptsModal").classList.add("on");
+  openShareOpts(fmObj);
 };
+/* share-options modal: prefill + show (single & bulk) */
+function openShareOpts(o){
+  shareTarget=o;
+  $("#sharePw").value="";
+  $("#shareSlug").value="";
+  const base=$("#slugBase");
+  if(base){
+    const b=(location.origin.replace(/^https?:\/\//,""))+"/f/";
+    base.textContent=b;
+    base.title=b;
+  }
+  $("#shareOptsModal").classList.add("on");
+}
 $("#fmRename").onclick=async()=>{
   if(!fmObj)return;
   const o=fmObj;
@@ -1146,12 +1204,14 @@ $("#fmRename").onclick=async()=>{
 
 async function shareLink(o,opts){
   opts=opts||{};
-  let q="ttl="+(opts.ttl||86400);
+  let q="ttl="+(opts.ttl??86400);
   if(opts.pw)q+="&password="+encodeURIComponent(opts.pw);
   if(opts.max>0)q+="&max_dl="+opts.max;
+  if(opts.slug)q+="&slug="+encodeURIComponent(opts.slug);
   try{
     const r=await api("/f/"+o.id+"/link?"+q,{method:"POST"});
-    $("#linkUrl").textContent=r.url;
+    // pretty link first when a slug was minted
+    $("#linkUrl").textContent=r.pretty_url||r.url;
     const sub=$("#linkS");
     const bits=[];
     if(r.password_protected){sub.textContent=t("linkPw")+" — "+(opts.pw);bits.push("🔒");}
@@ -1170,7 +1230,11 @@ $("#shareOpts").onsubmit=async ev=>{
   if(!shareTarget)return;
   const pw=$("#sharePw").value.trim();
   const ttlSel=$("#shareMax")?Math.max(0,parseInt($("#shareMax").value)||0):0;
-  await shareLink(shareTarget,{pw,ttl:parseInt($("#shareTtl").value)||86400,max:ttlSel});
+  // ttl: "0" = never (sent as-is); empty/invalid falls back to 24h
+  const ttlRaw=parseInt($("#shareTtl").value);
+  const ttl=Number.isFinite(ttlRaw)&&ttlRaw>=0?ttlRaw:86400;
+  const slug=$("#shareSlug").value.trim().toLowerCase().replace(/\s+/g,"-");
+  await shareLink(shareTarget,{pw,ttl,max:ttlSel,slug});
   $("#shareOptsModal").classList.remove("on");
 };
 $("#copyBtn").onclick=async()=>{
