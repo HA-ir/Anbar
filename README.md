@@ -1,5 +1,9 @@
 # Anbar
 
+[![CI](https://github.com/HA-ir/Anbar/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/HA-ir/Anbar/actions/workflows/ci.yaml)
+[![Docker image](https://img.shields.io/badge/image-ghcr.io%2FHA--ir%2FAnbar-blue)](https://github.com/HA-ir/Anbar/pkgs/container/anbar)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 **Telegram-backed object storage with zero local file retention.**
 
 Anbar is a two-way proxy (upload + download) between your users and Telegram.
@@ -93,13 +97,30 @@ but inert, and the Web UI shows the cache section as disabled. This
 preserves the zero-retention guarantee: with the default configuration anbar
 writes **nothing** to disk except the SQLite metadata database.
 
-## Speed test (v0.10.5, bot backend)
+## Speed test (v0.10.8, bot backend)
 
 Measured **2026-08-23** on a small VPS deployment (nginx + Cloudflare in
-front, `bot` backend, 16 MB chunk ceiling) with a Python client directly on
-the loopback port. **Cache OFF** throughout (master switch default) — every
-number below is a real Telegram round-trip. Expect similar-but-different
-numbers on your host; the ratios (2nd GET ≫ 1st GET) are what matter.
+front, `bot` backend, 16 MB chunk ceiling) with
+[scripts/bench.py](scripts/bench.py) directly on the loopback port.
+**Cache OFF** throughout (master switch default) — every number below is a
+real Telegram round-trip. Expect similar-but-different numbers on your host;
+the ratios (2nd GET ≫ 1st GET) are what matter.
+
+| Size | Upload | Download 1st GET | Download 2nd GET |
+|------|--------|------------------|------------------|
+| 1 MB | 0.29 s — 3.4 MB/s | 0.98 s — 1.0 MB/s | 0.25 s — 4.0 MB/s |
+| 8 MB | 0.77 s — 10.4 MB/s | 1.91 s — 4.2 MB/s | 0.32 s — 24.6 MB/s |
+| 45 MB | 7.10 s — 6.3 MB/s | 23.18 s — 1.9 MB/s | 0.77 s — 58.1 MB/s |
+| 100 MB | 19.39 s — 5.2 MB/s | 25.03 s — 4.0 MB/s | 2.03 s — 49.3 MB/s |
+
+Re-run it against your own instance:
+
+```bash
+export ANBAR_BASE_URL=http://127.0.0.1:8567 ANBAR_ADMIN_KEY=***
+.venv/bin/python scripts/bench.py --sizes 1 8 45
+```
+
+Historical v0.10.5 run (2026-08-23, same setup):
 
 | Size | Upload | Download 1st GET | Download 2nd GET |
 |------|--------|------------------|------------------|
@@ -248,7 +269,32 @@ curl http://127.0.0.1:8567/healthz
 
 ## Deploy (from F2 onward)
 
+**Option A — prebuilt image (GHCR, no build needed):**
+
 ```bash
+mkdir -p /opt/anbar && cd /opt/anbar
+curl -sO https://raw.githubusercontent.com/HA-ir/Anbar/main/.env.example
+# edit .env: bot token, base URL, keys
+cat > compose.yaml <<'YAML'
+services:
+  anbar:
+    image: ghcr.io/ha-ir/anbar:latest
+    env_file: [.env]
+    volumes:
+      - ./data:/app/data
+      - ./secrets:/app/secrets
+    ports:
+      - "127.0.0.1:8567:8567"   # loopback only — reverse proxy in front
+    restart: unless-stopped
+YAML
+docker compose up -d
+curl http://127.0.0.1:8567/healthz
+```
+
+**Option B — build from source:**
+
+```bash
+git clone https://github.com/HA-ir/Anbar.git && cd Anbar
 cp .env.example .env      # bot token, base URL, keys
 cd docker && docker compose up -d
 curl http://127.0.0.1:8567/healthz
@@ -321,6 +367,8 @@ button drives it from the browser.
 - [API reference](docs/API.md) — every endpoint, auth matrix, error codes, **anbarctl CLI reference**
 - [Deployment guide](docs/DEPLOY.md) — Docker, Caddy/Nginx, secrets, ops runbook
 - [Roadmap](docs/ROADMAP.md) — phase details, decisions, open questions
+- [Security policy](SECURITY.md) — how to report vulnerabilities privately
+- [Contributing](CONTRIBUTING.md) — dev setup, ground rules, PR guide
 
 ## Git conventions
 
