@@ -171,6 +171,21 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                         "sha256": sha,
                     }
                     job["state"] = "done"
+                    # best-effort channel notification (never blocks the job)
+                    import time as _t
+
+                    from .notify import notify_ingest_done
+
+                    try:
+                        await asyncio.wait_for(
+                            notify_ingest_done(
+                                app.state.backend, settings.base_url,
+                                job["object"], url,
+                                _t.time() - job["started"],
+                            ), timeout=10,
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
         except Exception as e:  # noqa: BLE001
             log.warning("ingest %s failed: %s", job_id, e)
             job["state"] = "error"

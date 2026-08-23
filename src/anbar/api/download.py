@@ -13,6 +13,8 @@ Auth (F4):
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -88,6 +90,18 @@ def _authenticate_download(request: Request, obj_id: str) -> None:
         raise HTTPException(403, "invalid signature")
     if exp <= int(time.time()):
         raise HTTPException(410, "link expired")
+    # optional per-object password (v0.9): kv holds an HMAC tag, the link
+    # must carry ?pw=<plaintext> whose tag matches. Admin/uploader bypass.
+    pw_tag = db.kv_get(f"pw:{obj_id}")
+    if pw_tag:
+        given = request.query_params.get("pw", "")
+        configured2 = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
+        secret2 = effective_hmac_secret(db, configured2) or ""
+        want = hmac.new(secret2.encode(), f"pw:{obj_id}:{given}".encode(),
+                        hashlib.sha256).hexdigest()[:32]
+        if not hmac.compare_digest(want, pw_tag):
+            raise HTTPException(403, "password required",
+                                headers={"WWW-Authenticate": 'xBasic realm="anbar-pw"'})
 
 
 @router.get("/{obj_id}")
@@ -182,11 +196,13 @@ async def download(request: Request, obj_id: str):
 
 
 @router.post("/{obj_id}/link")
-async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL):
+async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL,
+                    password: str = ""):
     """Mint a signed download link: `{base_url}/f/{id}?sig=...&exp=...`.
 
     `ttl` is the validity window in seconds (default 1 h, capped at 7 d).
-    Requires a bearer key (uploader or admin).
+    `password` (optional): the link then requires `?pw=<password>` too —
+    stored as an HMAC tag, never in plaintext. Requires a bearer key.
     """
     settings = request.app.state.settings
     db = request.app.state.db
@@ -204,11 +220,43 @@ async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL):
     exp = int(time.time()) + ttl
     sig = sign(obj_id, exp, secret)
     base = settings.base_url.rstrip("/")
-    return {
-        "url": f"{base}/f/{obj_id}?sig={sig}&exp={exp}",
-        "expires_at": exp,
-        "ttl_seconds": ttl,
-    }
+    url = f"{base}/f/{obj_id}?sig={sig}&exp={exp}"
+    out: dict = {"url": url, "expires_at": exp, "ttl_seconds": ttl}
+    if password.strip():
+        pw_tag = hmac.new(secret.encode(), f"pw:{obj_id}:{password.strip()}".encode(),
+                          hashlib.sha256).hexdigest()[:32]
+        db.kv_set(f"pw:{obj_id}", pw_tag)
+        out["password_protected"] = True
+        # append pw only as a hint param — real check happens server-side;
+        # we do NOT put the password itself in the URL.
+    return out
+
+
+@router.get("/{obj_id}/qr")
+async def qr(request: Request, obj_id: str):
+    """SVG QR code of the signed share link (admin/uploader)."""
+    from fastapi.responses import Response
+
+    from ..qrcode import qr_svg
+
+    settings = request.app.state.settings
+    row = request.app.state.db.get_object(obj_id)
+    if row is None:
+        raise HTTPException(404, "object not found")
+    role = whoami(request)
+    if effective_auth_enabled(request.app.state.db,
+                              settings.auth_enabled) and role == "anon":
+        raise HTTPException(401, "authentication required")
+    configured = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
+    secret = effective_hmac_secret(request.app.state.db, configured)
+    if not secret:
+        raise HTTPException(500, "hmac secret not configured")
+    ttl = 7 * 86400
+    exp = int(time.time()) + ttl
+    sig = sign(obj_id, exp, secret)
+    url = f"{settings.base_url.rstrip('/')}/f/{obj_id}?sig={sig}&exp={exp}"
+    return Response(content=qr_svg(url), media_type="image/svg+xml",
+                    headers={"Cache-Control": "no-store"})
 
 
 @router.delete("/{obj_id}")

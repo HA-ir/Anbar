@@ -405,7 +405,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
       <div class="searchbox">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
         <input type="search" id="fSearch" data-i18n-ph="searchPh" placeholder="جستجو در نام فایل…" autocomplete="off">
-        <button class="clr" id="fClear" hidden aria-label="clear">×</button>
+        <button class="clr" id="fClear" aria-label="clear" style="display:none">×</button>
       </div>
       <select id="fSort" aria-label="sort">
         <option value="new" data-i18n="sNew">جدیدترین</option>
@@ -508,14 +508,39 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 </aside>
 
 <!-- link modal -->
+<div class="modal" id="shareOptsModal">
+  <div class="modal-card">
+    <h3 data-i18n="linkOptT">گزینه‌های اشتراک</h3>
+    <form id="shareOpts">
+      <div class="set-row" style="margin:10px 0">
+        <label class="lab"><span data-i18n="linkTtl">انقضا</span></label>
+        <select id="shareTtl" style="flex:1;padding:9px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg2);color:var(--tx);font-family:inherit;direction:ltr">
+          <option value="3600">1 hour</option>
+          <option value="86400" selected>24 hours</option>
+          <option value="604800">7 days</option>
+          <option value="6048000">70 days</option>
+        </select>
+      </div>
+      <div class="set-row" style="margin:10px 0">
+        <label class="lab"><span data-i18n="linkPwLab">رمز عبور (اختیاری)</span></label>
+        <input type="text" id="sharePw" autocomplete="off" style="flex:1;padding:9px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);color:var(--tx);font-family:inherit;direction:ltr">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">
+        <button class="btn btn-primary" type="submit" style="width:auto" data-i18n="mkLink">ساخت لینک</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="modal" id="linkModal">
   <div class="modal-card">
     <h3 data-i18n="linkT" id="linkT_h">لینک اشتراک‌گذاری</h3>
-    <p data-i18n="linkS">این لینک بدون نیاز به ورود کار می‌کند و بعد از ۲۴ ساعت منقضی می‌شود.</p>
+    <p id="linkS" data-i18n="linkS">این لینک بدون نیاز به ورود کار می‌کند و بعد از ۲۴ ساعت منقضی می‌شود.</p>
     <div class="linkbox">
       <code id="linkUrl"></code>
       <button class="btn btn-primary" style="width:auto" id="copyBtn" data-i18n="copy">کپی</button>
     </div>
+    <img id="linkQr" alt="QR" style="display:none;margin:14px auto 0;border-radius:10px;width:150px;height:150px;background:#fff;padding:6px">
     <div style="margin-top:14px;text-align:end">
       <button class="btn btn-ghost" id="linkClose" data-i18n="close">بستن</button>
     </div>
@@ -578,7 +603,9 @@ const I18N={
   noMatch:"فایلی مطابق جستجو نیست", retry:"تلاش مجدد",
   secKeys:"کلیدهای API", keyNamePh:"نام کلید (مثلاً ci-bot)", mkKey:"ساخت کلید",
   keyOnce:"این کلید را الان کپی کن — دوباره نمایش داده نمیشود", revoke:"لغو",
-  revOk:"کلید لغو شد", noKeys:"هنوز کلیدی نساخته‌ای", pasteT:"چسباندن از کلیپ‌بورد"
+  revOk:"کلید لغو شد", noKeys:"هنوز کلیدی نساخته‌ای", pasteT:"چسباندن از کلیپ‌بورد",
+  linkOptT:"گزینه‌های اشتراک", linkTtl:"انقضا", linkPwLab:"رمز عبور (اختیاری)",
+  mkLink:"ساخت لینک", linkPw:"لینک رمزدار شد — رمز:"
  },
  en:{
   title:"anbar", loginSub:"Sign in to anbar — Telegram-backed object storage",
@@ -615,7 +642,9 @@ const I18N={
   noMatch:"No files match your search", retry:"Retry",
   secKeys:"API keys", keyNamePh:"key name (e.g. ci-bot)", mkKey:"Create key",
   keyOnce:"Copy this key now — it will not be shown again", revoke:"Revoke",
-  revOk:"Key revoked", noKeys:"No keys yet", pasteT:"Paste from clipboard"
+  revOk:"Key revoked", noKeys:"No keys yet", pasteT:"Paste from clipboard",
+  linkOptT:"Share options", linkTtl:"Expiry", linkPwLab:"Password (optional)",
+  mkLink:"Create link", linkPw:"Password-protected link — password:"
  }
 };
 let lang=localStorage.getItem("anbar-lang")||(navigator.language.startsWith("fa")?"fa":"fa");
@@ -767,10 +796,10 @@ function visibleFiles(){
 }
 $("#fSearch").oninput=e=>{
   fQuery=e.target.value.trim();
-  $("#fClear").hidden=!fQuery;
+  $("#fClear").style.display=fQuery?"flex":"none";
   renderRows();
 };
-$("#fClear").onclick=()=>{fQuery="";$("#fSearch").value="";$("#fClear").hidden=true;renderRows();};
+$("#fClear").onclick=()=>{fQuery="";$("#fSearch").value="";$("#fClear").style.display="none";renderRows();};
 $("#fSort").onchange=e=>{fSortMode=e.target.value;localStorage.setItem("anbar-sort",fSortMode);renderRows();};
 {  // restore saved sort selection once the DOM is parsed
   const s=document.getElementById("fSort");
@@ -908,21 +937,54 @@ $("#fmDl").onclick=()=>{
 $("#fmShare").onclick=async()=>{
   if(!fmObj)return;
   $("#fmClose").onclick();
-  shareLink(fmObj);
+  shareTarget=fmObj;
+  $("#sharePw").value="";
+  $("#shareOptsModal").classList.add("on");
 };
 
-async function shareLink(o){
+async function shareLink(o,opts){
+  opts=opts||{};
+  let q="ttl="+(opts.ttl||86400);
+  if(opts.pw)q+="&password="+encodeURIComponent(opts.pw);
   try{
-    const r=await api("/f/"+o.id+"/link?ttl=86400",{method:"POST"});
+    const r=await api("/f/"+o.id+"/link?"+q,{method:"POST"});
     $("#linkUrl").textContent=r.url;
+    const sub=$("#linkS");
+    if(r.password_protected){sub.textContent=t("linkPw")+" — "+(opts.pw);}
+    else sub.textContent=t("linkS");
+    const qr=$("#linkQr");
+    qr.src="/f/"+o.id+"/qr?_="+Date.now();
+    qr.style.display="block";
     $("#linkModal").classList.add("on");
   }catch(e){toast(e.message,"err");}
 }
+let shareTarget=null;
+$("#shareOpts").onsubmit=async ev=>{
+  ev.preventDefault();
+  if(!shareTarget)return;
+  const pw=$("#sharePw").value.trim();
+  const ttlSel=$("#shareTtl").value;
+  await shareLink(shareTarget,{pw,ttl:parseInt(ttlSel)||86400});
+  $("#shareOptsModal").classList.remove("on");
+};
 $("#copyBtn").onclick=async()=>{
   try{await navigator.clipboard.writeText($("#linkUrl").textContent);toast(t("copied"));}
   catch(e){$("#linkUrl").select?null:0;toast("copy failed","err");}
 };
 $("#linkClose").onclick=()=>$("#linkModal").classList.remove("on");
+// share-options modal: close via scrim click or Esc
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){
+    $("#shareOptsModal").classList.remove("on");
+    $("#linkModal").classList.remove("on");
+  }
+});
+{ // close the options modal when clicking its backdrop
+  const m=document.getElementById("shareOptsModal");
+  if(m)m.addEventListener("click",e=>{
+    if(e.target===m)m.classList.remove("on");
+  });
+}
 $("#linkModal").onclick=e=>{if(e.target.id==="linkModal")$("#linkModal").classList.remove("on");};
 async function delObj(o){
   if(!confirm(t("delQ")))return;
