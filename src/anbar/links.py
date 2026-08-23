@@ -31,7 +31,35 @@ def register_link(db, obj_id: str, exp: int, *, slug: str | None = None,
         "pw": bool(password_protected),
         "max_dl": max_dl or None,
         "created_at": int(time.time()),
+        "downloads": 0,
     }, separators=(",", ":")))
+
+
+def bump_link_downloads(db, request, obj_id: str) -> None:
+    """Count a full download against every live link registered for the object.
+
+    Called from the download path (best-effort — stats must never break
+    the stream). Only full downloads count; range/partial requests don't.
+    """
+    try:
+        now = int(time.time())
+        for k, v in list(db.kv_all()):
+            if not k.startswith(KV_PREFIX):
+                continue
+            rest = k[len(KV_PREFIX):]
+            oid, exp_s = rest.rsplit(":", 1)
+            if oid != obj_id or is_revoked(db, oid, exp_s):
+                continue
+            try:
+                meta = json.loads(v)
+            except (ValueError, json.JSONDecodeError):
+                continue
+            if int(exp_s) <= now:
+                continue
+            meta["downloads"] = int(meta.get("downloads") or 0) + 1
+            db.kv_set(k, json.dumps(meta, separators=(",", ":")))
+    except Exception:  # noqa: BLE001 - stats are best-effort
+        pass
 
 
 def is_revoked(db, obj_id: str, exp: int) -> bool:

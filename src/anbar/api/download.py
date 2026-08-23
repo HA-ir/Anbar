@@ -310,6 +310,11 @@ async def download(request: Request, obj_id: str):
         headers["Content-Range"] = f"bytes {start}-{end}/{total}"
     status = 206 if start is not None else 200
     db.bump_downloads(obj_id)
+    if start is None:
+        # v0.10.4: per-link download stats (best-effort, full downloads only)
+        from .. import links as links_registry
+
+        links_registry.bump_link_downloads(db, request, obj_id)
     # per-link download cap (v0.9.2): count full downloads only, then 410
     maxdl = db.kv_get(f"maxdl:{obj_id}")
     if maxdl and start is None:
@@ -676,3 +681,222 @@ async def zip_download(request: Request):
             "Accept-Ranges": "none",
         },
     )
+
+
+# ── shared album (v0.10.4): one public link → gallery page of many files ─────
+ALBUM_PREFIX = "album:"  # album:<token> -> {"ids": [...], "created_at": int}
+
+
+def _album_token(n: int = 12) -> str:
+    import secrets
+
+    alphabet = "abcdefghijkmnpqrstuvwxyz23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(n))
+
+
+@router.post("/album")
+async def album_create(request: Request):
+    """Mint one share link for several objects.
+
+    POST /f/album  body: {"ids": [...], "title"?: str}
+    Returns {"url": "<base>/a/<token>", "token": ...} — the page at /a/<token>
+    shows a gallery with per-file view/download links (no auth needed).
+    """
+    settings = request.app.state.settings
+    db = request.app.state.db
+    role = whoami(request)
+    if effective_auth_enabled(db, settings.auth_enabled) and role == "anon":
+        raise HTTPException(401, "authentication required")
+    if role != "admin":
+        raise HTTPException(403, "admin only")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "json body required") from None
+    ids = body.get("ids") if isinstance(body, dict) else None
+    if not ids or not isinstance(ids, list):
+        raise HTTPException(400, "ids[] required")
+    title = str(body.get("title") or "").strip()[:120]
+    clean = []
+    for oid in [str(i) for i in ids][:100]:
+        row = db.get_object(str(oid))
+        if row is not None:
+            clean.append({"id": oid, "filename": row["filename"],
+                          "size": row["size"]})
+    if not clean:
+        raise HTTPException(404, "no valid objects")
+    token = _album_token()
+    db.kv_set(f"{ALBUM_PREFIX}{token}", json.dumps({
+        "ids": [c["id"] for c in clean],
+        "title": title,
+        "created_at": int(time.time()),
+    }, separators=(",", ":")))
+    base = settings.base_url.rstrip("/")
+    return {"token": token, "count": len(clean),
+            "url": f"{base}/f/a/{token}"}
+
+
+@router.get("/a/{token}", include_in_schema=False)
+async def album_page(request: Request, token: str):
+    """Public gallery page for a shared album (no auth)."""
+    db = request.app.state.db
+    settings = request.app.state.settings
+    raw = db.kv_get(f"{ALBUM_PREFIX}{token}")
+    if not raw:
+        return HTMLResponse(
+            "<!DOCTYPE html><html lang=\"fa\" dir=\"rtl\"><head>"
+            "<meta charset=\"utf-8\"><title>anbar</title></head>"
+            "<body style=\"font-family:sans-serif;text-align:center;"
+            "padding-top:20vh;color:#889\">این آلبوم موجود نیست یا حذف شده."
+            "</body></html>", status_code=404)
+    data = json.loads(raw)
+    items = []
+    for oid in data.get("ids", []):
+        row = db.get_object(oid)
+        if row is None:
+            continue  # deleted after sharing — just hide it
+        kind = None
+        ext = (row["filename"] or "").rsplit(".", 1)[-1].lower()
+        ct = row["content_type"] or ""
+        if ct.startswith(("image/", "photo")) or ext in {
+                "jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"}:
+            kind = "image"
+        elif ct.startswith("video/") or ext in {
+                "mp4", "webm", "mkv", "mov", "avi", "m4v"}:
+            kind = "video"
+        elif ct.startswith("audio/") or ext in {
+                "mp3", "ogg", "wav", "flac", "m4a", "opus", "aac"}:
+            kind = "audio"
+        elif ext == "pdf":
+            kind = "pdf"
+        items.append({
+            "id": oid, "name": row["filename"], "kind": kind,
+            "ct": ct or "application/octet-stream",
+            "size": row["size"],
+            "sig": sign(oid, int(data["created_at"]) + 86400 * 30,
+                        effective_hmac_secret(
+                            db, settings.hmac_secret.get_secret_value()
+                            if settings.hmac_secret else None)),
+            "exp": int(data["created_at"]) + 86400 * 30,
+        })
+    title = data.get("title") or f"anbar · {len(items)} فایل"
+    import html as _html
+
+    payload = json.dumps(items).replace("</", "<\\/")
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{_html.escape(title)}</title>
+<style>
+:root{{--bg:#0b0f17;--bg2:#121826;--bg3:#1a2234;--line:#232c40;--line2:#2d3852;
+--tx:#e7ecf5;--tx2:#aab3c5;--tx3:#6b7690;--brand:#2f6bff}}
+@media(prefers-color-scheme:light){{:root{{--bg:#f3f6fb;--bg2:#fff;--bg3:#eaeff7;
+--line:#dde3ee;--line2:#cbd3e4;--tx:#17202f;--tx2:#48536a;--tx3:#8590a8}}}}
+*{{box-sizing:border-box;margin:0}}
+body{{background:var(--bg);color:var(--tx);
+font-family:'Vazirmatn',system-ui,'Segoe UI',Tahoma,sans-serif;padding:24px 16px}}
+h1{{font-size:17px;font-weight:700;text-align:center;margin-bottom:4px}}
+.sub{{text-align:center;color:var(--tx3);font-size:12px;margin-bottom:22px}}
+.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;
+max-width:1100px;margin:0 auto}}
+.cell{{background:var(--bg2);border:1px solid var(--line);border-radius:14px;overflow:hidden}}
+.thumb{{height:130px;background:var(--bg3);display:flex;align-items:center;
+justify-content:center;overflow:hidden;cursor:pointer;position:relative}}
+.thumb img,.thumb video{{width:100%;height:100%;object-fit:cover}}
+.thumb .ico{{color:var(--tx3);font-weight:800;font-size:13px;letter-spacing:.1em;
+display:flex;flex-direction:column;align-items:center;gap:6px}}
+.thumb .ico svg{{width:32px;height:32px;fill:none;stroke:currentColor;
+stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}}
+.gplay{{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.55);color:#fff;
+font-size:11px;padding:2px 7px;border-radius:8px}}
+.cname{{font-size:12px;padding:9px 10px 2px;white-space:nowrap;overflow:hidden;
+text-overflow:ellipsis;direction:ltr;text-align:left}}
+.csub{{font-size:11px;color:var(--tx3);padding:0 10px 10px;display:flex;
+justify-content:space-between;align-items:center}}
+.csub a{{color:var(--brand);text-decoration:none;font-weight:700}}
+.csub a:hover{{text-decoration:underline}}
+.lightbox{{display:none;position:fixed;inset:0;background:rgba(5,8,14,.92);
+z-index:50;align-items:center;justify-content:center;padding:20px;flex-direction:column;gap:14px}}
+.lightbox.on{{display:flex}}
+.lightbox img,.lightbox video{{max-width:94vw;max-height:80vh;border-radius:12px}}
+.lightbox iframe{{width:min(900px,94vw);height:min(720px,84vh);
+border:none;border-radius:12px;background:#fff}}
+.lbclose{{position:absolute;top:14px;left:16px;background:none;border:none;
+color:#fff;font-size:26px;cursor:pointer;padding:8px}}
+.lbdl{{padding:10px 22px;border-radius:11px;background:var(--brand);color:#fff;
+border:none;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
+text-decoration:none}}
+@media(max-width:480px){{.grid{{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}}.thumb{{height:104px}}}}
+</style>
+</head>
+<body>
+<h1>{_html.escape(title)}</h1>
+<div class="sub">{len(items)} فایل · anbar</div>
+<div class="grid" id="grid"></div>
+<div class="lightbox" id="lb">
+  <button class="lbclose" id="lbc">✕</button>
+  <div id="lbcnt"></div>
+  <a class="lbdl" id="lbdl" download>دانلود</a>
+</div>
+<script>
+const ITEMS = JSON.parse(__PAYLOAD__);
+const grid = document.getElementById('grid');
+function fmt(n){{
+  if(n>=1073741824)return (n/1073741824).toFixed(1)+' GB';
+  if(n>=1048576)return (n/1048576).toFixed(1)+' MB';
+  if(n>=1024)return (n/1024).toFixed(0)+' KB';
+  return n+' B';
+}}
+const ICO={{
+pdf:'<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12'
+   +'a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span>PDF</span>',
+audio:'<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/>'
+     +'<circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+other:'<svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2'
+     +'h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg>'}};
+ITEMS.forEach((it,i)=>{{
+  const url='/f/'+it.id+'?sig='+it.sig+'&exp='+it.exp;
+  let th;
+  if(it.kind==='image')th='<img loading="lazy" src="'+url+'" alt="">';
+  else if(it.kind==='video')th='<video src="'+url+'#t=1.5" preload="metadata" muted>'
+    +'</video><span class="gplay">▶</span>';
+  else th='<div class="ico">'+(ICO[it.kind]||ICO.other)+'</div>';
+  const cell=document.createElement('div');
+  cell.className='cell';
+  cell.innerHTML='<div class="thumb" data-i="'+i+'">'+th+'</div>'
+    +'<div class="cname">'+(it.name||'file')+'</div>'
+    +'<div class="csub"><span>'+fmt(it.size)+'</span>'
+    +(it.kind==='pdf'?'<a href="'+url+'" target="_blank">نمایش ↗</a>'
+      :'<a href="'+url+'" download>دانلود ⬇</a>')+'</div>';
+  grid.appendChild(cell);
+}});
+const lb=document.getElementById('lb'),cnt=document.getElementById('lbcnt'),
+      bdl=document.getElementById('lbdl');
+function openLb(i){{
+  const it=ITEMS[i],url='/f/'+it.id+'?sig='+it.sig+'&exp='+it.exp;
+  if(it.kind==='image')cnt.innerHTML='<img src="'+url+'" alt="">';
+  else if(it.kind==='video')cnt.innerHTML='<video src="'+url
+    +'" controls autoplay></video>';
+  else if(it.kind==='audio')cnt.innerHTML='<audio src="'+url
+    +'" controls autoplay style="width:min(500px,90vw)"></audio>';
+  else if(it.kind==='pdf')cnt.innerHTML='<iframe src="'+url+'"></iframe>';
+  else cnt.innerHTML='';
+  bdl.href=url;bdl.download=it.name||'file';
+  lb.classList.add('on');
+}}
+grid.addEventListener('click',e=>{{
+  const t=e.target.closest('.thumb');if(!t)return;
+  openLb(+t.dataset.i);
+}});
+document.getElementById('lbc').onclick=()=>{{
+  lb.classList.remove('on');cnt.innerHTML='';}};
+lb.addEventListener('click',e=>{{
+  if(e.target===lb){{lb.classList.remove('on');cnt.innerHTML='';}}}});
+document.addEventListener('keydown',e=>{{
+  if(e.key==='Escape'){{lb.classList.remove('on');cnt.innerHTML='';}}}});
+</script>
+</body>
+</html>""".replace("__PAYLOAD__", payload))

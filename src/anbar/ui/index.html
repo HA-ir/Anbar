@@ -186,6 +186,13 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .gthumb{height:110px;background:var(--bg2);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
 .gthumb img,.gthumb video{width:100%;height:100%;object-fit:cover}
 .gicon{font-size:22px;font-weight:700;color:var(--tx3);letter-spacing:.05em}
+/* gallery: real audio player + PDF card */
+.gaudio{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;padding:10px}
+.gaudio svg{width:30px;height:30px;fill:none;stroke:var(--brand);stroke-width:1.7;stroke-linecap:round;flex:none;margin-top:4px}
+.gaudio audio{width:100%;height:36px}
+.gpdf{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#ff5d6c}
+.gpdf svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.gpdf span{font-size:11px;font-weight:800;letter-spacing:.12em}
 .gplay{position:absolute;inset:auto auto 6px 6px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:8px}
 .gname{font-size:12px;padding:8px 10px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gsub{font-size:11px;color:var(--tx3);padding:0 10px 10px}
@@ -758,6 +765,7 @@ const I18N={
   mkLink:"ساخت لینک", linkPw:"لینک رمزدار شد — رمز:",
   linkNameLab:"نام لینک (اختیاری)", ttlNever:"هرگز (بدون انقضا)",
   shareSel:"اشتراک انتخاب‌شده‌ها", zipDl:"دانلود ZIP",
+  albumOk:"لینک آلبوم ساخته شد", albumSub:"یک لینک برای همه فایل‌ها — گالری عمومی با دانلود تکی",
   linksT:"لینک‌های فعال", linksS:"همه لینک‌های ساخته‌شده — امکان ابطال فوری",
   trashT:"سطل بازیافت", trashS:"موارد تا ۷ روز قابل بازیابی‌اند، بعد خودکار حذف می‌شوند.",
   trashEmpty:"خالی کردن سطل", restore:"بازیابی", purge:"حذف قطعی",
@@ -813,6 +821,7 @@ const I18N={
   mkLink:"Create link", linkPw:"Password-protected link — password:",
   linkNameLab:"Link name (optional)", ttlNever:"Never (no expiry)",
   shareSel:"Share selected", zipDl:"Download ZIP",
+  albumOk:"Album link created", albumSub:"One link for all files — public gallery with per-file download",
   linksT:"Active links", linksS:"Every minted link — revoke instantly",
   trashT:"Trash", trashS:"Items stay restorable for 7 days, then purge automatically.",
   trashEmpty:"Empty trash", restore:"Restore", purge:"Delete forever",
@@ -1155,7 +1164,9 @@ function renderGallery(list){
     let inner;
     if(kind==="image")inner='<img loading="lazy" src="'+url+'" alt="">';
     else if(kind==="video")inner='<video src="'+url+'#t=1.5" preload="metadata" muted></video><span class="gplay">▶</span>';
-    else if(kind==="audio")inner='<div class="gicon">♪</div>';
+    else if(kind==="audio")inner='<div class="gaudio"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
+      +'<audio src="'+url+'" controls preload="metadata"></audio></div>';
+    else if(kind==="pdf")inner='<div class="gpdf"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg><span>PDF</span></div>';
     else inner='<div class="gicon">'+esc((extOf(o.filename)||"bin").toUpperCase().slice(0,4))+'</div>';
     cell.innerHTML='<div class="gthumb">'+inner+'</div>'
       +'<div class="gname" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</div>'
@@ -1177,7 +1188,7 @@ function renderGallery(list){
       cell.querySelector(".selbox").checked=selSet.has(o.id);
     };
     cell.querySelector(".gthumb").addEventListener("click",e=>{
-      if(e.target.closest(".selbox,.gacts"))return;
+      if(e.target.closest(".selbox,.gacts,audio"))return;
       e.stopPropagation();
       openFileModal(o);
     });
@@ -1248,22 +1259,19 @@ $("#shareOpts").addEventListener("submit",async ev=>{
   const ttl=Number.isFinite(ttlRaw)&&ttlRaw>=0?ttlRaw:86400;
   const max=$("#shareMax")?Math.max(0,parseInt($("#shareMax").value)||0):0;
   $("#shareOptsModal").classList.remove("on");
-  const urls=[];
-  let ok=0;
-  for(const id of selSet){
-    let q="ttl="+ttl;
-    if(pw)q+="&password="+encodeURIComponent(pw);
-    if(max>0)q+="&max_dl="+max;
-    try{
-      const r=await api("/f/"+id+"/link?"+q,{method:"POST"});
-      urls.push(r.pretty_url||r.url);ok++;
-    }catch(e){urls.push("✗ "+id+": "+e.message);}
-  }
-  $("#linkT_h").textContent=t("shareSel")+" ("+ok+")";
-  $("#linkS").textContent="";
-  $("#linkUrl").textContent=urls.join("\n");
-  const qr=$("#linkQr");qr.style.display="none";
-  $("#linkModal").classList.add("on");
+  /* v0.10.4: one ALBUM link for the whole selection (gallery page) */
+  try{
+    const j=await api("/f/album",{method:"POST",
+      body:JSON.stringify({ids:[...selSet]})});
+    $("#linkT_h").textContent=t("albumOk")+" ("+j.count+")";
+    $("#linkS").textContent=t("albumSub");
+    $("#linkUrl").textContent=j.url;
+    const qr=$("#linkQr");
+    qr.src="/f/"+[...selSet][0]+"/qr?_="+Date.now();
+    qr.style.display="block";
+    $("#linkModal").classList.add("on");
+    return;
+  }catch(e){toast(e.message,"err");}
 },{once:false});
 /* ── links manager (v0.10) ── */
 function humanTtl(s){
@@ -1328,7 +1336,10 @@ $("#linksModal").onclick=e=>{if(e.target.id==="linksModal")$("#linksModal").clas
 let mgTarget=null;
 function openManage(L){
   mgTarget=L;
-  $("#mgName").textContent=(L.filename||L.obj_id)+(L.slug?"  ·  /f/"+L.slug:"");
+  const dlN=L.downloads??0;
+  $("#mgName").textContent=(L.filename||L.obj_id)
+    +(L.slug?"  ·  /f/"+L.slug:"")
+    +"  ·  ⬇ "+dlN;
   $("#mgPw").value="";$("#mgMax").value=L.max_dl||0;$("#mgOut").style.display="none";
   $("#mgWarn").style.display="none";
   // preselect the closest TTL option to what remains of the current link
