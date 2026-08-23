@@ -335,9 +335,26 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
   td:first-child::before{display:none}  /* file row is self-describing */
   td .acts{justify-content:flex-end}
   .num{font-size:13px;color:var(--tx)}
-  .modal-card{padding:20px 16px}
+  .modal-card{padding:20px 16px;max-width:calc(100vw - 16px)}
+  .modal{padding:8px}
   .drawer{width:100%}
   .btn-ghost{padding:8px 11px;font-size:12.5px}
+  /* share-options form: stack label above control, URL never overflows */
+  #shareOpts .set-row,.modal-card .set-row{
+    flex-direction:column;align-items:stretch;gap:6px;padding:7px 0}
+  #shareOpts .set-row .lab,.modal-card .set-row .lab{flex:none}
+  #shareOpts .set-row>div,.modal-card .set-row>div{flex:none;width:100%;min-width:0;direction:ltr}
+  #slugBase{display:block;max-width:100%;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;font-size:10.5px;margin-bottom:2px}
+  #shareOpts .set-row>div input,#shareOpts .set-row>div select,
+  .modal-card .set-row input[type=text],.modal-card .set-row select,
+  .modal-card .set-row input[type=number],.modal-card .set-row input[type=password]{
+    width:100%;flex:none;min-width:0;box-sizing:border-box}
+  /* links manager rows: wrap actions under the title on narrow screens */
+  .lnk-row{flex-wrap:wrap;gap:6px}
+  .lnk-main{flex:1;min-width:0}
+  .lk-acts{display:flex;gap:6px;flex:none;margin-inline-start:auto}
+  .keyrow{gap:10px}
 }
 </style>
 </head>
@@ -707,7 +724,7 @@ const I18N={
   ftPdf:"PDF", ftOther:"سایر", noLinks:"هنوز لینکی نساخته‌ای",
   noTrash:"سطل خالی است", revoked:"ابطال شد", expired:"منقضی",
   linkRevoked:"لینک ابطال شد", restored:"بازیابی شد", purged:"برای همیشه حذف شد",
-  zipStart:"در حال ساخت ZIP…",
+  zipStart:"در حال ساخت ZIP…", open:"باز کردن", revokeB:"ابطال لینک",
   renameT:"تغییر نام", renameOk:"نام تغییر کرد", selAll:"همه", selNone:"هیچ",
   delSel:"حذف انتخاب‌شده‌ها", nSelected:"انتخاب‌شده",
   maxDlLab:"سقف تعداد دانلود (۰ = بی‌نهایت)"
@@ -759,7 +776,7 @@ const I18N={
   ftPdf:"PDF", ftOther:"Other", noLinks:"No links yet",
   noTrash:"Trash is empty", revoked:"Revoked", expired:"Expired",
   linkRevoked:"Link revoked", restored:"Restored", purged:"Deleted forever",
-  zipStart:"Building ZIP…",
+  zipStart:"Building ZIP…", open:"Open", revokeB:"Revoke link",
   renameT:"Rename", renameOk:"Renamed", selAll:"All", selNone:"None",
   delSel:"Delete selected", nSelected:"selected",
   maxDlLab:"Download cap (0 = unlimited)"
@@ -1220,16 +1237,32 @@ async function openLinks(){
    box.innerHTML="";
    links.forEach(L=>{
      const d=document.createElement("div");
-     d.className="keyrow";
-     const badge=L.revoked?'<span class="tag bot" style="background:var(--err-soft);color:var(--err)">'+esc(t("revoked"))+'</span>'
-       :L.expired?'<span class="tag bot">'+esc(t("expired"))+'</span>'
-       :'<span class="tag mtproto">'+humanTtl(L.exp-Math.floor(Date.now()/1000))+'</span>';
-     d.innerHTML='<span class="kn" style="direction:ltr;text-align:left">'
-       +esc((L.filename||L.obj_id))+(L.slug?' <span style="color:var(--tx3);font-size:10.5px">/f/'+esc(L.slug)+'</span>':'')
-       +(L.pw?' 🔒':'')+(L.max_dl?' ⬇'+L.max_dl:'')
-       +'</span>'+badge
-       +(L.revoked||L.expired?'':'<button class="btn btn-warn lkrev" style="padding:5px 12px;font-size:11.5px">'+esc(t("purge")===t("purge")?"✕":"✕")+'</button>');
+     d.className="keyrow lnk-row";
+     const badge=L.revoked?'<span class="tag bot lk-badge" style="background:var(--err-soft);color:var(--err)">'+esc(t("revoked"))+'</span>'
+       :L.expired?'<span class="tag bot lk-badge">'+esc(t("expired"))+'</span>'
+       :'<span class="tag mtproto lk-badge">'+humanTtl(L.exp-Math.floor(Date.now()/1000))+'</span>';
+     // rebuild the share URL: pretty slug when present, else signed form
+     let href;
+     if(L.slug&&!L.revoked)href=location.origin+"/f/"+encodeURIComponent(L.slug);
+     else href=location.origin+"/f/"+encodeURIComponent(L.obj_id)+"?sig="+L.sig+"&exp="+L.exp;
+     d.innerHTML='<div class="lnk-main">'
+       +'<div class="kn" style="direction:ltr;text-align:left;overflow:hidden;text-overflow:ellipsis">'
+       +esc((L.filename||L.obj_id))+(L.pw?' 🔒':'')+(L.max_dl?' <span style="color:var(--tx3);font-size:10.5px">⬇'+esc(String(L.max_dl))+'</span>':'')
+       +'</div>'
+       +(L.slug?'<div class="lnk-url" style="direction:ltr;text-align:left;color:var(--brand);font-size:11px;font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px">/f/'+esc(L.slug)+'</div>':'')
+       +'</div>'+badge
+       +'<div class="lk-acts">'
+       +(L.revoked||L.expired?''
+         :'<button class="btn btn-ghost lkopn" title="'+esc(t("open"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">↗</button>'
+          +'<button class="btn btn-ghost lkcpy" title="'+esc(t("copy"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">⧉</button>'
+          +'<button class="btn btn-warn lkrev" title="'+esc(t("revokeB"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">✕</button>')
+       +'</div>';
      if(!L.revoked&&!L.expired){
+       d.querySelector(".lkopn").onclick=()=>window.open(href,"_blank");
+       d.querySelector(".lkcpy").onclick=async()=>{
+         try{await navigator.clipboard.writeText(href);toast(t("copied"));}
+         catch(e){toast("copy failed","err");}
+       };
        d.querySelector(".lkrev").onclick=async()=>{
          try{
            await api("/api/v1/admin/links/"+L.obj_id+"/revoke/"+L.exp,{method:"POST"});

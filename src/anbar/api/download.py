@@ -21,7 +21,7 @@ import re
 import time
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from .. import runtime
 from ..auth import (
@@ -68,6 +68,97 @@ def _parse_range(header: str | None, total: int) -> tuple[int | None, int | None
 
 def _range_416(total: int) -> HTTPException:
     return HTTPException(416, "unsatisfiable range", headers={"Content-Range": f"bytes */{total}"})
+
+
+def _pw_locked(request: Request, db, settings, obj_id: str) -> bool:
+    """True when this request is a browser visit that still needs a password.
+
+    A visitor is "past" the password gate when the object has no pw tag at
+    all, or when the provided `?pw=` matches it (same HMAC the download
+    path checks). Everything else — missing or wrong `?pw` — shows the
+    unlock page. Admin/uploader sessions bypass entirely.
+    """
+    if not effective_auth_enabled(db, settings.auth_enabled):
+        return False
+    if whoami(request) in ("admin", "uploader"):
+        return False
+    pw_tag = db.kv_get(f"pw:{obj_id}")
+    if not pw_tag:
+        return False
+    given = request.query_params.get("pw", "")
+    import hashlib as _hashlib
+
+    want = _hashlib.sha256(f"pw:{obj_id}:{given}".encode()).hexdigest()[:32]
+    return not hmac.compare_digest(want, pw_tag)
+
+
+def _password_page(obj_id: str) -> str:
+    """Standalone RTL unlock page: asks for the password, reloads with ?pw=.
+
+    The page submits a GET form to itself, so after a correct password the
+    browser simply re-requests the same URL + `?pw=<typed>` and gets the
+    normal download/stream. `badpw=1` in the query shows the error line.
+    """
+    return """<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>anbar · قفل</title>
+<style>
+:root{--bg:#0b0f17;--bg2:#121826;--bg3:#1a2234;--line:#232c40;--line2:#2d3852;
+--tx:#e7ecf5;--tx2:#aab3c5;--tx3:#6b7690;--brand:#2f6bff;--err:#ff5d6c}
+@media(prefers-color-scheme:light){:root{--bg:#f3f6fb;--bg2:#ffffff;--bg3:#eaeff7;
+--line:#dde3ee;--line2:#cbd3e4;--tx:#17202f;--tx2:#48536a;--tx3:#8590a8}}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Vazirmatn',system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;
+min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+background:radial-gradient(1200px 600px at 70% -10%,
+rgba(47,107,255,.12),transparent 60%),var(--bg);color:var(--tx)}
+.card{width:100%;max-width:380px;background:var(--bg2);border:1px solid var(--line);
+border-radius:20px;padding:38px 30px;text-align:center;
+box-shadow:0 18px 50px rgba(0,0,0,.25);animation:rise .35s cubic-bezier(.2,.9,.3,1.15)}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+.lock{width:58px;height:58px;margin:0 auto 16px;border-radius:16px;display:flex;
+align-items:center;justify-content:center;background:var(--bg3);color:var(--brand)}
+h1{font-size:16.5px;font-weight:700;margin-bottom:6px}
+p{font-size:12.5px;color:var(--tx2);margin-bottom:20px;line-height:1.9}
+form{display:flex;gap:8px}
+input{flex:1;min-width:0;padding:12px 14px;border:1.5px solid var(--line2);border-radius:12px;
+background:var(--bg3);color:var(--tx);font-size:14px;font-family:inherit;outline:none;
+transition:border .15s}
+input:focus{border-color:var(--brand)}
+button{padding:12px 18px;border:none;border-radius:12px;background:var(--brand);color:#fff;
+font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+button:hover{filter:brightness(1.08)}
+.err{display:none;color:var(--err);font-size:12px;margin-top:12px}
+.foot{margin-top:22px;font-size:10.5px;color:var(--tx3);direction:ltr}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="lock">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18"
+      height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+  </div>
+  <h1>این فایل رمزدار است</h1>
+  <p>برای دسترسی به فایل، رمز عبور لینک را وارد کنید.</p>
+  <form method="get" action="" id="pf">
+    <input type="password" name="pw" id="pwin" autocomplete="off" autofocus placeholder="رمز عبور">
+    <button type="submit">باز کردن</button>
+  </form>
+  <div class="err" id="perr">رمز عبور اشتباه است — دوباره تلاش کنید.</div>
+  <div class="foot">powered by anbar</div>
+</div>
+<script>
+if(new URLSearchParams(location.search).has('badpw'))
+  document.getElementById('perr').style.display='block';
+document.getElementById('pwin').focus();
+</script>
+</body>
+</html>"""
 
 
 def _authenticate_download(request: Request, obj_id: str) -> None:
@@ -128,6 +219,11 @@ async def download(request: Request, obj_id: str):
     row = db.get_object(obj_id)
     if row is None:
         raise HTTPException(404, "object not found")
+    # v0.10.1: password-protected link opened WITHOUT ?pw (or with a wrong
+    # one) by a browser → render the unlock page instead of a bare 403.
+    wants_html = "text/html" in request.headers.get("accept", "")
+    if wants_html and _pw_locked(request, db, settings, obj_id) is True:
+        return HTMLResponse(_password_page(obj_id), status_code=200)
     _authenticate_download(request, obj_id)
 
     manifest = Manifest.from_json(row["manifest"])
