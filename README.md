@@ -23,6 +23,7 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 | F8 | Bilingual UI (fa/en), dark/light theme, runtime settings panel, speed-test docs, cache master-switch fix | ✅ `v0.8.1` |
 | v0.9.x | URL ingest · pw-protected links · QR · rename · multi-select · per-link download cap · gallery view · metadata export · PWA share target · folder upload · API-key mgmt UI · pretty link slugs (`/f/<name>`) · never-expiring links (`ttl=0`) · bulk share · selection UX polish | ✅ `v0.9.5` |
 | v0.10 | Link registry + instant revoke · Trash (soft delete / restore / auto-purge 7d) · streaming bulk ZIP · type filter · video poster frames | ✅ `v0.10.0` |
+| v0.10.x | Mobile responsive · pw unlock page (hidden sig+exp, eye toggle, keyed-HMAC fix) · link manager modal in-app · live-only links list + per-link download counters · shared albums (`/f/a/<token>`) · gallery audio/PDF previews | ✅ `v0.10.5` — live |
 
 ## Why
 
@@ -92,13 +93,21 @@ but inert, and the Web UI shows the cache section as disabled. This
 preserves the zero-retention guarantee: with the default configuration anbar
 writes **nothing** to disk except the SQLite metadata database.
 
-## Speed test (v0.8.3, bot backend)
+## Speed test (v0.10.5, bot backend)
 
-Measured **2026-08-22** on a production deployment
-(`anbar.example.com`, nginx + Cloudflare, `bot` backend, one Telegram account,
+Measured **2026-08-23** on a production deployment
+(`anbar.example.com`, nginx + Cloudflare bypassed via loopback, `bot` backend,
 16 MB chunk ceiling) with a Python client directly on `127.0.0.1:8317`.
 **Cache OFF** throughout (master switch default) — every number below is a
 real Telegram round-trip.
+
+| Size | Upload | Download 1st GET | Download 2nd GET |
+|------|--------|------------------|------------------|
+| 1 MB | 0.28 s — 3.6 MB/s | 0.57 s — 1.7 MB/s | 0.18 s — 5.6 MB/s |
+| 8 MB | 0.83 s — 9.6 MB/s | 1.20 s — 6.6 MB/s | 0.40 s — 20.0 MB/s |
+| 45 MB (3 chunks) | 5.03 s — 9.0 MB/s | 4.21 s — 10.7 MB/s | 0.82 s — 54.8 MB/s |
+
+Historical v0.8.3 run (2026-08-22, same setup):
 
 | Size | Upload | Download 1st GET | Download 2nd GET |
 |------|--------|------------------|------------------|
@@ -196,16 +205,25 @@ src/anbar/
 ├── db.py             # SQLite WAL metadata store (objects + kv + rate tables)
 ├── cache.py          # F6: optional LRU disk cache (off by default)
 ├── ratelimit.py      # F6: fixed-window rate limits (SQLite, no Redis)
-├── cli.py            # anbarctl — operational CLI
+├── cli.py            # anbarctl — operational CLI (auth/objects/put/get/link…)
+├── links.py          # link registry: revoke, live-only listing, dl counters
+├── qrcode.py         # dependency-free QR encoder for share links
+├── objects.py        # chunking + manifest assembly
+├── runtime.py        # runtime-tunable settings (kv-backed, F8)
+├── zipper.py         # streaming ZIP (v0.10 bulk download)
 ├── api/
 │   ├── upload.py     # POST /api/v1/upload, /upload/raw
-│   ├── download.py   # GET /f/{id}, /f/{id}/info
-│   └── admin.py      # GET /api/v1/admin/status (+ auth toggle)
+│   ├── ingest.py     # URL ingest: server pulls a remote URL into storage
+│   ├── notify.py     # best-effort Telegram ping after ingest
+│   ├── download.py   # /f/{id}, links, slugs, pw page, albums, ZIP, stats
+│   ├── webauth.py    # session-cookie login for the web dashboard
+│   └── admin.py      # status/settings/trash/link manager endpoints
 └── storage/
     ├── base.py       # StorageBackend interface + FakeBackend (test contract)
     ├── bot_backend.py# F2: Bot API via httpx (no bot framework)
     └── mtproto_backend.py  # F5: Telethon (dedicated account, 2 GB)
-tests/                # 67 passing — API golden tests, storage contract, hardening
+tests/                # 162 passing — API golden tests, CLI round-trip,
+                      #   storage contract, hardening
 docker/               # Dockerfile (non-root, healthcheck), compose.yaml
 nginx/anbar.conf.example
 docs/                 # ARCHITECTURE, API, DEPLOY, ROADMAP
@@ -216,8 +234,8 @@ docs/                 # ARCHITECTURE, API, DEPLOY, ROADMAP
 
 ```bash
 uv sync --extra dev
-uv run pytest -q          # 67 passing
-uv run anbarctl version   # anbar 0.6.0
+uv run pytest -q          # 162 passing
+uv run anbarctl version   # anbar 0.10.5
 ```
 
 Run a local instance with the in-memory backend (no Telegram needed):
@@ -238,17 +256,42 @@ curl http://127.0.0.1:8317/healthz
 
 Put Caddy or your existing Nginx in front (TLS). See [docs/DEPLOY.md](docs/DEPLOY.md).
 
-## Share links (v0.9.5–v0.10)
+## Share links (v0.9.5–v0.10.5)
 
 - **Pretty names** — `POST /f/{id}/link?slug=report-2026` also serves the file
   at `/f/report-2026`. Names are unique (`409` on conflict), `[a-z0-9-_]`,
   max 64 chars, and freed when the object is destroyed.
 - **Never-expiring** — `ttl=0` mints a link signed for ~100 years.
-- **Registry + revoke** — every mint is registered; `GET /api/v1/admin/links`
-  lists all (filename, slug, 🔒, ⬇cap, state) and
+- **Passwords** — `&password=…` stores only an HMAC tag; browsers get an RTL
+  unlock page (with show/hide eye) whose hidden fields carry `sig`/`exp`
+  through the form, so submitting the correct password downloads the file.
+  Non-browser clients keep plain HTTP semantics (`401/403`).
+- **Download cap** — `&max_dl=N` kills the link after N full downloads.
+- **Registry + revoke** — every mint is registered;
+  [`GET /api/v1/admin/links`](docs/API.md) lists live links with filename,
+  slug, 🔒, ⬇cap and a per-link download counter, and
   `POST /api/v1/admin/links/{obj_id}/revoke/{exp}` kills a link *instantly*
-  (its URL starts returning `410 link revoked`). Tombstones self-clean after
-  7 days; pw/cap/slug tags are dropped with their last live link.
+  (its URL starts returning `410 link revoked`).
+- **Manage in place** — the ↗ button in the links list opens an in-app modal
+  (same look as the share dialog): change TTL / password / download cap →
+  the old window is revoked and a fresh link with the same slug is minted,
+  ready to copy. The ✕ button revokes outright.
+
+## Shared albums (v0.10.5)
+
+Select multiple files → «اشتراک انتخاب‌شده‌ها» → **one** public link:
+`/f/a/<token>` renders an RTL gallery page (no auth needed) with image and
+video thumbs, inline audio players, a PDF lightbox and per-file download
+links backed by 30-day signatures. Files deleted later just disappear from
+the album — the page never breaks. Mint it programmatically via
+`POST /f/album {"ids": […], "title": "…"}`.
+
+## Gallery previews (v0.10.4–v0.10.5)
+
+The gallery view plays audio right in each card (native `<audio>` element)
+and gives PDFs a proper document card; images/videos keep real thumbnails.
+Everything streams straight from Telegram through the server — zero disk
+usage for previews (the optional cache stays off by default).
 
 ## Trash (v0.10)
 
@@ -276,7 +319,7 @@ button drives it from the browser.
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — layers, data flow, chunking, storage locations
-- [API reference](docs/API.md) — every endpoint, auth matrix, error codes
+- [API reference](docs/API.md) — every endpoint, auth matrix, error codes, **anbarctl CLI reference**
 - [Deployment guide](docs/DEPLOY.md) — Docker, Caddy/Nginx, secrets, ops runbook
 - [Roadmap](docs/ROADMAP.md) — phase details, decisions, open questions
 

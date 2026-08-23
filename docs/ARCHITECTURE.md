@@ -144,8 +144,15 @@ eviction just means the next download re-streams from Telegram.
 Toggle has three levels: env (`ANBAR_AUTH_ENABLED`, needs restart), runtime API
 (`POST /api/v1/auth/toggle`, persisted in `kv`), CLI (`anbarctl auth on|off`).
 
-Signed URL format: `{base}/f/{id}?e=<unix expiry>&s=<hmac>` — or no expiry for
-permanent links. With auth off, signed links keep working (backwards compatible).
+Signed URL format: `{base}/f/{id}?sig=<hmac>&exp=<unix>` (ttl=0 → ~100-year
+expiry). Optional extras minted with the link: `slug` (`/f/<name>` pretty
+route), `password` (HMAC tag only; browsers get an unlock page whose hidden
+fields re-carry `sig`/`exp`), `max_dl` cap, and a per-link download counter
+(kv-backed, full GETs only). Every live link is registered in `kv`
+(`link:<obj>:<exp>`) so it can be listed and revoked instantly; revoked
+windows move to `rev:<obj>:<exp>`. Shared albums store their id list under
+`album:<token>` and serve a public gallery at `/f/a/<token>` using 30-day
+signatures per item.
 
 ## Failure modes
 

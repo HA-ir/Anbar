@@ -13,8 +13,9 @@
 | F7 | `f7-web-ui` | web UI (RTL): login with admin key → signed session cookie; list / upload / download / delete / share | UI E2E green: cookie-auth upload+download, tamper rejected, logout invalidates | ✅ v0.7.0 — E2E 14/14 on prod |
 | F9 | `main` | v0.8.x–v0.9.x: URL ingest, pw links, QR, rename, multi-select, per-link cap, gallery, PWA share target, folder upload, API-key UI, pretty slugs (`/f/<name>`), never-expire links (`ttl=0`), bulk share, selection UX | each release: tests+ruff green → build `f<N>` → deploy | ✅ v0.9.5 |
 | F10 | `main` | **v0.10**: link registry + instant revoke · trash (soft delete/restore/7-day auto-purge) · streaming bulk ZIP · type filter · video poster frames | 134 tests green; live smoke on prod; deployed | ✅ v0.10.0 |
+| — | `main` | **v0.10.1–v0.10.5** (hardening & UX): mobile responsive · pw unlock page w/ hidden sig+exp (keyed-HMAC fix) · link manager modal in-app · live-only links list · shared albums (`/f/a/<token>`) · per-link download counters · gallery audio/PDF previews | 162 tests green; live smoke on prod each release | ✅ v0.10.5 |
 
-## Open items (post-v0.10)
+## Open items (post-v0.10.5)
 
 - **MTProto on prod** — `/app/secrets` still empty; needs a dedicated
   account + `api_id`/`api_hash`. Deferred by the maintainer until the bot-backend

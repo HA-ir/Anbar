@@ -117,24 +117,55 @@ curl -X DELETE https://h/f/k3xQ9aB2mN0p -H "Authorization: Bearer ***"          
 curl -X DELETE "https://h/f/k3xQ9aB2mN0p?purge=true" -H "Authorization: Bearer ***"  # → destroy
 ```
 
-### `POST /f/{id}/link?ttl=3600`  *(F4)*
+### `POST /f/{id}/link?ttl=3600`  *(F4, v0.9.5–v0.10.4)*
 
-Mint a signed download link (owner or admin). `ttl` is a query parameter in
-seconds (clamped to 60…604800, default 3600; **`ttl=0` = never-expiring**,
-signed for ~100 years). Optional **`slug=<name>`** also serves the object at
-`/f/<name>` — `[a-z0-9-_]`, ≤64 chars, unique across all objects: minting an
-owned slug is idempotent, someone else's returns `409 link name already
-taken`, invalid characters return `400`. Signature is
-`HMAC-SHA256(secret, "<id>:<exp>")`; the secret is the rotated value from
-`kv` or `ANBAR_HMAC_SECRET` as fallback.
+Mint a signed download link (owner or admin). Query parameters:
+
+| param | default | meaning |
+|-------|---------|---------|
+| `ttl` | 3600 | validity in seconds (clamped 60…604800; **`0` = never-expiring**, signed ~100 years) |
+| `slug` | – | pretty name: object also served at `/f/<name>` (`[a-z0-9-_]`, ≤64 chars, unique; minting your own slug again is idempotent, someone else's → `409`, invalid chars → `400`) |
+| `password` | – | link then requires `?pw=<password>`; stored only as an HMAC tag (`HMAC(secret, "pw:<id>:<pw>")[:32]`) — plaintext never persisted |
+| `max_dl` | 0 | cap on full downloads through this link (`0` = unlimited); the Nth+1 full GET returns `410 download limit reached` |
+
+Signature is `HMAC-SHA256(secret, "<id>:<exp>")`; the secret is the rotated
+value from `kv` or `ANBAR_HMAC_SECRET` as fallback.
 
 ```json
 {"url": "https://h/f/k3xQ9aB2mN0p?sig=59c2…&exp=1787300281",
  "expires_at": 1787300281, "ttl_seconds": 3600,
- "slug": "report-2026", "pretty_url": "https://h/f/report-2026"}
+ "slug": "report-2026", "pretty_url": "https://h/f/report-2026",
+ "password_protected": true, "max_downloads": 5}
 ```
 
-Every mint is registered in the link registry (see `/api/v1/admin/links`).
+Every mint is registered in the link registry (see `/api/v1/admin/links`)
+and starts a per-link **download counter** (v0.10.4): each *full* GET with
+the valid signature bumps that link's count (range/partial requests don't).
+The counter is visible via `/api/v1/admin/links` and the in-app manage modal.
+Password-protected links serve an RTL unlock page to browsers
+(`Accept: text/html`) carrying hidden `sig`/`exp` fields so submitting the
+form keeps the signature intact; wrong passwords re-show the page with an
+inline error. `GET /f/{id}?view=1` adds `Content-Disposition: inline`
+(display instead of download).
+
+### Shared albums — `POST /f/album` + `GET /f/a/{token}`  *(v0.10.5)*
+
+One public link for many objects. Body `{"ids": ["…", …], "title"?: "…"}`
+(≤100 ids; missing ids skipped; none valid → `404`). Returns
+`{"token", "count", "url": "<base>/f/a/<token>"}`. The album page is a
+public RTL gallery (no auth): image/video thumbs, inline audio players,
+PDF lightbox, per-file view/download links backed by 30-day signatures.
+Objects deleted after sharing are simply hidden from the page; unknown
+tokens get a friendly `404`. Admin/session only for minting.
+
+### Link manager page/modal — `GET /api/v1/admin/links/{obj_id}/manage?exp=`  *(v0.10.3)*
+
+Admin/session HTML form showing one link's settings and its download
+count. The in-app modal (↗ button in the links list) does the same without
+leaving the dashboard: changing TTL / password / download-cap revokes the
+current window and mints a fresh link with the same slug; the new URL is
+shown with a copy button. Removing both password and cap from a protected
+link asks for confirmation first.
 
 ### `GET /api/v1/admin/objects?limit=50&offset=0`  *(F4)*
 
@@ -214,13 +245,14 @@ metadata change, no data loss). Returns the number of entries removed
 {"purged": 3}
 ```
 
-### `GET /api/v1/admin/links?limit=200`  *(v0.10)*
+### `GET /api/v1/admin/links?limit=200`  *(v0.10, live-only v0.10.2)*
 
-All registered share links, newest-expiry first. Each row: `obj_id`,
+Registered share links, newest-expiry first. Each row: `obj_id`,
 `filename` (null if the object was purged), `exists`, `exp`, `expired`,
-`revoked`, plus mint-time metadata (`slug`, `pw`, `max_dl`, `created_at`).
-Revoked links stay visible (tombstone) until 7 days after their original
-expiry.
+`revoked`, mint-time metadata (`slug`, `pw`, `max_dl`, `created_at`) and
+the per-link download counter (`downloads`). **Default shows live links
+only** — revoked and expired ones are hidden so the list reflects what is
+actually shareable right now; pass `?include_dead=1` for the audit view.
 
 ### `POST /api/v1/admin/links/{obj_id}/revoke/{exp}`  *(v0.10)*
 
@@ -254,6 +286,50 @@ total). The archive is generated on the fly (O(chunk) memory, nothing
 buffered on disk); entries keep filenames with a short-id suffix and are
 de-duplicated. Admin/session only; `application/zip` attachment named
 `anbar-YYYYMMDD-HHMMSS.zip`. Missing ids are skipped; all-missing → `404`.
+
+## `anbarctl` — the CLI  *(F4, v0.10.5)*
+
+`anbarctl` ships with the package (`[project.scripts]` in pyproject.toml)
+and talks to a running server over plain HTTP — no DB access needed, so it
+works remotely too. Config via flags or env:
+
+| source | flag | env |
+|--------|------|-----|
+| Server URL | `--base-url` | `ANBAR_BASE_URL` (default `http://127.0.0.1:8317`) |
+| Admin key | `--admin-key` | `ANBAR_ADMIN_KEY` |
+
+Commands (all verified against a live v0.10.5 instance):
+
+| command | what it does |
+|---------|--------------|
+| `anbarctl version` | print client version (no server needed) |
+| `anbarctl auth on\|off` | runtime toggle; idempotent ("already ON/OFF") |
+| `anbarctl rotate-secret` | rotate HMAC secret (all old signed links die) |
+| `anbarctl objects [--limit N]` | list objects, newest first |
+| `anbarctl link <id> [--ttl S]` | mint a signed link (default 3600s), prints URL |
+| `anbarctl put <file>` | multipart upload; prints `uploaded <id> (<bytes>)` |
+| `anbarctl get <id> -o <out>` | mint a 120 s link and stream the file to `<out>` |
+| `anbarctl login --api-id … --api-hash … --phone …` | MTProto session bootstrap |
+| `anbarctl install [--env-file F]` | write a systemd unit (non-root user) |
+
+Example round-trip:
+
+```bash
+export ANBAR_BASE_URL=https://anbar.example.com ANBAR_ADMIN_KEY=***
+anbarctl put report.pdf          # → uploaded k3xQ9aB2mN0p (482113 bytes)
+anbarctl link k3xQ9aB2mN0p       # → https://anbar.example.com/f/k3xQ…?sig=…
+anbarctl get k3xQ9aB2mN0p -o copy.pdf
+```
+
+Notes:
+
+- `put/get` are streaming-friendly but read the whole file into memory for
+  the multipart body — fine for typical files, not for multi-GB uploads.
+- Behind Cloudflare, some datacenter IPs get `403` from CF's bot rules on
+  python-urllib user agents; run the CLI from the host itself
+  (`http://127.0.0.1:8317`) or allowlist your IP in that case.
+- Exit codes: `0` success, `1` HTTP/business error (message on stderr),
+  `2` cannot reach the server.
 
 ## Rate limits
 

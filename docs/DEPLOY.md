@@ -175,13 +175,23 @@ KB of metadata). That is the whole point of Anbar.
 |------|---------|
 | Toggle auth (no restart) | `anbarctl auth on` / `anbarctl auth off` |
 | Rotate HMAC secret | `anbarctl rotate-secret` |
-| List objects | `anbarctl objects` |
+| List objects | `anbarctl objects [--limit 50]` |
 | Mint a share link | `anbarctl link <object_id> --ttl 3600` |
+| Upload a file | `anbarctl put /path/file` → prints object id |
+| Download an object | `anbarctl get <id> -o out.bin` (mints a 120 s link) |
+| Revoke one link | `curl -X POST …/api/v1/admin/links/<obj>/revoke/<exp>` (admin key) |
+| List live links + counters | `curl …/api/v1/admin/links?limit=200` (admin key) |
 | MTProto login (once) | `anbarctl login --api-id … --api-hash … --phone …` |
 | Health | `curl http://127.0.0.1:8317/healthz` |
 | Check backend / cache | `curl …/api/v1/admin/status` (admin key) |
 | Install as systemd (no Docker) | `anbarctl install --env-file /etc/anbar/.env` (then `systemctl enable --now anbar`) |
 | Update | `git pull && cd docker && docker compose up -d` (DB migrations are forward-only) |
+
+CLI config: `--base-url` / `$ANBAR_BASE_URL`, `--admin-key` /
+`$ANBAR_ADMIN_KEY`. On the server itself use
+`ANBAR_BASE_URL=http://127.0.0.1:8317` — going through Cloudflare with the
+python-urllib user agent can trip CF bot rules (`403`). Full command
+reference lives in [API.md](API.md#anbarctl--the-cli-f4-v0105).
 
 ### Non-Docker (fallback)
 
