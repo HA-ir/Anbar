@@ -130,7 +130,9 @@ def test_delete_owner(backend, client):
     """With a single API key, the uploader owns everything it uploaded."""
     obj = _upload(client, headers=AUTH)
     assert client.delete(f"/f/{obj}", headers=AUTH).status_code == 200
-    # gone now
+    # v0.10: first delete trashes; the row survives until purged
+    assert client.delete(f"/f/{obj}?purge=true", headers=AUTH).status_code == 200
+    # gone for real now
     assert client.delete(f"/f/{obj}", headers=AUTH).status_code == 404
 
 

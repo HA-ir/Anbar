@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS objects (
   manifest      TEXT,
   uploader_key  TEXT,
   created_at    INTEGER NOT NULL,
-  downloaded    INTEGER DEFAULT 0
+  downloaded    INTEGER DEFAULT 0,
+  deleted_at    INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_objects_created ON objects(created_at DESC);
 CREATE TABLE IF NOT EXISTS kv (
@@ -45,11 +46,22 @@ def _connect(path: Path) -> sqlite3.Connection:
 
 
 class Database:
+    # trash retention: soft-deleted rows purge themselves after 7 days
+    TRASH_TTL_S = 7 * 86400
+
     def __init__(self, path: Path):
         self.path = path
         self._conn = _connect(path)
         self._conn.executescript(SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after v0.9 (idempotent, ALTER-only)."""
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(objects)")}
+        if "deleted_at" not in cols:
+            self._conn.execute("ALTER TABLE objects ADD COLUMN deleted_at INTEGER")
+            self._conn.commit()
 
     # -- objects ---------------------------------------------------------
     def insert_object(self, obj: dict[str, Any]) -> None:
@@ -67,17 +79,36 @@ class Database:
         )
         self._conn.commit()
 
-    def get_object(self, obj_id: str) -> dict[str, Any] | None:
+    def get_object(self, obj_id: str, *, include_trashed: bool = False) -> dict[str, Any] | None:
         row = self._conn.execute(
             "SELECT * FROM objects WHERE id = ?", (obj_id,)
         ).fetchone()
-        return dict(row) if row else None
+        if row is None:
+            return None
+        d = dict(row)
+        if not include_trashed and d.get("deleted_at"):
+            return None  # soft-deleted rows vanish from the normal path
+        return d
 
-    def list_objects(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+    def list_objects(self, limit: int = 50, offset: int = 0,
+                     trash: bool = False) -> list[dict[str, Any]]:
+        where = "WHERE deleted_at IS NOT NULL" if trash else "WHERE deleted_at IS NULL"
+        order = ("deleted_at DESC" if trash else "created_at DESC")
         rows = self._conn.execute(
-            "SELECT id, filename, size, backend, created_at, downloaded, manifest "
-            "FROM objects ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            f"SELECT id, filename, size, backend, created_at, downloaded, deleted_at "
+            f"FROM objects {where} ORDER BY {order} LIMIT ? OFFSET ?",
             (limit, offset),
+        ).fetchall()
+        out = [{**dict(r), "chunks": 0} for r in rows]
+        return out
+
+    def list_objects_full(self, limit: int = 500,
+                          trash: bool = False) -> list[dict[str, Any]]:
+        """Listing that includes manifests (needed for ZIP/purge work)."""
+        where = "WHERE deleted_at IS NOT NULL" if trash else "WHERE deleted_at IS NULL"
+        rows = self._conn.execute(
+            f"SELECT * FROM objects {where} ORDER BY created_at DESC LIMIT ?",
+            (limit,),
         ).fetchall()
         out = []
         for r in rows:
@@ -86,15 +117,57 @@ class Database:
                 d["chunks"] = len(json.loads(d["manifest"])["chunks"]) if d.get("manifest") else 0
             except (json.JSONDecodeError, KeyError, TypeError):
                 d["chunks"] = 0
-            d.pop("manifest", None)
-            d.pop("uploader_key", None)  # credential — never listed
-            out.append(d)
+            return_list = ["id", "filename", "size", "backend", "created_at",
+                           "downloaded", "chunks", "content_type", "manifest",
+                           "uploader_key", "file_id", "deleted_at"]
+            out.append({k: d[k] for k in return_list if k in d})
         return out
 
     def delete_object(self, obj_id: str) -> bool:
         cur = self._conn.execute("DELETE FROM objects WHERE id = ?", (obj_id,))
         self._conn.commit()
         return cur.rowcount > 0
+
+    # -- trash (v0.10): soft delete → restore / hard purge -----------------
+    def soft_delete(self, obj_id: str) -> bool:
+        cur = self._conn.execute(
+            "UPDATE objects SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+            (int(time.time()), obj_id),
+        )
+        self._conn.commit()
+        return cur.rowcount > 0
+
+    def restore_object(self, obj_id: str) -> bool:
+        cur = self._conn.execute(
+            "UPDATE objects SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
+            (obj_id,),
+        )
+        self._conn.commit()
+        return cur.rowcount > 0
+
+    def trash_count(self) -> int:
+        row = self._conn.execute(
+            "SELECT COUNT(*) AS n FROM objects WHERE deleted_at IS NOT NULL").fetchone()
+        return row["n"]
+
+    def purge_expired_trash(self) -> list[str]:
+        """Hard-delete rows whose soft-delete is older than TRASH_TTL_S.
+
+        Only unsets metadata — the caller is responsible for deleting the
+        Telegram blobs before (or after) dropping the row. Returns the ids
+        purged so the API layer can clean remote blobs.
+        """
+        cutoff = int(time.time()) - self.TRASH_TTL_S
+        rows = self._conn.execute(
+            "SELECT id FROM objects WHERE deleted_at IS NOT NULL AND deleted_at < ?",
+            (cutoff,),
+        ).fetchall()
+        ids = [r["id"] for r in rows]
+        if ids:
+            self._conn.executemany(
+                "DELETE FROM objects WHERE id = ?", [(i,) for i in ids])
+            self._conn.commit()
+        return ids
 
     def rename_object(self, obj_id: str, filename: str) -> bool:
         cur = self._conn.execute(

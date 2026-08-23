@@ -42,8 +42,9 @@ def test_delete_clears_pw_tag(client):
     from urllib.parse import urlparse
     u = urlparse(client.post(f"/f/{oid}/link?ttl=600", headers=ADMIN).json()["url"])
     assert client.get(u.path + "?" + u.query).status_code == 403
-    # delete → tag gone
+    # delete → v0.10 trashes the object; purge destroys it for real
     client.delete(f"/f/{oid}", headers=ADMIN)
-    # kv tag must be gone after delete
+    # kv tag must be gone after purge
+    client.delete(f"/f/{oid}?purge=true", headers=ADMIN)
     db = client.app.state.db
     assert db.kv_get(f"pw:{oid}") is None

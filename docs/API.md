@@ -101,27 +101,40 @@ Metadata without the body (open when useful, see matrix).
  "created_at":1787296681,"downloaded":42}
 ```
 
-### `DELETE /f/{id}`  *(F4)*
+### `DELETE /f/{id}`  *(F4, v0.10 trash)*
 
-Removes the remote blob(s) (best-effort `deleteMessage`) + the metadata row.
-Owner or admin key. `200` with `{"deleted": true, "id": "…",
-"blobs_removed": 1}`, `404` if absent.
+**v0.10:** default is a **soft delete** — the object vanishes from listings
+and downloads (`404`), but blobs stay in Telegram and the row is restorable
+for 7 days. Returns `{"trashed": true, "id": "…", "restore_within_s": 604800}`.
+
+Add `?purge=true` for the old hard delete: remote blob(s) removed
+(best-effort `deleteMessage`) + metadata row dropped + pw/cap/slug/link tags
+cleaned. Returns `{"purged": true, "id": "…", "blobs_removed": 1}`.
+Owner or admin key; purging a trashed object is allowed (idempotent).
 
 ```bash
-curl -X DELETE https://h/f/k3xQ9aB2mN0p -H "Authorization: Bearer ***"
+curl -X DELETE https://h/f/k3xQ9aB2mN0p -H "Authorization: Bearer ***"          # → trash
+curl -X DELETE "https://h/f/k3xQ9aB2mN0p?purge=true" -H "Authorization: Bearer ***"  # → destroy
 ```
 
 ### `POST /f/{id}/link?ttl=3600`  *(F4)*
 
 Mint a signed download link (owner or admin). `ttl` is a query parameter in
-seconds (clamped to 60…604800, default 3600). Signature is
+seconds (clamped to 60…604800, default 3600; **`ttl=0` = never-expiring**,
+signed for ~100 years). Optional **`slug=<name>`** also serves the object at
+`/f/<name>` — `[a-z0-9-_]`, ≤64 chars, unique across all objects: minting an
+owned slug is idempotent, someone else's returns `409 link name already
+taken`, invalid characters return `400`. Signature is
 `HMAC-SHA256(secret, "<id>:<exp>")`; the secret is the rotated value from
 `kv` or `ANBAR_HMAC_SECRET` as fallback.
 
 ```json
 {"url": "https://h/f/k3xQ9aB2mN0p?sig=59c2…&exp=1787300281",
- "expires_at": 1787300281, "ttl_seconds": 3600}
+ "expires_at": 1787300281, "ttl_seconds": 3600,
+ "slug": "report-2026", "pretty_url": "https://h/f/report-2026"}
 ```
+
+Every mint is registered in the link registry (see `/api/v1/admin/links`).
 
 ### `GET /api/v1/admin/objects?limit=50&offset=0`  *(F4)*
 
@@ -201,6 +214,47 @@ metadata change, no data loss). Returns the number of entries removed
 {"purged": 3}
 ```
 
+### `GET /api/v1/admin/links?limit=200`  *(v0.10)*
+
+All registered share links, newest-expiry first. Each row: `obj_id`,
+`filename` (null if the object was purged), `exists`, `exp`, `expired`,
+`revoked`, plus mint-time metadata (`slug`, `pw`, `max_dl`, `created_at`).
+Revoked links stay visible (tombstone) until 7 days after their original
+expiry.
+
+### `POST /api/v1/admin/links/{obj_id}/revoke/{exp}`  *(v0.10)*
+
+Kill one link **immediately**: its URL keeps the signature but starts
+returning `410 link revoked`. `200 {"revoked": true, …}`; `404` when the
+link was already revoked or never registered. When an object's last live
+link goes, its pw / download-cap / slug tags are dropped too.
+
+### `GET /api/v1/admin/objects/{id}/link-info`  *(v0.10)*
+
+The same rows filtered to one object (used by the file-detail modal).
+
+### `GET /api/v1/admin/trash`  *(v0.10)*
+
+Soft-deleted objects: `items[]` with `deleted_at` and `purge_in_s` (seconds
+until the automatic hard delete), plus `count`.
+
+### `POST /api/v1/admin/trash/{id}/restore`  *(v0.10)*
+
+Bring a trashed object back (`200 {"restored": id}`; `404` if not in trash).
+
+### `DELETE /api/v1/admin/trash/{id}`  *(v0.10)*
+
+Destroy one trashed object right now (blobs + metadata + tags).
+`200 {"purged": id, "blobs_removed": N}`. Admin only.
+
+### `POST /f/zip`  *(v0.10)*
+
+Stream a ZIP of several objects. Body `{"ids": ["…", …]}` (≤100 ids, ≤8 GB
+total). The archive is generated on the fly (O(chunk) memory, nothing
+buffered on disk); entries keep filenames with a short-id suffix and are
+de-duplicated. Admin/session only; `application/zip` attachment named
+`anbar-YYYYMMDD-HHMMSS.zip`. Missing ids are skipped; all-missing → `404`.
+
 ## Rate limits
 
 Fixed-window counters in SQLite (no Redis):
@@ -217,12 +271,13 @@ A `0` limit disables that limiter. Over-limit requests return
 
 | Code | Meaning |
 |------|---------|
-| 400 | malformed request (missing name, bad range) |
+| 400 | malformed request (missing name, bad range, invalid slug) |
 | 401 | missing/unknown credential |
 | 403 | valid credential, not permitted (wrong role, invalid signature) |
 | 404 | unknown object id |
-| 410 | signed link expired |
-| 413 | over configured upload ceiling |
+| 409 | slug already taken by another object *(v0.9.5)* |
+| 410 | signed link expired — or **revoked** (`link revoked`) *(v0.10)* |
+| 413 | over configured upload ceiling / ZIP selection too large |
 | 429 | rate limited (see `Retry-After`) |
 | 502 | upstream (Telegram) failure |
 | 503 | service degraded / backend unhealthy |

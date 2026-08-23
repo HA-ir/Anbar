@@ -31,6 +31,7 @@ from ..auth import (
     verify_sig,
     whoami,
 )
+from ..db import Database
 from ..objects import Manifest
 from ..ratelimit import limit_download
 from ..storage import ObjectRef
@@ -86,6 +87,11 @@ def _authenticate_download(request: Request, obj_id: str) -> None:
         exp = int(exp_raw)
     except ValueError:
         raise HTTPException(403, "invalid signature") from None
+    # revoked links die immediately even before expiry (v0.10)
+    from .. import links as links_registry
+
+    if links_registry.is_revoked(db, obj_id, exp):
+        raise HTTPException(410, "link revoked")
     configured = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
     secret = effective_hmac_secret(db, configured)
     if not secret or not verify_sig(obj_id, exp, sig, secret):
@@ -260,6 +266,12 @@ async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL,
     if slug:
         out["slug"] = slug
         out["pretty_url"] = f"{base}/f/{slug}"
+
+    from .. import links as links_registry
+
+    links_registry.register_link(db, obj_id, exp, slug=slug or None,
+                                 password_protected=bool(password.strip()),
+                                 max_dl=max_dl)
     if password.strip():
         pw_tag = hmac.new(secret.encode(), f"pw:{obj_id}:{password.strip()}".encode(),
                           hashlib.sha256).hexdigest()[:32]
@@ -300,16 +312,17 @@ async def qr(request: Request, obj_id: str):
 
 
 @router.delete("/{obj_id}")
-async def delete(request: Request, obj_id: str):
-    """Delete the object (metadata + channel blobs). Owner or admin only.
+async def delete(request: Request, obj_id: str, purge: bool = False):
+    """Trash an object (soft delete) — or destroy it with ?purge=true.
 
-    The Telegram blobs are deleted best-effort; metadata removal is the
-    authoritative step.
+    Soft delete hides the object everywhere and schedules real deletion
+    after 7 days; restore brings it back. `purge=true` deletes the
+    Telegram blobs right now (old hard-delete behaviour).
     """
     settings = request.app.state.settings
     db = request.app.state.db
     backend = request.app.state.backend
-    row = db.get_object(obj_id)
+    row = db.get_object(obj_id, include_trashed=True)
     if row is None:
         raise HTTPException(404, "object not found")
     role = whoami(request)
@@ -319,33 +332,22 @@ async def delete(request: Request, obj_id: str):
     if not (role == "admin" or (role == "uploader" and is_owner)):
         raise HTTPException(403, "admin or owner key required")
 
-    manifest = json.loads(row["manifest"]) if row["manifest"] else {"chunks": []}
-    deleted_blobs = 0
-    for c in manifest.get("chunks", []):
-        try:
-            ref = ObjectRef(
-                file_id=c["f"],
-                message_id=c.get("m"),
-                backend=row["backend"],
-            )
-            if await backend.delete(ref):
-                deleted_blobs += 1
-        except Exception:  # noqa: BLE001 - best-effort remote cleanup
-            pass
-    db.delete_object(obj_id)
-    # drop any per-object kv tags (pw, download cap, pretty-link slugs)
-    for k, v in list(db.kv_all()):
-        if v == obj_id and k.startswith("slug:"):
-            db.kv_delete(k)
-    # drop any cached copy of this object (and its chunks, if chunked ids share
-    # the prefix) so a re-upload under a new id never serves stale bytes
+    if not purge:
+        # v0.10: soft delete → object vanishes from listings/downloads but
+        # stays restorable for 7 days; blobs stay in Telegram untouched.
+        if db.soft_delete(obj_id):
+            cache = getattr(request.app.state, "cache", None)
+            if cache is not None:
+                cache.remove(obj_id)
+            return {"trashed": True, "id": obj_id,
+                    "restore_within_s": Database.TRASH_TTL_S}
+        # already trashed → fall through to a real purge (idempotent UI)
+
+    deleted_blobs = await _purge_object_blobs(backend, db, row)
     cache = getattr(request.app.state, "cache", None)
     if cache is not None:
         cache.remove(obj_id)
-    db.kv_delete(f"pw:{obj_id}")  # drop a stale pw tag, if any
-    db.kv_delete(f"maxdl:{obj_id}")
-    db.kv_delete(f"dlc:{obj_id}")
-    return {"deleted": True, "id": obj_id, "blobs_removed": deleted_blobs}
+    return {"purged": True, "id": obj_id, "blobs_removed": deleted_blobs}
 
 
 @router.patch("/{obj_id}")
@@ -385,6 +387,38 @@ def _key_matches(request: Request, uploader_key: str) -> bool:
     return constant_time_equal(key, uploader_key)
 
 
+async def _purge_object_blobs(backend, db, row: dict) -> int:
+    """Hard-destroy one object row + its Telegram blobs. Returns blob count."""
+    obj_id = row["id"]
+    manifest = json.loads(row["manifest"]) if row["manifest"] else {"chunks": []}
+    deleted = 0
+    for c in manifest.get("chunks", []):
+        try:
+            ref = ObjectRef(
+                file_id=c["f"],
+                message_id=c.get("m"),
+                backend=row["backend"],
+            )
+            if await backend.delete(ref):
+                deleted += 1
+        except Exception:  # noqa: BLE001 - best-effort remote cleanup
+            pass
+    db.delete_object(obj_id)
+    # drop per-object kv tags (pw, cap, slugs, link registrations/tombstones)
+    from ..links import KV_PREFIX as _LK
+    from ..links import REV_PREFIX as _RV
+
+    for k, v in list(db.kv_all()):
+        if (v == obj_id and k.startswith("slug:")) or (
+            k.startswith((_LK, _RV)) and len(k.split(":", 2)) == 3
+            and k.split(":", 2)[1] == obj_id
+        ):
+            db.kv_delete(k)
+    for tag in ("pw:", "maxdl:", "dlc:"):
+        db.kv_delete(f"{tag}{obj_id}")
+    return deleted
+
+
 @router.get("/{obj_id}/info")
 async def info(request: Request, obj_id: str):
     db = request.app.state.db
@@ -403,4 +437,83 @@ async def info(request: Request, obj_id: str):
             "created_at": row["created_at"],
             "downloaded": row["downloaded"],
         }
+    )
+
+
+# ── bulk ZIP download (v0.10) ─────────────────────────────────────────────────
+@router.post("/zip")
+async def zip_download(request: Request):
+    """Stream several objects as one ZIP archive.
+
+    POST /f/zip  body: {"ids": ["id1", "id2", ...]}
+    The archive is generated on the fly (O(chunk) memory) and piped to the
+    client — nothing is buffered on disk. Admin/session only.
+    """
+    settings = request.app.state.settings
+    db = request.app.state.db
+    role = whoami(request)
+    if effective_auth_enabled(db, settings.auth_enabled) and role == "anon":
+        raise HTTPException(401, "authentication required")
+    if role != "admin":
+        raise HTTPException(403, "admin only")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "json body required") from None
+    ids = body.get("ids") if isinstance(body, dict) else None
+    if not ids or not isinstance(ids, list):
+        raise HTTPException(400, "ids[] required")
+    ids = [str(i) for i in ids][:100]  # sane cap
+
+    entries: list[tuple[str, str, dict]] = []
+    total = 0
+    from ..zipper import entry_name
+
+    used_names: set[str] = set()
+    for oid in ids:
+        row = db.get_object(oid)
+        if row is None:
+            continue  # skip missing instead of failing the whole archive
+        manifest = json.loads(row["manifest"]) if row["manifest"] else {"chunks": []}
+        name = entry_name(row["filename"], oid)
+        stem, dot, ext = name.rpartition(".")
+        base = name
+        n = 1
+        while base in used_names:
+            n += 1
+            base = f"{stem}-{n}{dot}{ext}" if dot else f"{name}-{n}"
+        used_names.add(base)
+        entries.append((base, oid, manifest))
+        total += row["size"]
+    if not entries:
+        raise HTTPException(404, "no valid objects")
+    if total > 8 * 1024**3:
+        raise HTTPException(413, "selection too large for one archive (>8 GB)")
+
+    backend = request.app.state.backend
+
+    async def fetch_chunk(obj_id: str, chunk_index: int,
+                          chunk_offset: int, length: int) -> bytes:
+        row = db.get_object(obj_id)
+        if row is None:
+            return b"\0" * length  # vanished mid-zip: keep offsets intact
+        manifest = json.loads(row["manifest"]) if row["manifest"] else {"chunks": []}
+        chunks = manifest.get("chunks", [])
+        if chunk_index >= len(chunks):
+            return b"\0" * length
+        c = chunks[chunk_index]
+        ref = ObjectRef(file_id=c["f"], message_id=c.get("m"), backend=row["backend"])
+        blob = await backend.open(ref)
+        return blob[chunk_offset:chunk_offset + length]
+
+    from ..zipper import stream_zip
+
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    return StreamingResponse(
+        stream_zip(entries, fetch_chunk),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="anbar-{stamp}.zip"',
+            "Accept-Ranges": "none",
+        },
     )

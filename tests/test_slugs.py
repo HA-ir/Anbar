@@ -68,6 +68,7 @@ def test_slug_freed_on_delete(client):
     oid = _upload(client)
     client.post(f"/f/{oid}/link?ttl=60&slug=temp", headers=ADMIN)
     client.delete(f"/f/{oid}", headers=ADMIN)
+    client.delete(f"/f/{oid}?purge=true", headers=ADMIN)  # v0.10: real destroy
     db = client.app.state.db
     assert db.kv_get("slug:temp") is None
     # and a new object can claim it

@@ -259,3 +259,79 @@ async def api_keys_revoke(request: Request, key_id: str):
     if not ok:
         raise HTTPException(404, "unknown key id")
     return {"revoked": key_id}
+
+
+# ── Share-link management (v0.10) ────────────────────────────────────────────
+@router.get("/admin/links")
+async def links_list(request: Request, limit: int = 200):
+    """All registered share links (newest first): expiry, slug, state."""
+    require_admin(request)
+    from ..links import list_links
+
+    return {"links": list_links(request.app.state.db, limit=limit)}
+
+
+@router.post("/admin/links/{obj_id}/revoke/{exp}")
+async def link_revoke(request: Request, obj_id: str, exp: int):
+    """Kill one link immediately (its URL starts returning 410)."""
+    require_admin(request)
+    from .. import links as links_registry
+
+    ok = links_registry.revoke(request.app.state.db, obj_id, exp)
+    if not ok:
+        raise HTTPException(404, "unknown link")
+    return {"revoked": True, "obj_id": obj_id, "exp": exp}
+
+
+@router.get("/admin/objects/{obj_id}/link-info")
+async def link_info(request: Request, obj_id: str):
+    """Links of a single object (used by the file detail modal)."""
+    require_admin(request)
+    from ..links import list_links
+
+    rows = [r for r in list_links(request.app.state.db, limit=500)
+            if r["obj_id"] == obj_id]
+    return {"links": rows}
+
+
+# ── Trash (v0.10) ─────────────────────────────────────────────────────────────
+@router.get("/admin/trash")
+async def trash_list(request: Request):
+    """Soft-deleted objects with their remaining restorable window."""
+    require_admin(request)
+    db = request.app.state.db
+    import time as _time
+
+    now = int(_time.time())
+    items = []
+    for r in db.list_objects(limit=500, trash=True):
+        deleted_at = r.get("deleted_at") or 0
+        items.append({
+            **{k: v for k, v in r.items() if k != "deleted_at"},
+            "deleted_at": deleted_at,
+            "purge_in_s": max(0, db.TRASH_TTL_S - (now - deleted_at)),
+        })
+    return {"items": items, "count": len(items)}
+
+
+@router.post("/admin/trash/{obj_id}/restore")
+async def trash_restore(request: Request, obj_id: str):
+    require_admin(request)
+    ok = request.app.state.db.restore_object(obj_id)
+    if not ok:
+        raise HTTPException(404, "not in trash")
+    return {"restored": obj_id}
+
+
+@router.delete("/admin/trash/{obj_id}")
+async def trash_purge_one(request: Request, obj_id: str):
+    """Permanently destroy one trashed object (blobs + metadata) now."""
+    from ..api.download import _purge_object_blobs
+
+    require_admin(request)
+    db = request.app.state.db
+    row = db.get_object(obj_id, include_trashed=True)
+    if row is None:
+        raise HTTPException(404, "object not found")
+    removed = await _purge_object_blobs(request.app.state.backend, db, row)
+    return {"purged": obj_id, "blobs_removed": removed}

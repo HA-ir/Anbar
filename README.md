@@ -21,6 +21,8 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 | F6 | Hardening: rate limiting, LRU cache, load test, docs, production deploy | ✅ `v0.6.0` — deployed |
 | F7 | Web UI (RTL): login → signed session cookie; list / upload / download / delete / share | ✅ `v0.7.0` |
 | F8 | Bilingual UI (fa/en), dark/light theme, runtime settings panel, speed-test docs, cache master-switch fix | ✅ `v0.8.1` |
+| v0.9.x | URL ingest · pw-protected links · QR · rename · multi-select · per-link download cap · gallery view · metadata export · PWA share target · folder upload · API-key mgmt UI · pretty link slugs (`/f/<name>`) · never-expiring links (`ttl=0`) · bulk share · selection UX polish | ✅ `v0.9.5` |
+| v0.10 | Link registry + instant revoke · Trash (soft delete / restore / auto-purge 7d) · streaming bulk ZIP · type filter · video poster frames | ✅ `v0.10.0` |
 
 ## Why
 
@@ -235,6 +237,41 @@ curl http://127.0.0.1:8317/healthz
 ```
 
 Put Caddy or your existing Nginx in front (TLS). See [docs/DEPLOY.md](docs/DEPLOY.md).
+
+## Share links (v0.9.5–v0.10)
+
+- **Pretty names** — `POST /f/{id}/link?slug=report-2026` also serves the file
+  at `/f/report-2026`. Names are unique (`409` on conflict), `[a-z0-9-_]`,
+  max 64 chars, and freed when the object is destroyed.
+- **Never-expiring** — `ttl=0` mints a link signed for ~100 years.
+- **Registry + revoke** — every mint is registered; `GET /api/v1/admin/links`
+  lists all (filename, slug, 🔒, ⬇cap, state) and
+  `POST /api/v1/admin/links/{obj_id}/revoke/{exp}` kills a link *instantly*
+  (its URL starts returning `410 link revoked`). Tombstones self-clean after
+  7 days; pw/cap/slug tags are dropped with their last live link.
+
+## Trash (v0.10)
+
+`DELETE /f/{id}` no longer destroys anything: it soft-deletes (hides from
+listings/downloads, blobs stay in Telegram). Trashed objects:
+
+- appear in `GET /api/v1/admin/trash` with their remaining window;
+- come back via `POST /api/v1/admin/trash/{id}/restore`;
+- die for real via `DELETE /api/v1/admin/trash/{id}` (or `DELETE /f/{id}?purge=true`)
+  which removes the Telegram blobs best-effort and drops metadata;
+- purge **automatically after 7 days** (background loop).
+
+The UI adds a trash button (with count badge), restore / delete-forever rows,
+and an "empty trash" action.
+
+## Bulk ZIP download (v0.10)
+
+`POST /f/zip` with `{"ids": [...]}` streams one archive built on the fly —
+O(one chunk) memory, nothing buffered on disk. Entries keep filenames
+(suffixed with the short object id, de-duplicated). Admin/session only,
+capped at 100 files / 8 GB per request. The selection bar's «دانلود ZIP»
+button drives it from the browser.
+
 
 ## Documentation
 

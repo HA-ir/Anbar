@@ -11,6 +11,17 @@
 | F5 | `f5-mtproto` | Telethon backend (dedicated account, Saved Messages), 2 GB, backend selection at runtime | file > 100 MB uploaded/downloaded; bot & mtproto coexist | ✅ v0.5.0 (golden needs a real account) |
 | F6 | `f6-hardening` | rate limiting (SQLite), LRU cache (off by default), load test, docs final, production deploy | golden test end-to-end; `v1.0` tag | ✅ v0.6.0 — deployed (`anbar.example.com`) — `v1.0` tag deferred at user request |
 | F7 | `f7-web-ui` | web UI (RTL): login with admin key → signed session cookie; list / upload / download / delete / share | UI E2E green: cookie-auth upload+download, tamper rejected, logout invalidates | ✅ v0.7.0 — E2E 14/14 on prod |
+| F9 | `main` | v0.8.x–v0.9.x: URL ingest, pw links, QR, rename, multi-select, per-link cap, gallery, PWA share target, folder upload, API-key UI, pretty slugs (`/f/<name>`), never-expire links (`ttl=0`), bulk share, selection UX | each release: tests+ruff green → build `f<N>` → deploy | ✅ v0.9.5 |
+| F10 | `main` | **v0.10**: link registry + instant revoke · trash (soft delete/restore/7-day auto-purge) · streaming bulk ZIP · type filter · video poster frames | 134 tests green; live smoke on prod; deployed | ✅ v0.10.0 |
+
+## Open items (post-v0.10)
+
+- **MTProto on prod** — `/app/secrets` still empty; needs a dedicated
+  account + `api_id`/`api_hash`. Deferred by the maintainer until the bot-backend
+  path has been exercised more.
+- README benchmark table records the 2026-08-22 bot-backend numbers
+  (0.5 MB–1 GB); re-run after switching backends or chunk size.
+- Optional future: S3/local backend behind the same interface (design only).
 
 Each phase: branch → small commits (`fN: <summary>`) → tests green → merge to
 `main` → tag `v0.N.0`.

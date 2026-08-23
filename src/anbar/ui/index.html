@@ -424,9 +424,24 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <!-- files -->
     <div class="toolbar">
       <h2><span data-i18n="files">فایل‌ها</span><span class="count" id="cnt">0</span></h2>
+      <select id="fType" aria-label="type filter" style="width:auto;padding:8px 10px;border:1.5px solid var(--line2);border-radius:9px;background:var(--bg2);color:var(--tx);font-family:inherit;font-size:13px">
+        <option value="" data-i18n="ftAll">همه انواع</option>
+        <option value="image" data-i18n="ftImage">عکس</option>
+        <option value="video" data-i18n="ftVideo">ویدیو</option>
+        <option value="audio" data-i18n="ftAudio">صدا</option>
+        <option value="pdf" data-i18n="ftPdf">PDF</option>
+        <option value="other" data-i18n="ftOther">سایر</option>
+      </select>
       <button class="btn btn-ghost" id="selAllBtn" style="width:auto" data-i18n="selAll">همه</button>
       <button class="btn btn-ghost" id="viewBtn" style="width:auto;padding:8px 11px" title="gallery">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </button>
+      <button class="btn btn-ghost" id="trashBtn" style="width:auto;padding:8px 11px" title="trash">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg>
+        <span class="count" id="trashCnt" style="display:none"></span>
+      </button>
+      <button class="btn btn-ghost" id="linksBtn" style="width:auto;padding:8px 11px" title="links">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
       </button>
       <button class="btn btn-ghost" id="refBtn">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"/></svg>
@@ -436,6 +451,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <div id="selBar" style="display:none;align-items:center;gap:10px;margin:-8px 0 14px;padding:8px 14px;background:var(--brand-soft);border:1px solid var(--line2);border-radius:10px;font-size:13px">
       <strong id="selCnt">0</strong>
       <button class="btn btn-ghost" id="selShareBtn" style="width:auto;padding:7px 12px" data-i18n="shareSel">اشتراک انتخاب‌شده‌ها</button>
+      <button class="btn btn-ghost" id="selZipBtn" style="width:auto;padding:7px 12px" data-i18n="zipDl">دانلود ZIP</button>
       <button class="btn btn-danger" id="selDelBtn" style="width:auto;padding:7px 12px" data-i18n="delSel">حذف انتخاب‌شده‌ها</button>
     </div>
 
@@ -597,6 +613,31 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
   </div>
 </div>
 
+<!-- links manager modal -->
+<div class="modal" id="linksModal">
+  <div class="modal-card">
+    <h3 data-i18n="linksT">لینک‌های فعال</h3>
+    <p id="linksSub" data-i18n="linksS">همه لینک‌های ساخته‌شده — امکان ابطال فوری</p>
+    <div id="linksList" style="max-height:50vh;overflow-y:auto"></div>
+    <div style="margin-top:14px;text-align:end">
+      <button class="btn btn-ghost" id="linksClose" data-i18n="close">بستن</button>
+    </div>
+  </div>
+</div>
+
+<!-- trash modal -->
+<div class="modal" id="trashModal">
+  <div class="modal-card">
+    <h3 data-i18n="trashT">سطل بازیافت</h3>
+    <p id="trashSub" data-i18n="trashS">موارد تا ۷ روز قابل بازیابی‌اند، بعد خودکار حذف می‌شوند.</p>
+    <div id="trashList" style="max-height:50vh;overflow-y:auto"></div>
+    <div style="margin-top:14px;text-align:end;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-warn" id="trashEmptyBtn" style="width:auto" data-i18n="trashEmpty">خالی کردن سطل</button>
+      <button class="btn btn-ghost" id="trashClose" data-i18n="close">بستن</button>
+    </div>
+  </div>
+</div>
+
 <!-- file detail modal -->
 <div class="modal" id="fileModal">
   <div class="modal-card file-card">
@@ -658,7 +699,15 @@ const I18N={
   linkOptT:"گزینه‌های اشتراک", linkTtl:"انقضا", linkPwLab:"رمز عبور (اختیاری)",
   mkLink:"ساخت لینک", linkPw:"لینک رمزدار شد — رمز:",
   linkNameLab:"نام لینک (اختیاری)", ttlNever:"هرگز (بدون انقضا)",
-  shareSel:"اشتراک انتخاب‌شده‌ها",
+  shareSel:"اشتراک انتخاب‌شده‌ها", zipDl:"دانلود ZIP",
+  linksT:"لینک‌های فعال", linksS:"همه لینک‌های ساخته‌شده — امکان ابطال فوری",
+  trashT:"سطل بازیافت", trashS:"موارد تا ۷ روز قابل بازیابی‌اند، بعد خودکار حذف می‌شوند.",
+  trashEmpty:"خالی کردن سطل", restore:"بازیابی", purge:"حذف قطعی",
+  ftAll:"همه انواع", ftImage:"عکس", ftVideo:"ویدیو", ftAudio:"صدا",
+  ftPdf:"PDF", ftOther:"سایر", noLinks:"هنوز لینکی نساخته‌ای",
+  noTrash:"سطل خالی است", revoked:"ابطال شد", expired:"منقضی",
+  linkRevoked:"لینک ابطال شد", restored:"بازیابی شد", purged:"برای همیشه حذف شد",
+  zipStart:"در حال ساخت ZIP…",
   renameT:"تغییر نام", renameOk:"نام تغییر کرد", selAll:"همه", selNone:"هیچ",
   delSel:"حذف انتخاب‌شده‌ها", nSelected:"انتخاب‌شده",
   maxDlLab:"سقف تعداد دانلود (۰ = بی‌نهایت)"
@@ -702,7 +751,15 @@ const I18N={
   linkOptT:"Share options", linkTtl:"Expiry", linkPwLab:"Password (optional)",
   mkLink:"Create link", linkPw:"Password-protected link — password:",
   linkNameLab:"Link name (optional)", ttlNever:"Never (no expiry)",
-  shareSel:"Share selected",
+  shareSel:"Share selected", zipDl:"Download ZIP",
+  linksT:"Active links", linksS:"Every minted link — revoke instantly",
+  trashT:"Trash", trashS:"Items stay restorable for 7 days, then purge automatically.",
+  trashEmpty:"Empty trash", restore:"Restore", purge:"Delete forever",
+  ftAll:"All types", ftImage:"Images", ftVideo:"Videos", ftAudio:"Audio",
+  ftPdf:"PDF", ftOther:"Other", noLinks:"No links yet",
+  noTrash:"Trash is empty", revoked:"Revoked", expired:"Expired",
+  linkRevoked:"Link revoked", restored:"Restored", purged:"Deleted forever",
+  zipStart:"Building ZIP…",
   renameT:"Rename", renameOk:"Renamed", selAll:"All", selNone:"None",
   delSel:"Delete selected", nSelected:"selected",
   maxDlLab:"Download cap (0 = unlimited)"
@@ -857,12 +914,19 @@ let files=[];
 function updateLimTag(){
   $("#limTag").textContent=t("limit")+humanSize(maxUploadBytes);
 }
-let fQuery="",fSortMode=localStorage.getItem("anbar-sort")||"new";
+let fQuery="",fSortMode=localStorage.getItem("anbar-sort")||"new",fType="";
 function visibleFiles(){
   let list=files;
   if(fQuery){
     const q=fQuery.toLowerCase();
     list=list.filter(o=>(o.filename||o.id||"").toLowerCase().includes(q));
+  }
+  if(fType){
+    list=list.filter(o=>{
+      const k=mediaKind(o);
+      if(fType==="other")return !k||k==="pdf";
+      return k===fType;
+    });
   }
   const by={
     new:(a,b)=>(b.created_at||0)-(a.created_at||0),
@@ -881,6 +945,7 @@ $("#fSearch").oninput=e=>{
 };
 $("#fClear").onclick=()=>{fQuery="";$("#fSearch").value="";$("#fClear").style.display="none";renderRows();};
 $("#fSort").onchange=e=>{fSortMode=e.target.value;localStorage.setItem("anbar-sort",fSortMode);renderRows();};
+$("#fType").onchange=e=>{fType=e.target.value;renderRows();};
 {  // restore saved sort selection once the DOM is parsed
   const s=document.getElementById("fSort");
   if(s)s.value=fSortMode;
@@ -903,6 +968,7 @@ async function refresh(){
       }catch(e){files=[];}
     })()]);
     renderRows();
+    refreshTrashBadge();
   }finally{
     btn&&btn.classList.remove("busy");
   }
@@ -1024,7 +1090,7 @@ function renderGallery(list){
     cell.className="gcell"+(kind?" has":"");
     let inner;
     if(kind==="image")inner='<img loading="lazy" src="'+url+'" alt="">';
-    else if(kind==="video")inner='<video src="'+url+'" preload="metadata" muted></video><span class="gplay">▶</span>';
+    else if(kind==="video")inner='<video src="'+url+'#t=1.5" preload="metadata" muted></video><span class="gplay">▶</span>';
     else if(kind==="audio")inner='<div class="gicon">♪</div>';
     else inner='<div class="gicon">'+esc((extOf(o.filename)||"bin").toUpperCase().slice(0,4))+'</div>';
     cell.innerHTML='<div class="gthumb">'+inner+'</div>'
@@ -1092,6 +1158,23 @@ $("#selShareBtn").onclick=()=>{
   if(!selSet.size)return;
   openShareOpts(null); // reuse the options form; shareTarget=null marks bulk
 };
+/* bulk ZIP: stream the selection as one archive */
+$("#selZipBtn").onclick=async()=>{
+  if(!selSet.size)return;
+  toast(t("zipStart"));
+  try{
+    const r=await fetch("/f/zip",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ids:[...selSet]})});
+    if(!r.ok){throw new Error((await r.json()).detail||r.status);}
+    const blob=await r.blob();
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="anbar-"+new Date().toISOString().slice(0,10)+".zip";
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+  }catch(e){toast(e.message,"err");}
+};
 $("#shareOpts").addEventListener("submit",async ev=>{
   // bulk branch runs only when nothing is targeted
   if(shareTarget||!selSet.size)return;
@@ -1118,6 +1201,104 @@ $("#shareOpts").addEventListener("submit",async ev=>{
   const qr=$("#linkQr");qr.style.display="none";
   $("#linkModal").classList.add("on");
 },{once:false});
+/* ── links manager (v0.10) ── */
+function humanTtl(s){
+ if(s>=365*86400*50)return "∞";
+ if(s>=86400)return Math.round(s/86400)+"d";
+ if(s>=3600)return Math.round(s/3600)+"h";
+ if(s>=60)return Math.round(s/60)+"m";
+ return s+"s";
+}
+async function openLinks(){
+ $("#linksModal").classList.add("on");
+ const box=$("#linksList");
+ box.innerHTML='<div class="empty" style="padding:24px">…</div>';
+ try{
+   const r=await api("/api/v1/admin/links?limit=200");
+   const links=r.links||[];
+   if(!links.length){box.innerHTML='<div class="empty" style="padding:24px"><p>'+esc(t("noLinks"))+'</p></div>';return;}
+   box.innerHTML="";
+   links.forEach(L=>{
+     const d=document.createElement("div");
+     d.className="keyrow";
+     const badge=L.revoked?'<span class="tag bot" style="background:var(--err-soft);color:var(--err)">'+esc(t("revoked"))+'</span>'
+       :L.expired?'<span class="tag bot">'+esc(t("expired"))+'</span>'
+       :'<span class="tag mtproto">'+humanTtl(L.exp-Math.floor(Date.now()/1000))+'</span>';
+     d.innerHTML='<span class="kn" style="direction:ltr;text-align:left">'
+       +esc((L.filename||L.obj_id))+(L.slug?' <span style="color:var(--tx3);font-size:10.5px">/f/'+esc(L.slug)+'</span>':'')
+       +(L.pw?' 🔒':'')+(L.max_dl?' ⬇'+L.max_dl:'')
+       +'</span>'+badge
+       +(L.revoked||L.expired?'':'<button class="btn btn-warn lkrev" style="padding:5px 12px;font-size:11.5px">'+esc(t("purge")===t("purge")?"✕":"✕")+'</button>');
+     if(!L.revoked&&!L.expired){
+       d.querySelector(".lkrev").onclick=async()=>{
+         try{
+           await api("/api/v1/admin/links/"+L.obj_id+"/revoke/"+L.exp,{method:"POST"});
+           toast(t("linkRevoked"));openLinks();
+         }catch(e){toast(e.message,"err");}
+       };
+     }
+     box.appendChild(d);
+   });
+ }catch(e){box.innerHTML='<div class="empty" style="padding:24px"><p>'+esc(e.message)+'</p></div>';}
+}
+$("#linksBtn").onclick=openLinks;
+$("#linksClose").onclick=()=>$("#linksModal").classList.remove("on");
+$("#linksModal").onclick=e=>{if(e.target.id==="linksModal")$("#linksModal").classList.remove("on");};
+
+/* ── trash (v0.10) ── */
+async function refreshTrashBadge(){
+ try{
+   const r=await api("/api/v1/admin/trash");
+   const n=r.count||0;
+   const b=$("#trashCnt");
+   b.style.display=n?"inline-block":"none";
+   b.textContent=n;
+ }catch(e){}
+}
+async function openTrash(){
+ $("#trashModal").classList.add("on");
+ const box=$("#trashList");
+ try{
+   const r=await api("/api/v1/admin/trash");
+   const items=r.items||[];
+   if(!items.length){box.innerHTML='<div class="empty" style="padding:24px"><p>'+esc(t("noTrash"))+'</p></div>';}
+   else{
+     box.innerHTML="";
+     items.forEach(o=>{
+       const d=document.createElement("div");
+       d.className="keyrow";
+       d.innerHTML='<span class="kn" style="direction:ltr;text-align:left">'+esc(o.filename||o.id)
+         +' <span style="color:var(--tx3);font-size:10.5px">'+humanSize(o.size)+" · "+humanTtl(o.purge_in_s)+'↩</span></span>'
+         +'<button class="btn btn-ghost trst" data-id="'+esc(o.id)+'" style="width:auto;padding:5px 12px;font-size:11.5px">'+esc(t("restore"))+'</button>'
+         +'<button class="btn btn-warn trpg" data-id="'+esc(o.id)+'" style="width:auto;padding:5px 12px;font-size:11.5px">'+esc(t("purge"))+'</button>';
+       d.querySelector(".trst").onclick=async()=>{
+         try{await api("/api/v1/admin/trash/"+o.id+"/restore",{method:"POST"});toast(t("restored"));openTrash();refreshTrashBadge();refresh();}
+         catch(e){toast(e.message,"err");}
+       };
+       d.querySelector(".trpg").onclick=async()=>{
+         if(!confirm(t("purge")+" — "+(o.filename||o.id)+"؟"))return;
+         try{await api("/api/v1/admin/trash/"+o.id,{method:"DELETE"});toast(t("purged"));openTrash();refreshTrashBadge();}
+         catch(e){toast(e.message,"err");}
+       };
+       box.appendChild(d);
+     });
+   }
+ }catch(e){box.innerHTML='<p>'+esc(e.message)+'</p>';}
+}
+$("#trashBtn").onclick=openTrash;
+$("#trashClose").onclick=()=>$("#trashModal").classList.remove("on");
+$("#trashModal").onclick=e=>{if(e.target.id==="trashModal")$("#trashModal").classList.remove("on");};
+$("#trashEmptyBtn").onclick=async()=>{
+ if(!confirm(t("trashEmpty")+"؟"))return;
+ try{
+   const r=await api("/api/v1/admin/trash");
+   for(const o of (r.items||[])){
+     await api("/api/v1/admin/trash/"+o.id,{method:"DELETE"});
+   }
+   toast(t("purged"));openTrash();refreshTrashBadge();
+ }catch(e){toast(e.message,"err");}
+};
+
 async function renameObj(o){
   const name=prompt(t("renameT"),o.filename||"");
   if(name===null)return;
