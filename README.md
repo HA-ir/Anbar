@@ -95,11 +95,11 @@ writes **nothing** to disk except the SQLite metadata database.
 
 ## Speed test (v0.10.5, bot backend)
 
-Measured **2026-08-23** on a production deployment
-(`anbar.example.com`, nginx + Cloudflare bypassed via loopback, `bot` backend,
-16 MB chunk ceiling) with a Python client directly on `127.0.0.1:8317`.
-**Cache OFF** throughout (master switch default) — every number below is a
-real Telegram round-trip.
+Measured **2026-08-23** on a small VPS deployment (nginx + Cloudflare in
+front, `bot` backend, 16 MB chunk ceiling) with a Python client directly on
+the loopback port. **Cache OFF** throughout (master switch default) — every
+number below is a real Telegram round-trip. Expect similar-but-different
+numbers on your host; the ratios (2nd GET ≫ 1st GET) are what matter.
 
 | Size | Upload | Download 1st GET | Download 2nd GET |
 |------|--------|------------------|------------------|

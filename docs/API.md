@@ -326,8 +326,8 @@ Notes:
 - `put/get` are streaming-friendly but read the whole file into memory for
   the multipart body — fine for typical files, not for multi-GB uploads.
 - Behind Cloudflare, some datacenter IPs get `403` from CF's bot rules on
-  python-urllib user agents; run the CLI from the host itself
-  (`http://127.0.0.1:8317`) or allowlist your IP in that case.
+  python-urllib user agents; run the CLI from the host itself (the loopback
+  bind, e.g. `http://127.0.0.1:8317`) or allowlist your IP in that case.
 - Exit codes: `0` success, `1` HTTP/business error (message on stderr),
   `2` cannot reach the server.
 
