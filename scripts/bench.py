@@ -44,13 +44,69 @@ def http(method: str, url: str, *, key: str | None = None, data: bytes | None = 
         return e.code, e.read()
 
 
+def http_stream_to_file(method: str, url: str, out_path: str, *, key: str | None = None,
+                        headers: dict[str, str] | None = None) -> tuple[int, str]:
+    """GET streaming to disk; returns (status, sha256 hex). RSS stays ~1 MB."""
+    sha = hashlib.sha256()
+    req = urllib.request.Request(url, method=method)
+    req.add_header("User-Agent", "anbar-bench/1.0")
+    if key:
+        req.add_header("Authorization", f"Bearer {key}")
+    for k, v in (headers or {}).items():
+        req.add_header(k, v)
+    try:
+        with urllib.request.urlopen(req, timeout=3600) as r, open(out_path, "wb") as f:
+            while True:
+                piece = r.read(1 * MB)
+                if not piece:
+                    break
+                sha.update(piece)
+                f.write(piece)
+                del piece
+        return 200, sha.hexdigest()
+    except urllib.error.HTTPError as e:
+        e.read()
+        return e.code, ""
+
+
 def bench_size(base: str, key: str, size_mb: int, keep: bool = False) -> dict:
-    payload = os.urandom(int(size_mb * MB))
-    sha = hashlib.sha256(payload).hexdigest()
+    # stream-friendly: build the payload in 1 MB pieces to keep RSS low,
+    # then hash + upload from a temp file instead of holding it all in RAM.
+    import tempfile
+    sha = hashlib.sha256()
+    tmp = tempfile.NamedTemporaryFile(delete=False, dir="/root/anbar_bench_big")
+    piece = bytes(1 * MB)
+    written = 0
+    target = size_mb * MB
+    while written < target:
+        n = min(len(piece), target - written)
+        chunk = os.urandom(n)
+        sha.update(chunk)
+        tmp.write(chunk)
+        written += n
+    tmp.close()
+    payload_path = tmp.name
+    payload_sha = sha.hexdigest()
+    size_bytes = written
+
+    def _cleanup():
+        try:
+            os.unlink(payload_path)
+        except OSError:
+            pass
+
+    if not keep:
+        try:
+            import atexit
+            atexit.register(_cleanup)
+        except Exception:
+            pass
 
     t0 = time.perf_counter()
-    st, body = http("POST", f"{base}/api/v1/upload/raw", key=key, data=payload,
-                    headers={"X-File-Name": f"bench-{size_mb}mb.bin"})
+    with open(payload_path, "rb") as f:
+        st, body = http("POST", f"{base}/api/v1/upload/raw", key=key, data=f,
+                        headers={"X-File-Name": f"bench-{size_mb}mb.bin",
+                                 "Content-Length": str(size_bytes)})
     up_t = time.perf_counter() - t0
     if st != 200:
         sys.exit(f"upload failed ({st}): {body[:200]}")
@@ -62,15 +118,19 @@ def bench_size(base: str, key: str, size_mb: int, keep: bool = False) -> dict:
     url = json.loads(link_body)["url"]
 
     t0 = time.perf_counter()
-    st, dl = http("GET", url)
+    dl_path = payload_path + ".dl1"
+    st, dl_sha = http_stream_to_file("GET", url, dl_path)
     d1_t = time.perf_counter() - t0
-    if st != 200 or hashlib.sha256(dl).hexdigest() != sha:
+    os.unlink(dl_path)
+    if st != 200 or dl_sha != payload_sha:
         sys.exit(f"first GET failed/corrupt ({st})")
 
     t0 = time.perf_counter()
-    st, dl2 = http("GET", url)
+    dl2_path = payload_path + ".dl2"
+    st, dl2_sha = http_stream_to_file("GET", url, dl2_path)
     d2_t = time.perf_counter() - t0
-    if st != 200 or hashlib.sha256(dl2).hexdigest() != sha:
+    os.unlink(dl2_path)
+    if st != 200 or dl2_sha != payload_sha:
         sys.exit(f"second GET failed/corrupt ({st})")
 
     if not keep:
@@ -78,9 +138,9 @@ def bench_size(base: str, key: str, size_mb: int, keep: bool = False) -> dict:
 
     return {
         "size_mb": size_mb,
-        "up_s": up_t, "up_mbs": len(payload) / MB / up_t,
-        "d1_s": d1_t, "d1_mbs": len(payload) / MB / d1_t,
-        "d2_s": d2_t, "d2_mbs": len(payload) / MB / d2_t,
+        "up_s": up_t, "up_mbs": size_bytes / MB / up_t,
+        "d1_s": d1_t, "d1_mbs": size_bytes / MB / d1_t,
+        "d2_s": d2_t, "d2_mbs": size_bytes / MB / d2_t,
     }
 
 
