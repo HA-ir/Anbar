@@ -51,12 +51,12 @@ Liveness probe (Docker/k8s). Returns `200`:
 Multipart form, field `file`. Streams to Telegram in ≤16 MB chunks.
 
 ```bash
-curl -X POST https://h/api/v1/upload \
+curl -X POST http://127.0.0.1:8567/api/v1/upload \
   -H "Authorization: Bearer $API_KEY" \
   -F "file=@report.pdf"
 ```
 ```json
-{"id":"k3xQ9aB2mN0p","url":"https://h/f/k3xQ9aB2mN0p",
+{"id":"k3xQ9aB2mN0p","url":"http://127.0.0.1:8567/f/k3xQ9aB2mN0p",
  "size":2097152,"sha256":"9f2c…","chunks":1}
 ```
 
@@ -69,7 +69,7 @@ header; size is read from `Content-Length` (or chunked transfer, hashing as it
 arrives).
 
 ```bash
-curl -X POST https://h/api/v1/upload/raw \
+curl -X POST http://127.0.0.1:8567/api/v1/upload/raw \
   -H "Authorization: Bearer $API_KEY" \
   -H "X-File-Name: disk.img" \
   -H "Content-Length: 3221225472" \
@@ -83,8 +83,8 @@ Same response shape as multipart upload.
 Streams the object. Honors `Range`.
 
 ```bash
-curl -OJ https://h/f/k3xQ9aB2mN0p
-curl -r 1048576-2097151 https://h/f/k3xQ9aB2mN0p -o chunk.bin
+curl -OJ http://127.0.0.1:8567/f/k3xQ9aB2mN0p
+curl -r 1048576-2097151 http://127.0.0.1:8567/f/k3xQ9aB2mN0p -o chunk.bin
 ```
 
 Headers: `Content-Type`, `Content-Length`, `Accept-Ranges: bytes`,
@@ -113,8 +113,8 @@ cleaned. Returns `{"purged": true, "id": "…", "blobs_removed": 1}`.
 Owner or admin key; purging a trashed object is allowed (idempotent).
 
 ```bash
-curl -X DELETE https://h/f/k3xQ9aB2mN0p -H "Authorization: Bearer ***"          # → trash
-curl -X DELETE "https://h/f/k3xQ9aB2mN0p?purge=true" -H "Authorization: Bearer ***"  # → destroy
+curl -X DELETE http://127.0.0.1:8567/f/k3xQ9aB2mN0p -H "Authorization: Bearer ***"          # → trash
+curl -X DELETE "http://127.0.0.1:8567/f/k3xQ9aB2mN0p?purge=true" -H "Authorization: Bearer ***"  # → destroy
 ```
 
 ### `POST /f/{id}/link?ttl=3600`  *(F4, v0.9.5–v0.10.4)*
@@ -132,9 +132,9 @@ Signature is `HMAC-SHA256(secret, "<id>:<exp>")`; the secret is the rotated
 value from `kv` or `ANBAR_HMAC_SECRET` as fallback.
 
 ```json
-{"url": "https://h/f/k3xQ9aB2mN0p?sig=59c2…&exp=1787300281",
+{"url": "http://127.0.0.1:8567/f/k3xQ9aB2mN0p?sig=59c2…&exp=1787300281",
  "expires_at": 1787300281, "ttl_seconds": 3600,
- "slug": "report-2026", "pretty_url": "https://h/f/report-2026",
+ "slug": "report-2026", "pretty_url": "http://127.0.0.1:8567/f/report-2026",
  "password_protected": true, "max_downloads": 5}
 ```
 
@@ -295,7 +295,7 @@ works remotely too. Config via flags or env:
 
 | source | flag | env |
 |--------|------|-----|
-| Server URL | `--base-url` | `ANBAR_BASE_URL` (default `http://127.0.0.1:8317`) |
+| Server URL | `--base-url` | `ANBAR_BASE_URL` (default `http://127.0.0.1:8567`) |
 | Admin key | `--admin-key` | `ANBAR_ADMIN_KEY` |
 
 Commands (all verified against a live v0.10.5 instance):
@@ -327,7 +327,7 @@ Notes:
   the multipart body — fine for typical files, not for multi-GB uploads.
 - Behind Cloudflare, some datacenter IPs get `403` from CF's bot rules on
   python-urllib user agents; run the CLI from the host itself (the loopback
-  bind, e.g. `http://127.0.0.1:8317`) or allowlist your IP in that case.
+  bind, e.g. `http://127.0.0.1:8567`) or allowlist your IP in that case.
 - Exit codes: `0` success, `1` HTTP/business error (message on stderr),
   `2` cannot reach the server.
 

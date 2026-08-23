@@ -95,10 +95,10 @@ Notes:
 cd docker
 docker compose up -d
 docker compose logs -f anbar
-curl http://127.0.0.1:8317/healthz
+curl http://127.0.0.1:8567/healthz
 ```
 
-The service binds to **127.0.0.1:8317** only — expose it solely through the
+The service binds to **127.0.0.1:8567** only — expose it solely through the
 reverse proxy.
 
 ### Volumes
@@ -124,7 +124,7 @@ restore file bytes — those live in Telegram; the DB only points at them.
 
 ```
 d.example.com {
-    reverse_proxy 127.0.0.1:8317
+    reverse_proxy 127.0.0.1:8567
 }
 ```
 
@@ -142,7 +142,7 @@ server {
     client_body_buffer_size 128k;
 
     location / {
-        proxy_pass http://127.0.0.1:8317;
+        proxy_pass http://127.0.0.1:8567;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -182,14 +182,14 @@ KB of metadata). That is the whole point of Anbar.
 | Revoke one link | `curl -X POST …/api/v1/admin/links/<obj>/revoke/<exp>` (admin key) |
 | List live links + counters | `curl …/api/v1/admin/links?limit=200` (admin key) |
 | MTProto login (once) | `anbarctl login --api-id … --api-hash … --phone …` |
-| Health | `curl http://127.0.0.1:8317/healthz` |
+| Health | `curl http://127.0.0.1:8567/healthz` |
 | Check backend / cache | `curl …/api/v1/admin/status` (admin key) |
 | Install as systemd (no Docker) | `anbarctl install --env-file /etc/anbar/.env` (then `systemctl enable --now anbar`) |
 | Update | `git pull && cd docker && docker compose up -d` (DB migrations are forward-only) |
 
 CLI config: `--base-url` / `$ANBAR_BASE_URL`, `--admin-key` /
 `$ANBAR_ADMIN_KEY`. On the server itself use
-`ANBAR_BASE_URL=http://127.0.0.1:8317` — going through Cloudflare with the
+`ANBAR_BASE_URL=http://127.0.0.1:8567` — going through Cloudflare with the
 python-urllib user agent can trip CF bot rules (`403`). Full command
 reference lives in [API.md](API.md#anbarctl--the-cli-f4-v0105).
 

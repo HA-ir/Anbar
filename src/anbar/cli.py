@@ -2,7 +2,7 @@
 
 Talks to a running anbar server over HTTP. The admin key comes from the
 ANBAR_ADMIN_KEY env var (or --admin-key); the base URL from ANBAR_BASE_URL
-(or --base-url, default http://127.0.0.1:8317).
+(or --base-url, default http://127.0.0.1:8567).
 """
 from __future__ import annotations
 
@@ -256,7 +256,7 @@ def _cmd_get(args: argparse.Namespace) -> int:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="anbarctl", description=__doc__)
     parser.add_argument("--base-url",
-                        default=os.environ.get("ANBAR_BASE_URL", "http://127.0.0.1:8317"),
+                        default=os.environ.get("ANBAR_BASE_URL", "http://127.0.0.1:8567"),
                         help="anbar server base URL (default: $ANBAR_BASE_URL)")
     parser.add_argument("--admin-key", default=os.environ.get("ANBAR_ADMIN_KEY"),
                         help="admin API key (default: $ANBAR_ADMIN_KEY)")

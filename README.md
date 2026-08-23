@@ -241,9 +241,9 @@ uv run anbarctl version   # anbar 0.10.5
 Run a local instance with the in-memory backend (no Telegram needed):
 
 ```bash
-ANBAR_BACKEND=fake ANBAR_BASE_URL=http://127.0.0.1:8317 \
-  uv run uvicorn anbar.main:create_app --factory --port 8317
-curl http://127.0.0.1:8317/healthz
+ANBAR_BACKEND=fake ANBAR_BASE_URL=http://127.0.0.1:8567 \
+  uv run uvicorn anbar.main:create_app --factory --port 8567
+curl http://127.0.0.1:8567/healthz
 ```
 
 ## Deploy (from F2 onward)
@@ -251,7 +251,7 @@ curl http://127.0.0.1:8317/healthz
 ```bash
 cp .env.example .env      # bot token, base URL, keys
 cd docker && docker compose up -d
-curl http://127.0.0.1:8317/healthz
+curl http://127.0.0.1:8567/healthz
 ```
 
 Put Caddy or your existing Nginx in front (TLS). See [docs/DEPLOY.md](docs/DEPLOY.md).

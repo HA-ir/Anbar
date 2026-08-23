@@ -25,8 +25,8 @@ class Settings(BaseSettings):
 
     # server
     host: str = "0.0.0.0"
-    port: int = Field(default=8000, ge=1, le=65535)
-    base_url: str = "http://127.0.0.1:8000"  # used to build returned links
+    port: int = Field(default=8567, ge=1, le=65535)
+    base_url: str = "http://127.0.0.1:8567"  # used to build returned links
     log_level: str = Field(default="INFO", pattern=r"^(DEBUG|INFO|WARNING|ERROR)$")
 
     # storage

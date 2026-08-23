@@ -19,9 +19,9 @@ RUN mkdir -p /app/data /app/secrets && chown -R anbar:anbar /app/data /app/secre
 VOLUME ["/app/data", "/app/secrets"]
 
 USER anbar
-EXPOSE 8000
+EXPOSE 8567
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-    CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz')"
+    CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8567/healthz')"
 
-CMD ["uvicorn", "anbar.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "anbar.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8567"]

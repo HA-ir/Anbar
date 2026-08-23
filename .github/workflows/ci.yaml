@@ -31,9 +31,9 @@ jobs:
         run: docker build -f docker/Dockerfile -t anbar:ci .
       - name: Smoke — healthz
         run: |
-          docker run -d --name tglp -e ANBAR_BACKEND=fake -p 127.0.0.1:8317:8000 anbar:ci
+          docker run -d --name tglp -e ANBAR_BACKEND=fake -p 127.0.0.1:8567:8567 anbar:ci
           for i in $(seq 1 15); do
             sleep 1
-            if curl -fsS http://127.0.0.1:8317/healthz; then exit 0; fi
+            if curl -fsS http://127.0.0.1:8567/healthz; then exit 0; fi
           done
           echo "healthz never came up"; exit 1

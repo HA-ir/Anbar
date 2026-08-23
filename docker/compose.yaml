@@ -12,7 +12,7 @@ services:
       - ../data:/app/data          # SQLite (few KB) + optional LRU cache (capped)
       - ../secrets:/app/secrets    # MTProto session (optional, F5)
     ports:
-      - "127.0.0.1:8317:8000"      # loopback only — put a reverse proxy in front
+      - "127.0.0.1:8567:8567"      # loopback only — put a reverse proxy in front
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
