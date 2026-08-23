@@ -9,7 +9,7 @@ import json
 import time
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from .. import runtime
 from ..auth import (
@@ -295,9 +295,173 @@ async def link_info(request: Request, obj_id: str):
 
 
 # ── Trash (v0.10) ─────────────────────────────────────────────────────────────
+@router.get("/admin/links/{obj_id}/manage")
+async def link_manage_page(request: Request, obj_id: str, exp: int):
+    """Standalone manager page for one share link (admin/session only).
+
+    Shows the link's current settings and lets the owner re-mint with a new
+    TTL / password / download cap — the previous window is revoked in the
+    same flow, so there is exactly one live link per row afterwards.
+    """
+    require_admin(request)
+    db = request.app.state.db
+    from ..links import list_links
+
+    row = next((x for x in list_links(db, limit=500)
+                if x["obj_id"] == obj_id and x["exp"] == exp), None)
+    if row is None:
+        raise HTTPException(404, "link not found")
+
+    import html as _html
+
+    def esc(s: object) -> str:
+        return _html.escape(str(s or ""), quote=True)
+
+    fname = esc(row["filename"])
+    pw_checked = "checked" if row["pw"] else ""
+    slug_js = esc(row["slug"]) if row["slug"] else ""
+    ttl_opts = [(3600, "۱ ساعت"), (86400, "۲۴ ساعت"), (604800, "۷ روز"),
+                (6048000, "۷۰ روز"), (0, "هرگز (بدون انقضا)")]
+    opts = "\n".join(
+        f'<option value="{v}"{" selected" if v == 86400 else ""}>{lbl}</option>'
+        for v, lbl in ttl_opts)
+    maxdl = int(row["max_dl"] or 0)
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>anbar · مدیریت لینک</title>
+<style>
+:root{{--bg:#0b0f17;--bg2:#121826;--bg3:#1a2234;--line:#232c40;--line2:#2d3852;
+--tx:#e7ecf5;--tx2:#aab3c5;--tx3:#6b7690;--brand:#2f6bff;--ok:#31c48d;--err:#ff5d6c}}
+@media(prefers-color-scheme:light){{:root{{--bg:#f3f6fb;--bg2:#ffffff;--bg3:#eaeff7;
+--line:#dde3ee;--line2:#cbd3e4;--tx:#17202f;--tx2:#48536a;--tx3:#8590a8}}}}
+*{{box-sizing:border-box;margin:0}}
+body{{font-family:'Vazirmatn',system-ui,'Segoe UI',Tahoma,sans-serif;min-height:100vh;
+display:flex;align-items:center;justify-content:center;padding:16px;color:var(--tx);
+background:radial-gradient(1200px 600px at 70% -10%,
+rgba(47,107,255,.12),transparent 60%),var(--bg)}}
+.card{{width:100%;max-width:430px;background:var(--bg2);border:1px solid var(--line);
+border-radius:18px;padding:26px 22px;box-shadow:0 18px 50px rgba(0,0,0,.25)}}
+h1{{font-size:16px;font-weight:700;margin-bottom:4px}}
+.fname{{font-size:12px;color:var(--tx3);margin-bottom:18px;direction:ltr;text-align:left}}
+.row{{margin-bottom:14px}}
+label{{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}}
+input[type=text],input[type=number],select{{width:100%;padding:10px 12px;
+border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);
+color:var(--tx);font-family:inherit;font-size:13.5px;outline:none}}
+input:focus,select:focus{{border-color:var(--brand)}}
+.check{{display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}}
+.check input{{width:16px;height:16px;accent-color:var(--brand)}}
+.actions{{display:flex;gap:8px;margin-top:20px}}
+button{{flex:1;padding:11px 14px;border:none;border-radius:11px;font-family:inherit;
+font-size:13.5px;font-weight:700;cursor:pointer}}
+.primary{{background:var(--brand);color:#fff}}
+.danger{{background:transparent;border:1.5px solid var(--err);color:var(--err);flex:0 0 auto;
+padding-inline:18px}}
+.msg{{display:none;margin-top:14px;padding:10px 12px;border-radius:10px;
+font-size:12.5px;line-height:1.9}}
+.msg.ok{{background:rgba(49,196,141,.12);color:var(--ok);word-break:break-word}}
+.msg.err{{background:rgba(255,93,108,.12);color:var(--err)}}
+.linkout{{margin-top:14px;display:none;background:var(--bg3);border:1px solid var(--line);
+border-radius:10px;padding:10px 12px;font-family:ui-monospace,monospace;
+font-size:11.5px;direction:ltr;text-align:left;word-break:break-all;user-select:all}}
+@media(max-width:480px){{.card{{padding:20px 14px}}.actions{{flex-direction:column}}
+.danger{{flex:auto}}}}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>مدیریت لینک اشتراک</h1>
+  <div class="fname">{fname}</div>
+  <form id="mf">
+    <div class="row">
+      <label for="ttl">انقضای لینک</label>
+      <select id="ttl">{opts}</select>
+    </div>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="haspw" {pw_checked}>
+        محافظت با رمز عبور</label>
+    </div>
+    <div class="row" id="pwrow" style="display:none">
+      <label for="npw">رمز عبور جدید</label>
+      <input type="text" id="npw" autocomplete="off" placeholder="رمز دلخواه">
+    </div>
+    <div class="row">
+      <label for="maxdl">سقف تعداد دانلود (۰ = بی‌نهایت)</label>
+      <input type="number" id="maxdl" min="0" value="{maxdl}">
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">ذخیره و ساخت لینک جدید</button>
+      <button type="button" class="danger" id="revBtn">ابطال لینک</button>
+    </div>
+  </form>
+  <div class="msg ok" id="mok"></div>
+  <div class="msg err" id="merr"></div>
+  <div class="linkout" id="lout"></div>
+</div>
+<script>
+const OID = {obj_id!r}, OLD_EXP = {exp};
+const SLUG = {slug_js!r};
+const H = {{'Content-Type': 'application/json'}};
+
+function show(id, txt) {{
+  const e = document.getElementById(id);
+  e.textContent = txt; e.style.display = 'block';
+}}
+document.getElementById('haspw').onchange = e => {{
+  document.getElementById('pwrow').style.display =
+    e.target.checked ? 'block' : 'none';
+}};
+document.getElementById('mf').onsubmit = async ev => {{
+  ev.preventDefault();
+  const ttl = parseInt(document.getElementById('ttl').value, 10);
+  const hasPw = document.getElementById('haspw').checked;
+  const npw = document.getElementById('npw').value.trim();
+  if (hasPw && !npw) {{
+    show('merr', 'برای محافظت با رمز، یک رمز وارد کنید.');
+    return;
+  }}
+  const maxdl = parseInt(document.getElementById('maxdl').value, 10) || 0;
+  try {{
+    // revoke the current window first (idempotent; 404 is fine)
+    await fetch('/api/v1/admin/links/' + OID + '/revoke/' + OLD_EXP,
+      {{method: 'POST', headers: H}});
+    let q = 'ttl=' + ttl + (hasPw ? '&password=' + encodeURIComponent(npw) : '')
+      + (maxdl ? '&max_dl=' + maxdl : '')
+      + (SLUG ? '&slug=' + encodeURIComponent(SLUG) : '');
+    const r = await fetch('/f/' + OID + '/link?' + q,
+      {{method: 'POST', headers: H}});
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    const j = await r.json();
+    document.getElementById('merr').style.display = 'none';
+    show('mok', 'لینک جدید ساخته شد — لینک قبلی ابطال شد:');
+    const lo = document.getElementById('lout');
+    lo.textContent = j.pretty_url || j.url;
+    lo.style.display = 'block';
+  }} catch (e) {{ show('merr', e.message || String(e)); }}
+}};
+document.getElementById('revBtn').onclick = async () => {{
+  if (!confirm('این لینک برای همیشه ابطال شود؟')) return;
+  try {{
+    await fetch('/api/v1/admin/links/' + OID + '/revoke/' + OLD_EXP,
+      {{method: 'POST', headers: H}});
+    document.getElementById('mok').style.display = 'none';
+    document.getElementById('lout').style.display = 'none';
+    show('merr', 'لینک ابطال شد — این صفحه دیگر کار نمی‌کند.');
+  }} catch (e) {{ show('merr', e.message || String(e)); }}
+}};
+document.getElementById('pwrow').style.display =
+  document.getElementById('haspw').checked ? 'block' : 'none';
+</script>
+</body>
+</html>""")
+
+
 @router.get("/admin/trash")
 async def trash_list(request: Request):
-    """Soft-deleted objects with their remaining restorable window."""
     require_admin(request)
     db = request.app.state.db
     import time as _time

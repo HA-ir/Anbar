@@ -725,6 +725,7 @@ const I18N={
   noTrash:"سطل خالی است", revoked:"ابطال شد", expired:"منقضی",
   linkRevoked:"لینک ابطال شد", restored:"بازیابی شد", purged:"برای همیشه حذف شد",
   zipStart:"در حال ساخت ZIP…", open:"باز کردن", revokeB:"ابطال لینک",
+  manageB:"مدیریت لینک",
   renameT:"تغییر نام", renameOk:"نام تغییر کرد", selAll:"همه", selNone:"هیچ",
   delSel:"حذف انتخاب‌شده‌ها", nSelected:"انتخاب‌شده",
   maxDlLab:"سقف تعداد دانلود (۰ = بی‌نهایت)"
@@ -777,6 +778,7 @@ const I18N={
   noTrash:"Trash is empty", revoked:"Revoked", expired:"Expired",
   linkRevoked:"Link revoked", restored:"Restored", purged:"Deleted forever",
   zipStart:"Building ZIP…", open:"Open", revokeB:"Revoke link",
+  manageB:"Manage link",
   renameT:"Rename", renameOk:"Renamed", selAll:"All", selNone:"None",
   delSel:"Delete selected", nSelected:"selected",
   maxDlLab:"Download cap (0 = unlimited)"
@@ -1253,13 +1255,13 @@ async function openLinks(){
        +'</div>'+badge
        +'<div class="lk-acts">'
        +(L.revoked||L.expired?''
-         :'<button class="btn btn-ghost lkopn" title="'+esc(t("open"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">↗</button>'
+         :'<button class="btn btn-ghost lkopn" title="'+esc(t("manageB"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">↗</button>'
           +'<button class="btn btn-ghost lkcpy" title="'+esc(t("copy"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">⧉</button>'
           +'<button class="btn btn-warn lkrev" title="'+esc(t("revokeB"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">✕</button>')
        +'</div>';
      if(!L.revoked&&!L.expired){
        d.querySelector(".lkopn").onclick=()=>window.open(
-         href+(href.includes("?")?"&view=1":"?view=1"),"_blank");
+         "/api/v1/admin/links/"+L.obj_id+"/manage?exp="+L.exp,"_blank");
        d.querySelector(".lkcpy").onclick=async()=>{
          try{await navigator.clipboard.writeText(href);toast(t("copied"));}
          catch(e){toast("copy failed","err");}

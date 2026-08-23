@@ -177,6 +177,8 @@ document.getElementById('eyebtn').onclick=function(){
     return html
 
 
+
+
 def _authenticate_download(request: Request, obj_id: str) -> None:
     """Enforce the download auth matrix for this object (no-op when auth OFF)."""
     settings = request.app.state.settings
@@ -245,10 +247,15 @@ async def download(request: Request, obj_id: str):
         pw_tag = db.kv_get(f"pw:{obj_id}")
         if pw_tag:
             given = request.query_params.get("pw", "")
-            import hashlib as _hashlib
-
-            want = _hashlib.sha256(
-                f"pw:{obj_id}:{given}".encode()).hexdigest()[:32]
+            configured0 = (settings.hmac_secret.get_secret_value()
+                           if settings.hmac_secret else None)
+            # v0.10.3 fix: the tag is an HMAC (same as mint_link), not a
+            # bare sha256 — the old precheck never matched, so even the
+            # CORRECT password re-showed the "wrong password" page.
+            secret0 = effective_hmac_secret(db, configured0) or ""
+            want = hmac.new(secret0.encode(),
+                            f"pw:{obj_id}:{given}".encode(),
+                            hashlib.sha256).hexdigest()[:32]
             if not hmac.compare_digest(want, pw_tag):
                 configured = (settings.hmac_secret.get_secret_value()
                               if settings.hmac_secret else None)
