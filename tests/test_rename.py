@@ -44,7 +44,6 @@ def test_delete_clears_pw_tag(client):
     assert client.get(u.path + "?" + u.query).status_code == 403
     # delete → tag gone
     client.delete(f"/f/{oid}", headers=ADMIN)
-    # re-upload same id is impossible (random ids) but kv must be empty:
-    import sqlite3
+    # kv tag must be gone after delete
     db = client.app.state.db
     assert db.kv_get(f"pw:{oid}") is None

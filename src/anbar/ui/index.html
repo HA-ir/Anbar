@@ -532,6 +532,10 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
         <label class="lab"><span data-i18n="linkPwLab">رمز عبور (اختیاری)</span></label>
         <input type="text" id="sharePw" autocomplete="off" style="flex:1;padding:9px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);color:var(--tx);font-family:inherit;direction:ltr">
       </div>
+      <div class="set-row" style="margin:10px 0">
+        <label class="lab"><span data-i18n="maxDlLab">سقف تعداد دانلود (۰ = بی‌نهایت)</span></label>
+        <input type="number" id="shareMax" min="0" value="0" style="flex:1;padding:9px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);color:var(--tx);font-family:inherit;direction:ltr">
+      </div>
       <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">
         <button class="btn btn-primary" type="submit" style="width:auto" data-i18n="mkLink">ساخت لینک</button>
       </div>
@@ -616,6 +620,7 @@ const I18N={
   mkLink:"ساخت لینک", linkPw:"لینک رمزدار شد — رمز:",
   renameT:"تغییر نام", renameOk:"نام تغییر کرد", selAll:"همه", selNone:"هیچ",
   delSel:"حذف انتخاب‌شده‌ها", nSelected:"انتخاب‌شده",
+  maxDlLab:"سقف تعداد دانلود (۰ = بی‌نهایت)"
  },
  en:{
   title:"anbar", loginSub:"Sign in to anbar — Telegram-backed object storage",
@@ -656,7 +661,8 @@ const I18N={
   linkOptT:"Share options", linkTtl:"Expiry", linkPwLab:"Password (optional)",
   mkLink:"Create link", linkPw:"Password-protected link — password:",
   renameT:"Rename", renameOk:"Renamed", selAll:"All", selNone:"None",
-  delSel:"Delete selected", nSelected:"selected"
+  delSel:"Delete selected", nSelected:"selected",
+  maxDlLab:"Download cap (0 = unlimited)"
  }
 };
 let lang=localStorage.getItem("anbar-lang")||(navigator.language.startsWith("fa")?"fa":"fa");
@@ -1007,12 +1013,16 @@ async function shareLink(o,opts){
   opts=opts||{};
   let q="ttl="+(opts.ttl||86400);
   if(opts.pw)q+="&password="+encodeURIComponent(opts.pw);
+  if(opts.max>0)q+="&max_dl="+opts.max;
   try{
     const r=await api("/f/"+o.id+"/link?"+q,{method:"POST"});
     $("#linkUrl").textContent=r.url;
     const sub=$("#linkS");
-    if(r.password_protected){sub.textContent=t("linkPw")+" — "+(opts.pw);}
+    const bits=[];
+    if(r.password_protected){sub.textContent=t("linkPw")+" — "+(opts.pw);bits.push("🔒");}
     else sub.textContent=t("linkS");
+    if(r.max_downloads){bits.push("⬇ "+r.max_downloads);}
+    if(bits.length)sub.textContent+="  "+bits.join(" ");
     const qr=$("#linkQr");
     qr.src="/f/"+o.id+"/qr?_="+Date.now();
     qr.style.display="block";
@@ -1024,8 +1034,8 @@ $("#shareOpts").onsubmit=async ev=>{
   ev.preventDefault();
   if(!shareTarget)return;
   const pw=$("#sharePw").value.trim();
-  const ttlSel=$("#shareTtl").value;
-  await shareLink(shareTarget,{pw,ttl:parseInt(ttlSel)||86400});
+  const ttlSel=$("#shareMax")?Math.max(0,parseInt($("#shareMax").value)||0):0;
+  await shareLink(shareTarget,{pw,ttl:parseInt($("#shareTtl").value)||86400,max:ttlSel});
   $("#shareOptsModal").classList.remove("on");
 };
 $("#copyBtn").onclick=async()=>{

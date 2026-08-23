@@ -138,6 +138,16 @@ async def download(request: Request, obj_id: str):
         headers["Content-Range"] = f"bytes {start}-{end}/{total}"
     status = 206 if start is not None else 200
     db.bump_downloads(obj_id)
+    # per-link download cap (v0.9.2): count full downloads only, then 410
+    maxdl = db.kv_get(f"maxdl:{obj_id}")
+    if maxdl and start is None:
+        try:
+            used = int(db.kv_get(f"dlc:{obj_id}") or "0") + 1
+            db.kv_set(f"dlc:{obj_id}", str(used))
+            if used > int(maxdl):
+                raise HTTPException(410, "download limit reached for this link")
+        except ValueError:
+            pass
 
     cache = getattr(request.app.state, "cache", None)
     use_cache = (
@@ -197,12 +207,14 @@ async def download(request: Request, obj_id: str):
 
 @router.post("/{obj_id}/link")
 async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL,
-                    password: str = ""):
+                    password: str = "", max_dl: int = 0):
     """Mint a signed download link: `{base_url}/f/{id}?sig=...&exp=...`.
 
     `ttl` is the validity window in seconds (default 1 h, capped at 7 d).
     `password` (optional): the link then requires `?pw=<password>` too —
-    stored as an HMAC tag, never in plaintext. Requires a bearer key.
+    stored as an HMAC tag, never in plaintext. `max_dl` > 0 caps the
+    number of downloads; the counter lives in kv and hits return 410.
+    Requires a bearer key.
     """
     settings = request.app.state.settings
     db = request.app.state.db
@@ -227,8 +239,10 @@ async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL,
                           hashlib.sha256).hexdigest()[:32]
         db.kv_set(f"pw:{obj_id}", pw_tag)
         out["password_protected"] = True
-        # append pw only as a hint param — real check happens server-side;
-        # we do NOT put the password itself in the URL.
+    if max_dl > 0:
+        db.kv_set(f"maxdl:{obj_id}", str(max_dl))
+        db.kv_set(f"dlc:{obj_id}", "0")
+        out["max_downloads"] = max_dl
     return out
 
 
@@ -299,6 +313,8 @@ async def delete(request: Request, obj_id: str):
     if cache is not None:
         cache.remove(obj_id)
     db.kv_delete(f"pw:{obj_id}")  # drop a stale pw tag, if any
+    db.kv_delete(f"maxdl:{obj_id}")
+    db.kv_delete(f"dlc:{obj_id}")
     return {"deleted": True, "id": obj_id, "blobs_removed": deleted_blobs}
 
 
