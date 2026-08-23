@@ -173,6 +173,10 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
   padding:2px 9px;border-radius:20px}
 .btn-ghost{border:1px solid var(--line);background:var(--bg2);color:var(--tx2);font-size:13px;padding:8px 14px}
 .btn-ghost:hover{color:var(--tx);border-color:var(--line2);background:var(--hover)}
+/* viewBtn active (gallery on): filled accent so the mode is obvious */
+#viewBtn.view-on{background:var(--brand);border-color:var(--brand);color:#fff;
+  box-shadow:0 0 0 3px var(--brand-soft)}
+#viewBtn.view-on:hover{filter:brightness(1.08)}
 .btn-danger{border:1px solid var(--err);background:transparent;color:var(--err);font-size:13px;padding:8px 14px}
 .btn-danger:hover{background:var(--err);color:#fff}
 /* gallery view */
@@ -199,6 +203,13 @@ td{padding:13px 16px;border-bottom:1px solid var(--line);font-size:13.5px;vertic
 tr:last-child td{border-bottom:none}
 tbody tr{transition:background .12s}
 tbody tr:hover{background:var(--hover)}
+/* selected row/card highlight */
+tbody tr.selected td{background:var(--brand-soft)}
+tbody tr.selected .fname .fn{color:var(--brand)}
+.gcell.selected{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}
+.gcell.selected::after{content:"✓";position:absolute;inset-inline-end:8px;bottom:8px;width:20px;height:20px;
+  border-radius:50%;background:var(--brand);color:#fff;font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;z-index:2}
 .fname{display:flex;align-items:center;gap:11px;min-width:0}
 .fic{width:34px;height:34px;flex:none;border-radius:9px;background:var(--brand-soft);display:flex;
   align-items:center;justify-content:center}
@@ -924,7 +935,7 @@ function renderRows(){
   list.forEach(o=>{
     const tr=document.createElement("tr");
     tr.innerHTML=
-      '<td data-th="'+t("thName")+'"><div class="fname"><input type="checkbox" class="selbox" data-id="'+o.id+'" style="display:none;margin-inline-end:8px;vertical-align:-2px">'
+      '<td data-th="'+t("thName")+'"><div class="fname"><input type="checkbox" class="selbox" data-id="'+o.id+'" style="margin-inline-end:8px;vertical-align:-2px">'
       +'<span class="fic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>'
       +'<span class="fn" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</span></div></td>'
       +'<td class="num" data-th="'+t("thSize")+'">'+humanSize(o.size)+'</td>'
@@ -940,26 +951,51 @@ function renderRows(){
       const a=document.createElement("a");
       a.href="/f/"+o.id;document.body.appendChild(a);a.click();a.remove();
     };
-    tr.querySelector(".fname").onclick=()=>openFileModal(o);
-    tr.querySelector(".fname").style.cursor="pointer";
     tr.querySelector('[data-a=ln]').onclick=()=>shareLink(o);
     tr.querySelector('[data-a=del]').onclick=()=>delObj(o);
+    // click anywhere on the row toggles selection; the name still opens
+    tr.onclick=e=>{
+      if(e.target.closest(".selbox,.acts,a,button"))return;
+      if(e.target.closest(".fn")){openFileModal(o);return;}
+      toggleSel(o.id);
+      tr.querySelector(".selbox").checked=selSet.has(o.id);
+      tr.classList.toggle("selected",selSet.has(o.id));
+    };
+    tr.querySelector(".fname").style.cursor="pointer";
     tr.querySelector(".selbox").onchange=e=>{
+      e.stopPropagation();
       if(e.target.checked)selSet.add(o.id);else selSet.delete(o.id);
       updateSelBar();
+      tr.classList.toggle("selected",selSet.has(o.id));
     };
-    if(selSet.has(o.id))tr.querySelector(".selbox").checked=true;
+    if(selSet.has(o.id)){tr.querySelector(".selbox").checked=true;tr.classList.add("selected");}
     tb.appendChild(tr);
   });
 }
 /* multi-select (v0.9) */
 const selSet=new Set();
 let viewMode=localStorage.getItem("anbar-view")||"table";
+function syncViewBtn(){
+  const b=$("#viewBtn");
+  if(!b)return;
+  const on=viewMode==="gallery";
+  b.classList.toggle("view-on",on);
+  b.title=on?"table view":"gallery view";
+}
 $("#viewBtn").onclick=()=>{
   viewMode=viewMode==="table"?"gallery":"table";
   localStorage.setItem("anbar-view",viewMode);
+  syncViewBtn();
   renderRows();
 };
+syncViewBtn();
+/* selection UX: click the row/card to toggle selection (no hunting for
+   a tiny checkbox). Name click still opens the file modal. */
+function toggleSel(id){
+  if(selSet.has(id))selSet.delete(id);else selSet.add(id);
+  updateSelBar();
+  return selSet.has(id);
+}
 function renderGallery(list){
   const tb=$("#rows");
   tb.innerHTML="";
@@ -988,16 +1024,26 @@ function renderGallery(list){
       +'</div>';
     cell.querySelector('[data-a=dl]').onclick=()=>{toast(t("dlStart"));const a=document.createElement("a");a.href=url;document.body.appendChild(a);a.click();a.remove();};
     cell.querySelector('[data-a=del]').onclick=()=>delObj(o);
-    cell.querySelector(".gthumb").onclick=e=>{
-      if(e.target.closest(".selbox,.gacts"))return;
-      openFileModal(o);
+    // whole card toggles selection; thumb opens the modal
+    cell.onclick=e=>{
+      if(e.target.closest(".gacts,.selbox,a,button"))return;
+      toggleSel(o.id);
+      cell.classList.toggle("selected",selSet.has(o.id));
+      cell.querySelector(".selbox").checked=selSet.has(o.id);
     };
+    cell.querySelector(".gthumb").addEventListener("click",e=>{
+      if(e.target.closest(".selbox,.gacts"))return;
+      e.stopPropagation();
+      openFileModal(o);
+    });
     cell.querySelector(".gthumb").style.cursor="pointer";
     cell.querySelector(".selbox").onchange=e=>{
+      e.stopPropagation();
       if(e.target.checked)selSet.add(o.id);else selSet.delete(o.id);
       updateSelBar();
+      cell.classList.toggle("selected",selSet.has(o.id));
     };
-    if(selSet.has(o.id))cell.querySelector(".selbox").checked=true;
+    if(selSet.has(o.id)){cell.querySelector(".selbox").checked=true;cell.classList.add("selected");}
     g.appendChild(cell);
   });
   wrap.insertBefore(g,wrap.firstChild);
