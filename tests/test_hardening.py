@@ -176,7 +176,7 @@ def test_cli_install_writes_unit(tmp_path):
     env.write_text("ANBAR_BACKEND=bot\n")
     unit = tmp_path / "anbar.service"
     rc = cli_main(["install", "--unit", str(unit), "--env-file", str(env),
-                   "--workdir", "/root/anbar", "--loopback"])
+                   "--workdir", "/srv/anbar", "--loopback"])
     assert rc == 0
     body = unit.read_text()
     assert "ExecStart=" in body and "anbar.main:create_app" in body
@@ -186,5 +186,5 @@ def test_cli_install_writes_unit(tmp_path):
 
 def test_cli_install_missing_env_file_fails(tmp_path):
     rc = cli_main(["install", "--unit", str(tmp_path / "u.service"),
-                   "--env-file", str(tmp_path / "nope.env"), "--workdir", "/root/anbar"])
+                   "--env-file", str(tmp_path / "nope.env"), "--workdir", "/srv/anbar"])
     assert rc == 1

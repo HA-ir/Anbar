@@ -315,7 +315,6 @@ O(one chunk) memory, nothing buffered on disk. Entries keep filenames
 capped at 100 files / 8 GB per request. The selection bar's «دانلود ZIP»
 button drives it from the browser.
 
-
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — layers, data flow, chunking, storage locations
