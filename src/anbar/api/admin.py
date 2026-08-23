@@ -5,6 +5,7 @@ budget) and a cache purge.
 """
 from __future__ import annotations
 
+import json
 import time
 
 from fastapi import APIRouter, HTTPException, Request
@@ -190,6 +191,43 @@ async def objects(request: Request, limit: int = 50, offset: int = 0):
     limit = max(1, min(limit, 500))
     rows = db.list_objects(limit=limit, offset=max(0, offset))
     return {"objects": rows, "count": len(rows)}
+
+
+@router.get("/admin/export")
+async def export_metadata(request: Request, format: str = "json"):
+    """Export object metadata as JSON or CSV (admin; backup/inventory)."""
+    import csv
+    import io
+
+    from fastapi.responses import Response
+
+    require_admin(request)
+    db = request.app.state.db
+    rows = db.list_objects(limit=500)
+    if format == "csv":
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["id", "filename", "size", "chunks", "downloads",
+                    "created_at", "content_type", "sha256"])
+        for r in rows:
+            m = r.get("manifest") or ""
+            chunks = m.count('"f"') if isinstance(m, str) else 0
+            w.writerow([r["id"], r["filename"], r["size"], chunks,
+                        r.get("downloaded", 0), r.get("created_at", ""),
+                        r.get("content_type", ""), (r.get("sha256") or "")[:16]])
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="anbar-objects.csv"'},
+        )
+    out = [{"id": r["id"], "filename": r["filename"], "size": r["size"],
+            "downloaded": r.get("downloaded", 0), "created_at": r.get("created_at"),
+            "sha256": (r.get("sha256") or "")} for r in rows]
+    return Response(
+        content=json.dumps({"exported": len(out), "objects": out}, ensure_ascii=False, indent=1),
+        media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="anbar-objects.json"'},
+    )
 
 
 # ── API key management (v0.8.7) ──────────────────────────────────────────────

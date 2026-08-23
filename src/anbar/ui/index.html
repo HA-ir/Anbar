@@ -175,6 +175,21 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .btn-ghost:hover{color:var(--tx);border-color:var(--line2);background:var(--hover)}
 .btn-danger{border:1px solid var(--err);background:transparent;color:var(--err);font-size:13px;padding:8px 14px}
 .btn-danger:hover{background:var(--err);color:#fff}
+/* gallery view */
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:14px}
+.gcell{position:relative;background:var(--bg3);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.gcell:hover{border-color:var(--line2)}
+.gthumb{height:110px;background:var(--bg2);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.gthumb img,.gthumb video{width:100%;height:100%;object-fit:cover}
+.gicon{font-size:22px;font-weight:700;color:var(--tx3);letter-spacing:.05em}
+.gplay{position:absolute;inset:auto auto 6px 6px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:8px}
+.gname{font-size:12px;padding:8px 10px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gsub{font-size:11px;color:var(--tx3);padding:0 10px 10px}
+.gcell .selbox{position:absolute;top:8px;inset-inline-start:8px;z-index:2;display:none}
+.gcell:hover .selbox,.gcell .selbox:checked{display:block}
+.gacts{position:absolute;top:6px;inset-inline-end:6px;display:none;gap:4px;z-index:2}
+.gcell:hover .gacts{display:flex}
+.gacts .act{background:var(--bg2)}
 /* table */
 .tbl-wrap{background:var(--bg2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
 table{width:100%;border-collapse:collapse}
@@ -373,6 +388,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
       <small data-i18n="dropS">چند فایلی · بدون ذخیره روی دیسک سرور — مستقیم در تلگرام</small>
       <span class="lim" id="limTag"></span>
       <input type="file" id="fileInput" multiple hidden>
+      <input type="file" id="dirInput" webkitdirectory multiple hidden>
     </div>
 
     <!-- url ingest -->
@@ -398,6 +414,9 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <div class="toolbar">
       <h2><span data-i18n="files">فایل‌ها</span><span class="count" id="cnt">0</span></h2>
       <button class="btn btn-ghost" id="selAllBtn" style="width:auto" data-i18n="selAll">همه</button>
+      <button class="btn btn-ghost" id="viewBtn" style="width:auto;padding:8px 11px" title="gallery">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </button>
       <button class="btn btn-ghost" id="refBtn">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"/></svg>
         <span data-i18n="refresh">به‌روزرسانی</span>
@@ -424,7 +443,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
       </select>
     </div>
 
-    <div class="tbl-wrap">
+    <div class="tbl-wrap" id="tblWrap">
       <table>
         <thead><tr>
           <th data-i18n="thName">نام فایل</th>
@@ -760,6 +779,16 @@ async function api(path,opt={}){
 let authed=false,maxUploadBytes=20*1024*1024;
 async function boot(){
   applyI18n();setTheme(theme);
+  // PWA share target: /?url=... (or text containing a URL) → prefill ingest
+  try{
+    const sp=new URLSearchParams(location.search);
+    const shared=sp.get("url")||sp.get("text")||sp.get("title")||"";
+    const m=/(https?:\/\/[^\s]+)/.exec(shared);
+    if(m){
+      sessionStorage.setItem("anbar-shared",m[1]);
+      history.replaceState(null,"",location.pathname);
+    }
+  }catch(e){}
   try{
     const me=await api("/ui/me");
     if(me.authed){authed=true;showApp();}
@@ -769,6 +798,15 @@ function showLogin(){$("#loginWrap").style.display="flex";$("#app").classList.re
 function showApp(){
   $("#loginWrap").style.display="none";$("#app").classList.add("on");
   refresh();
+  // consume a PWA-shared URL: prefill + auto-submit the ingest form
+  const shared=sessionStorage.getItem("anbar-shared");
+  if(shared){
+    sessionStorage.removeItem("anbar-shared");
+    if(/^https?:\/\//i.test(shared)){
+      $("#urlInput").value=shared;
+      $("#urlForm").requestSubmit?$("#urlForm").requestSubmit():$("#urlBtn").click();
+    }
+  }
 }
 $("#loginForm").onsubmit=async ev=>{
   ev.preventDefault();
@@ -870,6 +908,9 @@ function renderRows(){
   const list=visibleFiles();
   $("#cnt").textContent=files.length;
   $("#empty").style.display=files.length?"none":"block";
+  if(viewMode==="gallery"){renderGallery(list);updateSelBar();return;}
+  const wrap=$("#tblWrap");
+  wrap.querySelectorAll(".gallery").forEach(g=>g.remove());
   const nm=$("#noMatch");
   if(files.length&&!list.length){
     if(!nm){const d=document.createElement("div");d.id="noMatch";d.className="empty";
@@ -913,6 +954,54 @@ function renderRows(){
 }
 /* multi-select (v0.9) */
 const selSet=new Set();
+let viewMode=localStorage.getItem("anbar-view")||"table";
+$("#viewBtn").onclick=()=>{
+  viewMode=viewMode==="table"?"gallery":"table";
+  localStorage.setItem("anbar-view",viewMode);
+  renderRows();
+};
+function renderGallery(list){
+  const tb=$("#rows");
+  tb.innerHTML="";
+  const wrap=$("#tblWrap");
+  wrap.querySelectorAll(".gallery").forEach(g=>g.remove());
+  if(!list.length)return;
+  const g=document.createElement("div");
+  g.className="gallery";
+  list.forEach(o=>{
+    const kind=mediaKind(o);
+    const url="/f/"+o.id;
+    const cell=document.createElement("div");
+    cell.className="gcell"+(kind?" has":"");
+    let inner;
+    if(kind==="image")inner='<img loading="lazy" src="'+url+'" alt="">';
+    else if(kind==="video")inner='<video src="'+url+'" preload="metadata" muted></video><span class="gplay">▶</span>';
+    else if(kind==="audio")inner='<div class="gicon">♪</div>';
+    else inner='<div class="gicon">'+esc((extOf(o.filename)||"bin").toUpperCase().slice(0,4))+'</div>';
+    cell.innerHTML='<div class="gthumb">'+inner+'</div>'
+      +'<div class="gname" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</div>'
+      +'<div class="gsub">'+humanSize(o.size)+' · '+(o.downloaded??0)+'⬇</div>'
+      +'<input type="checkbox" class="selbox" data-id="'+o.id+'">'
+      +'<div class="gacts">'
+      +'<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
+      +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
+      +'</div>';
+    cell.querySelector('[data-a=dl]').onclick=()=>{toast(t("dlStart"));const a=document.createElement("a");a.href=url;document.body.appendChild(a);a.click();a.remove();};
+    cell.querySelector('[data-a=del]').onclick=()=>delObj(o);
+    cell.querySelector(".gthumb").onclick=e=>{
+      if(e.target.closest(".selbox,.gacts"))return;
+      openFileModal(o);
+    };
+    cell.querySelector(".gthumb").style.cursor="pointer";
+    cell.querySelector(".selbox").onchange=e=>{
+      if(e.target.checked)selSet.add(o.id);else selSet.delete(o.id);
+      updateSelBar();
+    };
+    if(selSet.has(o.id))cell.querySelector(".selbox").checked=true;
+    g.appendChild(cell);
+  });
+  wrap.insertBefore(g,wrap.firstChild);
+}
 function updateSelBar(){
   const bar=$("#selBar");
   if(!bar)return;
@@ -1146,16 +1235,60 @@ async function pollIngest(jobId){
 }
 
 /* ================= upload ================= */
-const drop=$("#drop"),fileInput=$("#fileInput");
+const drop=$("#drop"),fileInput=$("#fileInput"),dirInput=$("#dirInput");
 let queue=[],uploading=false;
 drop.onclick=()=>fileInput.click();
+// right-click (or long-press) the dropzone → pick a whole folder
+drop.oncontextmenu=e=>{e.preventDefault();dirInput.click();};
 ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over")}));
 ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over")}));
 drop.addEventListener("drop",e=>{
+  const items=e.dataTransfer?.items;
+  if(items&&items.length&&typeof items[0].webkitGetAsEntry==="function"){
+    // folder-aware drop: walk directory entries recursively
+    const entries=[];
+    for(const it of items){
+      const ent=it.webkitGetAsEntry&&it.webkitGetAsEntry();
+      if(ent)entries.push(ent);
+    }
+    if(entries.some(en=>en.isDirectory)){
+      const files=[];
+      let pending=entries.length;
+      const done=()=>{if(files.length)enqueue(files);};
+      const walkDir=(dir,base)=>{
+        const rd=dir.createReader();
+        rd.readEntries(async ents=>{
+          for(const en of ents){
+            if(en.isDirectory)walkDir(en,(base?base+"/":"")+en.name);
+            else{
+              await new Promise(res=>en.file(f=>{
+                f._rel=(base?base+"/":"")+f.name;files.push(f);res();
+              },res));
+            }
+          }
+          if(--pending===0)done();
+        });
+      };
+      for(const en of entries){
+        if(en.isDirectory){walkDir(en,en.name);pending+=0;}
+        else en.file(f=>{f._rel=f.name;files.push(f);if(--pending===0)done();});
+      }
+      return;
+    }
+  }
   const fs=[...(e.dataTransfer?.files||[])];
   if(fs.length)enqueue(fs);
 });
 fileInput.onchange=()=>{enqueue([...fileInput.files]);fileInput.value="";};
+dirInput.onchange=()=>{
+  // flatten with relative paths as names so chunks stay distinguishable
+  enqueue([...dirInput.files].map(f=>{
+    const rel=f.webkitRelativePath||f.name;
+    try{return new File([f],rel,{type:f.type,lastModified:f.lastModified});}
+    catch(e){f.name=rel;return f;}
+  }));
+  dirInput.value="";
+};
 
 function enqueue(list){
   for(const f of list){
