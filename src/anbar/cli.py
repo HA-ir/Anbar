@@ -197,6 +197,62 @@ WantedBy=multi-user.target
     return 0
 
 
+def _cmd_put(args: argparse.Namespace) -> int:
+    """Upload a file (multipart) with any uploader/admin key; prints the id."""
+    path = args.file
+    if not os.path.isfile(path):
+        print(f"error: no such file: {path}", file=sys.stderr)
+        return 1
+    name = os.path.basename(path)
+    boundary = "----anbarctl7d3f2b9c1e"
+    with open(path, "rb") as f:
+        payload = f.read()
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{name}"\r\n'
+        f"Content-Type: application/octet-stream\r\n\r\n"
+    ).encode() + payload + f"\r\n--{boundary}--\r\n".encode()
+    key = args.key or args.admin_key
+    req = urllib.request.Request(
+        f"{args.base_url}/api/v1/upload", data=body, method="POST")
+    req.add_header("Content-Type",
+                   f"multipart/form-data; boundary={boundary}")
+    if key:
+        req.add_header("Authorization", f"Bearer {key}")
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            out = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        print(f"error: upload failed: HTTP {e.code}", file=sys.stderr)
+        return 1
+    obj = out.get("object") or out
+    oid = obj.get("id") or out.get("object_id") or "?"
+    size = obj.get("size") or len(payload)
+    print(f"uploaded {oid} ({size} bytes)")
+    return 0
+
+
+def _cmd_get(args: argparse.Namespace) -> int:
+    """Download an object to a local file via a freshly minted signed link."""
+    code, body = _http("POST", f"{args.base_url}/f/{args.object_id}/link?ttl=120",
+                       args.admin_key)
+    if code != 200:
+        print(f"error: link mint failed: HTTP {code} {body}", file=sys.stderr)
+        return 1
+    url = body["url"]
+    req = urllib.request.Request(url)
+    req.add_header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) anbarctl")
+    with urllib.request.urlopen(req, timeout=1800) as resp, \
+            open(args.out, "wb") as f:
+        while True:
+            chunk = resp.read(1 << 20)
+            if not chunk:
+                break
+            f.write(chunk)
+    print(f"saved {args.out}")
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="anbarctl", description=__doc__)
     parser.add_argument("--base-url",
@@ -225,6 +281,17 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_rot = sub.add_parser("rotate-secret", help="rotate the HMAC signing secret")
     p_rot.set_defaults(func=_cmd_rotate)
+
+    p_put = sub.add_parser("put", help="upload a local file; prints its object id")
+    p_put.add_argument("file", help="path of the file to upload")
+    p_put.add_argument("--key", default=os.environ.get("ANBAR_API_KEY"),
+                       help="uploader API key (default: $ANBAR_API_KEY)")
+    p_put.set_defaults(func=_cmd_put)
+
+    p_get = sub.add_parser("get", help="download an object to a local file")
+    p_get.add_argument("object_id")
+    p_get.add_argument("-o", "--out", required=True, help="destination path")
+    p_get.set_defaults(func=_cmd_get)
 
     p_login = sub.add_parser(
         "login",
