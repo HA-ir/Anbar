@@ -1258,7 +1258,8 @@ async function openLinks(){
           +'<button class="btn btn-warn lkrev" title="'+esc(t("revokeB"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">✕</button>')
        +'</div>';
      if(!L.revoked&&!L.expired){
-       d.querySelector(".lkopn").onclick=()=>window.open(href,"_blank");
+       d.querySelector(".lkopn").onclick=()=>window.open(
+         href+(href.includes("?")?"&view=1":"?view=1"),"_blank");
        d.querySelector(".lkcpy").onclick=async()=>{
          try{await navigator.clipboard.writeText(href);toast(t("copied"));}
          catch(e){toast("copy failed","err");}

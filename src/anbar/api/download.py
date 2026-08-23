@@ -70,36 +70,15 @@ def _range_416(total: int) -> HTTPException:
     return HTTPException(416, "unsatisfiable range", headers={"Content-Range": f"bytes */{total}"})
 
 
-def _pw_locked(request: Request, db, settings, obj_id: str) -> bool:
-    """True when this request is a browser visit that still needs a password.
+def _password_page(obj_id: str, sig: str, exp: int, failed: bool = False) -> str:
+    """Standalone RTL unlock page for a pw-protected link.
 
-    A visitor is "past" the password gate when the object has no pw tag at
-    all, or when the provided `?pw=` matches it (same HMAC the download
-    path checks). Everything else — missing or wrong `?pw` — shows the
-    unlock page. Admin/uploader sessions bypass entirely.
+    The GET form keeps the link's `sig`/`exp` in hidden fields (a bare
+    `?pw=` would drop them and fail auth), shows a server-driven error
+    line when the previous try was wrong, and includes a show-password
+    eye toggle.
     """
-    if not effective_auth_enabled(db, settings.auth_enabled):
-        return False
-    if whoami(request) in ("admin", "uploader"):
-        return False
-    pw_tag = db.kv_get(f"pw:{obj_id}")
-    if not pw_tag:
-        return False
-    given = request.query_params.get("pw", "")
-    import hashlib as _hashlib
-
-    want = _hashlib.sha256(f"pw:{obj_id}:{given}".encode()).hexdigest()[:32]
-    return not hmac.compare_digest(want, pw_tag)
-
-
-def _password_page(obj_id: str) -> str:
-    """Standalone RTL unlock page: asks for the password, reloads with ?pw=.
-
-    The page submits a GET form to itself, so after a correct password the
-    browser simply re-requests the same URL + `?pw=<typed>` and gets the
-    normal download/stream. `badpw=1` in the query shows the error line.
-    """
-    return """<!DOCTYPE html>
+    html = """<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
@@ -134,6 +113,12 @@ font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
 button:hover{filter:brightness(1.08)}
 .err{display:none;color:var(--err);font-size:12px;margin-top:12px}
 .foot{margin-top:22px;font-size:10.5px;color:var(--tx3);direction:ltr}
+.pwrow{display:flex;gap:8px;align-items:stretch}
+.pwwrap{position:relative;flex:1;min-width:0}
+.pwwrap input{width:100%;padding-inline-end:44px}
+.eye{position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);
+background:none;border:none;padding:8px;color:var(--tx3);cursor:pointer;line-height:0}
+.eye:hover{color:var(--tx)}
 </style>
 </head>
 <body>
@@ -146,19 +131,50 @@ button:hover{filter:brightness(1.08)}
   <h1>این فایل رمزدار است</h1>
   <p>برای دسترسی به فایل، رمز عبور لینک را وارد کنید.</p>
   <form method="get" action="" id="pf">
-    <input type="password" name="pw" id="pwin" autocomplete="off" autofocus placeholder="رمز عبور">
-    <button type="submit">باز کردن</button>
+    <input type="hidden" name="sig" value="__SIG__">
+    <input type="hidden" name="exp" value="__EXP__">
+    <div class="pwrow">
+      <div class="pwwrap">
+        <input type="password" name="pw" id="pwin" autocomplete="off"
+          autofocus placeholder="رمز عبور">
+        <button type="button" class="eye" id="eyebtn" aria-label="نمایش رمز"
+          title="نمایش رمز">
+          <svg id="eye-open" width="18" height="18" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2"><path
+            d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle
+            cx="12" cy="12" r="3"/></svg>
+          <svg id="eye-shut" width="18" height="18" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path
+            d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45
+            18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11
+            8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line
+            x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
+      <button type="submit">باز کردن</button>
+    </div>
   </form>
   <div class="err" id="perr">رمز عبور اشتباه است — دوباره تلاش کنید.</div>
   <div class="foot">powered by anbar</div>
 </div>
 <script>
-if(new URLSearchParams(location.search).has('badpw'))
-  document.getElementById('perr').style.display='block';
+var err=document.getElementById('perr');
+__FAILED__
 document.getElementById('pwin').focus();
+document.getElementById('eyebtn').onclick=function(){
+  var inp=document.getElementById('pwin'),o=document.getElementById('eye-open'),
+      s=document.getElementById('eye-shut'),show=inp.type==='password';
+  inp.type=show?'text':'password';
+  o.style.display=show?'none':'';
+  s.style.display=show?'':'none';
+};
 </script>
 </body>
 </html>"""
+    html = html.replace("__SIG__", sig).replace(
+        "__EXP__", str(int(exp))).replace(
+        "__FAILED__", "err.style.display='block';" if failed else "")
+    return html
 
 
 def _authenticate_download(request: Request, obj_id: str) -> None:
@@ -219,11 +235,46 @@ async def download(request: Request, obj_id: str):
     row = db.get_object(obj_id)
     if row is None:
         raise HTTPException(404, "object not found")
-    # v0.10.1: password-protected link opened WITHOUT ?pw (or with a wrong
-    # one) by a browser → render the unlock page instead of a bare 403.
-    wants_html = "text/html" in request.headers.get("accept", "")
-    if wants_html and _pw_locked(request, db, settings, obj_id) is True:
-        return HTMLResponse(_password_page(obj_id), status_code=200)
+    # v0.10.2: browser visit to a pw-protected link without the right ?pw
+    # gets the unlock page. A carried valid sig/exp is reused in the form;
+    # pretty-slug opens get a fresh 1h window (the pw tag only exists while
+    # a live link does, so revoking the last link kills the page too).
+    if ("text/html" in request.headers.get("accept", "")
+            and effective_auth_enabled(db, settings.auth_enabled)
+            and whoami(request) not in ("admin", "uploader")):
+        pw_tag = db.kv_get(f"pw:{obj_id}")
+        if pw_tag:
+            given = request.query_params.get("pw", "")
+            import hashlib as _hashlib
+
+            want = _hashlib.sha256(
+                f"pw:{obj_id}:{given}".encode()).hexdigest()[:32]
+            if not hmac.compare_digest(want, pw_tag):
+                configured = (settings.hmac_secret.get_secret_value()
+                              if settings.hmac_secret else None)
+                secret = effective_hmac_secret(db, configured)
+                sig_q = request.query_params.get("sig")
+                exp_q = request.query_params.get("exp")
+                use_sig = use_exp = None
+                if sig_q and exp_q and secret:
+                    try:
+                        exp_v = int(exp_q)
+                        from .. import links as links_registry
+
+                        if (verify_sig(obj_id, exp_v, sig_q, secret)
+                                and exp_v > int(time.time())
+                                and not links_registry.is_revoked(
+                                    db, obj_id, exp_v)):
+                            use_sig, use_exp = sig_q, exp_v
+                    except ValueError:
+                        pass
+                if use_sig is None and secret:
+                    use_exp = int(time.time()) + 3600
+                    use_sig = sign(obj_id, use_exp, secret)
+                if use_sig:
+                    return HTMLResponse(_password_page(
+                        obj_id, use_sig, use_exp, failed=bool(given)))
+                # invalid/revoked/expired carried link → real error below
     _authenticate_download(request, obj_id)
 
     manifest = Manifest.from_json(row["manifest"])
@@ -237,10 +288,15 @@ async def download(request: Request, obj_id: str):
         length = total
         segments = manifest.map_range(0, total)
 
+    # v0.10.2: ?view=1 → serve inline (browser plays/edits instead of saving)
+    disposition = "attachment"
+    if request.query_params.get("view") in ("1", "true"):
+        disposition = "inline"
+
     headers = {
         "Content-Length": str(length),
         "Content-Type": row["content_type"] or "application/octet-stream",
-        "Content-Disposition": f'attachment; filename="{row["filename"]}"',
+        "Content-Disposition": f'{disposition}; filename="{row["filename"]}"',
         "Accept-Ranges": "bytes",
     }
     if start is not None:

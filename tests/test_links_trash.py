@@ -35,9 +35,9 @@ def test_revoke_kills_link(client):
     assert r.status_code == 200
     # same URL now returns 410 revoked
     assert client.get(u.path + "?" + u.query).status_code == 410
-    # listing shows revoked state
+    # live view (default) hides the dead link entirely
     links = client.get("/api/v1/admin/links", headers=ADMIN).json()["links"]
-    assert links[0]["revoked"] is True
+    assert all(not (x["obj_id"] == oid and x["exp"] == exp) for x in links)
     # revoking again → 404 (already gone)
     assert client.post(f"/api/v1/admin/links/{oid}/revoke/{exp}",
                        headers=ADMIN).status_code == 404

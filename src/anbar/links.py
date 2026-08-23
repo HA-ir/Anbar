@@ -49,8 +49,14 @@ def revoke(db, obj_id: str, exp: int) -> bool:
     return True
 
 
-def list_links(db, limit: int = 200) -> list[dict]:
-    """All registered links (live + revoked, newest first) with object names."""
+def list_links(db, limit: int = 200, *, include_dead: bool = False) -> list[dict]:
+    """Registered links (newest-expiry first) with object names.
+
+    Default shows **live links only** — revoked and expired ones are hidden
+    so the manager reflects what is actually shareable right now. Pass
+    `include_dead=True` for an audit view.
+    """
+    now = int(time.time())
     rows = []
     revoked = {}
     for k, _v in db.kv_all():
@@ -70,26 +76,30 @@ def list_links(db, limit: int = 200) -> list[dict]:
             meta = json.loads(v)
         except (ValueError, json.JSONDecodeError):
             continue
+        is_rev = (obj_id, exp) in revoked
+        if not include_dead and (is_rev or exp <= now):
+            continue  # live view skips dead links entirely
         row = db.get_object(obj_id)
         rows.append({
             "obj_id": obj_id,
             "filename": (row["filename"] if row else None),
             "exists": row is not None,
             "exp": exp,
-            "expired": exp <= int(time.time()),
-            "revoked": (obj_id, exp) in revoked,
+            "expired": exp <= now,
+            "revoked": is_rev,
             **meta,
         })
-    # tombstones whose registration was already purged still show as revoked
-    known = {(r["obj_id"], r["exp"]) for r in rows}
-    for (obj_id, exp) in revoked:
-        if (obj_id, exp) not in known:
-            row = db.get_object(obj_id)
-            rows.append({"obj_id": obj_id,
-                         "filename": (row["filename"] if row else None),
-                         "exists": row is not None, "exp": exp,
-                         "expired": exp <= int(time.time()), "revoked": True,
-                         "slug": None, "pw": False, "max_dl": None})
+    if include_dead:
+        # tombstones whose registration was already purged still show
+        known = {(r["obj_id"], r["exp"]) for r in rows}
+        for (obj_id, exp) in revoked:
+            if (obj_id, exp) not in known:
+                row = db.get_object(obj_id)
+                rows.append({"obj_id": obj_id,
+                             "filename": (row["filename"] if row else None),
+                             "exists": row is not None, "exp": exp,
+                             "expired": exp <= now, "revoked": True,
+                             "slug": None, "pw": False, "max_dl": None})
     rows.sort(key=lambda r: r["exp"], reverse=True)
     return rows[: max(1, limit)]
 
