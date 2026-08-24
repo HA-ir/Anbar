@@ -352,6 +352,7 @@ button drives it from the browser.
 - [API reference](docs/API.md) — every endpoint, auth matrix, error codes, **anbarctl CLI reference**
 - [Deployment guide](docs/DEPLOY.md) — Docker, Caddy/Nginx, secrets, ops runbook
 - [Roadmap](docs/ROADMAP.md) — phase details, decisions, open questions
+- [Changelog](CHANGELOG.md) — notable changes per release
 - [Security policy](SECURITY.md) — how to report vulnerabilities privately
 - [Contributing](CONTRIBUTING.md) — dev setup, ground rules, PR guide
 
