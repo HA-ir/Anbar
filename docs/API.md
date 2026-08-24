@@ -70,13 +70,22 @@ arrives).
 
 ```bash
 curl -X POST http://127.0.0.1:8567/api/v1/upload/raw \
-  -H "Authorization: Bearer $API_KEY" \
+  -H "Authorization: Bearer ***" \
   -H "X-File-Name: disk.img" \
   -H "Content-Length: 3221225472" \
   --data-binary @disk.img
 ```
 
 Same response shape as multipart upload.
+
+**Resumable uploads** — send `X-Upload-Id: <client-generated-id>` to make an
+upload resumable. If the connection drops, re-send **from byte 0** with the
+same `X-Upload-Id` + `X-Resume-From: <chunks-done>`; the server drains the
+already-stored leading chunks (no duplicate Telegram posts) and commits only
+the tail. Checkpoints live in kv for 24 h. Verified end-to-end on a 100 MB
+payload: pass 1 stored 3×16 MB chunks then the client hard-dropped; pass 2
+re-sent the full 100 MB in 13.9 s, server drained 3 chunks / posted 4 new,
+and the committed object's SHA-256 matched the client-side hash exactly.
 
 ### `GET /f/{id}`  *(F3)*
 
