@@ -18,7 +18,7 @@ SPEC = {
     "rate_download": (0, 100_000),      # per (client IP, object) / min
     "rate_upload": (0, 100_000),        # per API key / min
     "rate_login": (0, 10_000),          # per client IP / min
-    "max_upload_mb": (1, 2048),         # object size ceiling, MB
+    "max_upload_mb": (1, 102400),         # object size ceiling, MB
     "web_session_ttl": (300, 604_800),  # seconds, max 7 days
     "cache_mb": (0, 8192),              # LRU budget; 0 = cache off
 }

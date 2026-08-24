@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # chunking (v1.1)
     chunking: ChunkingMode = ChunkingMode.AUTO
-    chunk_size_mb: int = Field(default=16, ge=1, le=1024)
+    chunk_size_mb: int = Field(default=16, ge=1)
 
     # flood pacing (v0.8.3, bot backend)
     flood_send_gap_s: float = Field(default=1.1, ge=0)  # min gap between sends

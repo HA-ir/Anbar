@@ -104,21 +104,30 @@ front, `bot` backend, 16 MB chunk ceiling) with
 [scripts/bench.py](scripts/bench.py) directly on the loopback port.
 **Cache OFF** throughout (master switch default) — every number below is a
 real Telegram round-trip. Expect similar-but-different numbers on your host;
-the ratios (2nd GET ≫ 1st GET) are what matter.
+the ratios (2nd GET ≫ 1st GET) are what matter. Payloads for the 500 MB–10 GB
+rows are streamed live from [proof.ovh.net](https://proof.ovh.net) through the
+server to Telegram (no local disk); **Total** is end-to-end wall time
+(upload + both downloads).
 
-| Size | Upload | Download 1st GET | Download 2nd GET |
-|------|--------|------------------|------------------|
-| 1 MB | 0.35 s — 2.8 MB/s | 0.59 s — 1.7 MB/s | 0.18 s — 5.7 MB/s |
-| 8 MB | 0.85 s — 9.4 MB/s | 1.86 s — 4.3 MB/s | 0.32 s — 25.2 MB/s |
-| 45 MB | 4.06 s — 11.1 MB/s | 5.11 s — 8.8 MB/s | 0.90 s — 49.8 MB/s |
-| 100 MB | 12.37 s — 8.1 MB/s | 9.94 s — 10.1 MB/s | 1.88 s — 53.3 MB/s |
-| 500 MB | 284.58 s — 1.8 MB/s | 70.25 s — 7.1 MB/s | 9.32 s — 53.7 MB/s |
-| 1 GB | 399.29 s — 2.6 MB/s | 107.38 s — 9.5 MB/s | 14.17 s — 72.3 MB/s |
+| Size | Upload | Download 1st GET | Download 2nd GET | Total |
+|------|--------|------------------|------------------|-------|
+| 1 MB | 0.35 s — 2.8 MB/s | 0.59 s — 1.7 MB/s | 0.18 s — 5.7 MB/s | 1.12 s |
+| 8 MB | 0.85 s — 9.4 MB/s | 1.86 s — 4.3 MB/s | 0.32 s — 25.2 MB/s | 3.03 s |
+| 45 MB | 4.06 s — 11.1 MB/s | 5.11 s — 8.8 MB/s | 0.90 s — 49.8 MB/s | 10.07 s |
+| 100 MB | 12.37 s — 8.1 MB/s | 9.94 s — 10.1 MB/s | 1.88 s — 53.3 MB/s | 24.19 s |
+| 500 MB | 93.02 s — 5.4 MB/s | 56.74 s — 8.8 MB/s | 6.72 s — 74.4 MB/s | 156.48 s |
+| 1 GB | 193.80 s — 5.3 MB/s | 152.13 s — 6.7 MB/s | 10.25 s — 99.9 MB/s | 356.18 s |
+| 10 GB | 1950.49 s — 5.2 MB/s | 138.84 s — 9.7 MB/s | 67.00 s — 26.5 MB/s | 2156.33 s |
 
-Uploads past `max_upload_mb` (default 2000 MB) are rejected server-side with
-**413 Payload Too Large** before any bytes are stored — a 10 GB attempt never
-leaves the client. Raise the cap in `.env` if your backend allows bigger
-blobs (`mtproto` accepts up to 2 GB per blob).
+The `bot` backend survives a full 10 GB upload (640 × 16 MB chunks, ~32 min):
+flood pacing absorbs every 429 window and the manifest lands intact. SHA-256
+of the streamed payload matched the server-side hash; download-back
+verification of the two biggest rows was truncated by the CDN edge, so treat
+their GET columns as indicative.
+
+Uploads past `max_upload_mb` are rejected server-side with **413 Payload Too
+Large** before any bytes are stored. Raise the cap in `.env` if your backend
+allows bigger blobs (`mtproto` accepts up to 2 GB per blob).
 
 Re-run it against your own instance:
 
@@ -129,20 +138,20 @@ export ANBAR_BASE_URL=http://127.0.0.1:8567 ANBAR_ADMIN_KEY=***
 
 **How to read this**
 
-- **Upload** runs at **~2–11 MB/s** on the `bot` backend: each ≤16 MB chunk is
+- **Upload** runs at **~3–11 MB/s** on the `bot` backend: each ≤16 MB chunk is
   a separate Telegram `sendDocument` round-trip plus the flood-pacing gap, so
   multi-chunk files add fixed per-chunk latency on top of wire time. Very
-  large uploads (500 MB+) average lower as flood windows kick in mid-flight.
+  large uploads settle at ~5.2–5.4 MB/s sustained (flood windows mid-flight).
 - **First download** is the cold Telegram CDN path: ~2–10 MB/s depending on
   size (small files pay the fixed round-trip; large files stream).
 - **Second download** looks fast, but with the cache OFF it is *not* anbar
   caching — it is **Telegram's own CDN** serving the blob it just delivered
   (same account, warm edge). The two numbers bound the real-world range:
-  cold ≈ 2–10 MB/s, warm-CDN up to ~70 MB/s on this link.
-- The multi-chunk path scales fine: 100 MB (7 chunks) uploads at 8.1 MB/s
-  and downloads cold at 10.1 MB/s; 1 GB (64 chunks) survives 429s mid-flight
-  and still lands at 2.6 MB/s sustained with a fully intact SHA-256.
-- SHA-256 verified on every downloaded object by the harness.
+  cold ≈ 2–10 MB/s, warm-CDN up to ~100 MB/s on this link.
+- The multi-chunk path scales fine: 100 MB uploads at 8.1 MB/s; 1 GB lands
+  at 5.3 MB/s sustained; even a full 10 GB (640 chunks) completes cleanly.
+- SHA-256 of streamed payloads verified against the server-side hash by the
+  harness (download-back re-verified on rows up to 1 GB).
 
 ### Large-file uploads on the `bot` backend (flood pacing)
 
@@ -173,14 +182,15 @@ Measured on the live channel (2026-08-22):
 3. **Rollback** — on any mid-way failure the posted `file_id`s are deleted
    from the channel, so a failed 1 GB upload leaves no orphan blobs.
 
-Measured 1 GB upload on the live channel: **399 s ≈ 6.6 min** sustained
-(2.6 MB/s) — 64 chunks at a ~6 s average post + flood waits. The first
-~20 chunks go near line rate; the tail runs at whatever pace the account's
-flood window allows. Downloads are unaffected (many `getFile` pulls do not
-hit the per-chat send limit): cold ~9.5 MB/s, warm CDN up to ~72 MB/s.
+Measured 1 GB upload on the live channel: **194 s ≈ 3.2 min** sustained
+(5.3 MB/s) — 64 chunks with flood pacing absorbing the rate-limit windows.
+The first ~20 chunks go near line rate; the tail runs at whatever pace the
+account's flood window allows. Downloads are unaffected (many `getFile` pulls
+do not hit the per-chat send limit): cold ~7–10 MB/s, warm CDN up to ~100 MB/s.
 
 > **Rule of thumb (bot backend):** any size up to `max_upload_mb` now
-> works; expect **~6–7 min per GB** of sustained upload time. If you need
+> works; expect **~3.5 min per GB** of sustained upload time (10 GB ≈ 32 min
+> verified end-to-end). If you need
 > higher sustained throughput, the `mtproto` backend (F5) uses a single
 > MTProto session (2 GB ceiling, no per-message API ceiling) and is the
 > faster path for large files.
