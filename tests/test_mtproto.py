@@ -44,6 +44,9 @@ class FakeClient:
     async def is_user_authorized(self) -> bool:
         return self._authorized
 
+    async def get_entity(self, peer):
+        return ("entity", peer)
+
     async def send_file(self, entity, file, file_name: str = "", **kw) -> _Msg:
         msg_id = self._next_id
         self._next_id += 1

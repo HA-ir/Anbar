@@ -23,14 +23,15 @@ class MTProtoBackend(StorageBackend):
     max_upload_bytes = _MAX_SEND_BYTES
 
     def __init__(self, api_id: int, api_hash: str, session_file: str,
-                 client=None, peer: str = "me") -> None:
+                 client=None, peer: str | int = "me") -> None:
         if client is None:
             from telethon import TelegramClient  # lazy: optional at import time
 
             client = TelegramClient(str(session_file), api_id, api_hash)
         self._client = client
         self._session_file = str(session_file)
-        self._peer = peer  # destination entity: "me" (Saved) or a channel id
+        self._peer_spec: str | int = peer  # "me" (Saved) or a channel id
+        self._peer = peer  # resolved entity after connect()
         self._connected = False
 
     async def connect(self) -> None:
@@ -57,6 +58,17 @@ class MTProtoBackend(StorageBackend):
                 f"mtproto: could not start client ({e}). If the account was "
                 "logged out or the session is stale, re-run `anbarctl login`."
             ) from e
+        # Resolve the destination peer once, up front. Telethon's string
+        # parsing of marked channel ids ("-100…") requires a cache hit and
+        # fails on fresh sessions, while the integer form resolves reliably.
+        if self._peer_spec != "me":
+            try:
+                self._peer = await self._client.get_entity(int(self._peer_spec))
+            except ValueError as e:
+                raise RuntimeError(
+                    f"mtproto: cannot resolve peer {self._peer_spec!r} — the "
+                    "account may not be a member of that channel."
+                ) from e
         self._connected = True
 
     # ── StorageBackend contract ─────────────────────────────────────
