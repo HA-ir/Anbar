@@ -1,6 +1,8 @@
 """F5: MTProto backend contract with a mock Telethon client + wiring."""
 from __future__ import annotations
 
+import io
+
 import pytest
 
 from anbar.config import Backend, Settings
@@ -50,15 +52,24 @@ class FakeClient:
     async def send_file(self, entity, file, file_name: str = "", **kw) -> _Msg:
         msg_id = self._next_id
         self._next_id += 1
-        self._msgs[msg_id] = _Msg(msg_id, msg_id, file if isinstance(file, bytes) else b"")
+        if isinstance(file, io.BytesIO):
+            file.seek(0)
+            payload = file.read()
+        elif isinstance(file, bytes):
+            payload = file
+        else:
+            payload = b""
+        self._msgs[msg_id] = _Msg(msg_id, msg_id, payload)
         return self._msgs[msg_id]
 
     async def get_messages(self, entity, ids=None, **kw):
         mid = ids if not isinstance(ids, (list, tuple)) else ids[0]
         return self._msgs.get(mid)
 
-    async def download_media(self, msg, file) -> None:
-        file.write(msg._data)
+    def iter_download(self, msg, request_size: int = 1048576):
+        async def _gen():
+            yield msg._data
+        return _gen()
 
     async def delete_messages(self, entity, message_id: int) -> None:
         self._msgs.pop(message_id, None)

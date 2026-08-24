@@ -80,8 +80,10 @@ class MTProtoBackend(StorageBackend):
         deliberately ignored: everything is sent as a force_document so the
         blob stays a byte-exact opaque file in the channel.
         """
-        msg = await self._client.send_file(self._peer, data, file_name=name,
-                                           force_document=True)
+        msg = await self._client.send_file(
+            self._peer, io.BytesIO(data), file_name=name,
+            force_document=True, file_size=len(data),
+        )
         doc = msg.media.document if msg.media else None
         if doc is None:
             raise RuntimeError(f"mtproto: message {msg.id} has no document")
@@ -102,7 +104,8 @@ class MTProtoBackend(StorageBackend):
             raise FileNotFoundError(
                 f"mtproto: message {ref.message_id} not found or has no document")
         buf = io.BytesIO()
-        await self._client.download_media(msg, file=buf)
+        async for piece in self._client.iter_download(msg, request_size=524288):
+            buf.write(piece)
         return buf.getvalue()
 
     async def delete(self, ref: ObjectRef) -> bool:
