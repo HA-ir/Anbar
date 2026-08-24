@@ -79,11 +79,16 @@ class MTProtoBackend(StorageBackend):
         `content_type` is accepted for the StorageBackend contract but
         deliberately ignored: everything is sent as a force_document so the
         blob stays a byte-exact opaque file in the channel.
+
+        Uploaded through `upload_file` with 512 KB parts: Telethon's
+        `send_file` path ignores part_size and falls back to 128 KB parts,
+        which quarters throughput (RTT-bound).
         """
+        handle = await self._client.upload_file(
+            io.BytesIO(data), file_size=len(data), part_size_kb=512,
+        )
         msg = await self._client.send_file(
-            self._peer, io.BytesIO(data), file_name=name,
-            force_document=True, file_size=len(data),
-            part_size_kb=512,
+            self._peer, handle, file_name=name, force_document=True,
         )
         doc = msg.media.document if msg.media else None
         if doc is None:

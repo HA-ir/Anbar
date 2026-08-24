@@ -58,9 +58,18 @@ class FakeClient:
         elif isinstance(file, bytes):
             payload = file
         else:
-            payload = b""
+            # uploaded InputFile handle from upload_file(): keep last payload
+            payload = self._last_upload if hasattr(self, "_last_upload") else b""
         self._msgs[msg_id] = _Msg(msg_id, msg_id, payload)
         return self._msgs[msg_id]
+
+    async def upload_file(self, file, file_size: int | None = None,
+                          part_size_kb: float | None = None, **kw):
+        if isinstance(file, io.BytesIO):
+            file.seek(0)
+            self._last_upload = file.read()
+        else:
+            self._last_upload = b""
 
     async def get_messages(self, entity, ids=None, **kw):
         mid = ids if not isinstance(ids, (list, tuple)) else ids[0]
