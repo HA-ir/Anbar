@@ -83,6 +83,7 @@ class MTProtoBackend(StorageBackend):
         msg = await self._client.send_file(
             self._peer, io.BytesIO(data), file_name=name,
             force_document=True, file_size=len(data),
+            part_size_kb=512,
         )
         doc = msg.media.document if msg.media else None
         if doc is None:
