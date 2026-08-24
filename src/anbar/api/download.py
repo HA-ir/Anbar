@@ -355,6 +355,7 @@ async def download(request: Request, obj_id: str):
                 with open(tmp, "wb") as out:
                     for idx, off, n in segments:
                         ref = ObjectRef(file_id=manifest.chunks[idx].file_id,
+                                        message_id=manifest.chunks[idx].message_id,
                                         backend=backend.name)
                         chunk = await backend.open(ref)
                         part = chunk[off : off + n]
@@ -375,7 +376,9 @@ async def download(request: Request, obj_id: str):
     async def stream():
         # one chunk in flight per request — never the whole object
         for idx, off, n in segments:
-            ref = ObjectRef(file_id=manifest.chunks[idx].file_id, backend=backend.name)
+            ref = ObjectRef(file_id=manifest.chunks[idx].file_id,
+                            message_id=manifest.chunks[idx].message_id,
+                            backend=backend.name)
             chunk = await backend.open(ref)
             yield chunk[off : off + n]
 
