@@ -53,8 +53,9 @@ class FakeClient:
         self._msgs[msg_id] = _Msg(msg_id, msg_id, file if isinstance(file, bytes) else b"")
         return self._msgs[msg_id]
 
-    async def get_message(self, entity, message_id: int) -> _Msg | None:
-        return self._msgs.get(message_id)
+    async def get_messages(self, entity, ids=None, **kw):
+        mid = ids if not isinstance(ids, (list, tuple)) else ids[0]
+        return self._msgs.get(mid)
 
     async def download_media(self, msg, file) -> None:
         file.write(msg._data)

@@ -97,7 +97,7 @@ class MTProtoBackend(StorageBackend):
         """Re-fetch a blob from Saved Messages (bounded by chunk size)."""
         if ref.message_id is None:
             raise RuntimeError("mtproto ref without message_id")
-        msg = await self._client.get_message(self._peer, ref.message_id)
+        msg = await self._client.get_messages(self._peer, ids=ref.message_id)
         if msg is None or msg.media is None:
             raise FileNotFoundError(
                 f"mtproto: message {ref.message_id} not found or has no document")
