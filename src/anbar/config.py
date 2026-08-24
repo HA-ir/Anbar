@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     api_id: int | None = None
     api_hash: str = ""
     session_file: Path = Path("secrets/session.session")
+    mtproto_peer: str = "me"  # destination entity for mtproto blobs ("me"=Saved)
 
     # limits
     max_upload_mb: int = Field(default=2000, ge=1)

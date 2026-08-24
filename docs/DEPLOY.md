@@ -74,6 +74,9 @@ a bot. Blobs live in the account's Saved Messages.
    ANBAR_API_ID=123456
    ANBAR_API_HASH=abcdef...
    ANBAR_SESSION_FILE=/app/secrets/session.session
+   # destination for stored blobs: "me" = the account's Saved Messages
+   # (default); or a channel/group id like -1004435059287
+   ANBAR_MTPROTO_PEER=me
    # chunk size may now be raised: 49 MB is the default cap
    ANBAR_CHUNK_SIZE_MB=49
    ```

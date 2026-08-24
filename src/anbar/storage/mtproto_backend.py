@@ -23,13 +23,14 @@ class MTProtoBackend(StorageBackend):
     max_upload_bytes = _MAX_SEND_BYTES
 
     def __init__(self, api_id: int, api_hash: str, session_file: str,
-                 client=None) -> None:
+                 client=None, peer: str = "me") -> None:
         if client is None:
             from telethon import TelegramClient  # lazy: optional at import time
 
             client = TelegramClient(str(session_file), api_id, api_hash)
         self._client = client
         self._session_file = str(session_file)
+        self._peer = peer  # destination entity: "me" (Saved) or a channel id
         self._connected = False
 
     async def connect(self) -> None:
@@ -61,7 +62,7 @@ class MTProtoBackend(StorageBackend):
     # ── StorageBackend contract ─────────────────────────────────────
     async def store(self, data: bytes, name: str) -> ObjectRef:
         """Upload one blob as a document into Saved Messages."""
-        msg = await self._client.send_file("me", data, file_name=name,
+        msg = await self._client.send_file(self._peer, data, file_name=name,
                                            force_document=True)
         doc = msg.media.document if msg.media else None
         if doc is None:
@@ -78,7 +79,7 @@ class MTProtoBackend(StorageBackend):
         """Re-fetch a blob from Saved Messages (bounded by chunk size)."""
         if ref.message_id is None:
             raise RuntimeError("mtproto ref without message_id")
-        msg = await self._client.get_message("me", ref.message_id)
+        msg = await self._client.get_message(self._peer, ref.message_id)
         if msg is None or msg.media is None:
             raise FileNotFoundError(
                 f"mtproto: message {ref.message_id} not found or has no document")
@@ -91,7 +92,7 @@ class MTProtoBackend(StorageBackend):
         if ref.message_id is None:
             return False
         try:
-            await self._client.delete_messages("me", ref.message_id)
+            await self._client.delete_messages(self._peer, ref.message_id)
             return True
         except Exception:  # noqa: BLE001 - best-effort remote cleanup
             return False

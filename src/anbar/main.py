@@ -115,6 +115,7 @@ def _default_backend(settings) -> StorageBackend:
             api_id=settings.api_id,
             api_hash=settings.api_hash,
             session_file=str(settings.session_file),
+            peer=settings.mtproto_peer,
         )
     raise RuntimeError(f"unknown backend {settings.backend!r}")
 
