@@ -60,8 +60,14 @@ class MTProtoBackend(StorageBackend):
         self._connected = True
 
     # ── StorageBackend contract ─────────────────────────────────────
-    async def store(self, data: bytes, name: str) -> ObjectRef:
-        """Upload one blob as a document into Saved Messages."""
+    async def store(self, data: bytes, name: str,
+                    content_type: str | None = None) -> ObjectRef:
+        """Upload one blob as a document into the destination peer.
+
+        `content_type` is accepted for the StorageBackend contract but
+        deliberately ignored: everything is sent as a force_document so the
+        blob stays a byte-exact opaque file in the channel.
+        """
         msg = await self._client.send_file(self._peer, data, file_name=name,
                                            force_document=True)
         doc = msg.media.document if msg.media else None
