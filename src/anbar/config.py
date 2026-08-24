@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     # chunking (v1.1)
     chunking: ChunkingMode = ChunkingMode.AUTO
     chunk_size_mb: int = Field(default=16, ge=1)
+    mtproto_chunk_cap_mb: int = Field(default=49, ge=1)
 
     # flood pacing (v0.8.3, bot backend)
     flood_send_gap_s: float = Field(default=1.1, ge=0)  # min gap between sends
@@ -91,12 +92,16 @@ class Settings(BaseSettings):
         """Effective chunk size in bytes (capped by the backend's send limit).
 
         bot: 19 MB (Bot API ceiling is 20 MB).
-        mtproto: 49 MB (larger blobs → fewer messages; Telethon handles any
-        size up to 2 GB per file, so this is a tunable efficiency knob).
+        mtproto: capped by `mtproto_chunk_cap_mb` (default 49 MB; Telegram
+        itself allows up to 2 GB per file, so this is a tunable knob).
         fake: 19 MB (mirrors the bot contract).
         """
         size = self.chunk_size_mb * 1024 * 1024
-        cap = 49 * 1024 * 1024 if self.backend is Backend.MTPROTO else 19 * 1024 * 1024
+        cap = (
+            self.mtproto_chunk_cap_mb * 1024 * 1024
+            if self.backend is Backend.MTPROTO
+            else 19 * 1024 * 1024
+        )
         return min(size, cap)
 
 

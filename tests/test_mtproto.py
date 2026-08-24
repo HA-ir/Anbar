@@ -147,9 +147,23 @@ async def test_chunk_size_backend_aware():
     mp16 = Settings(backend=Backend.MTPROTO, chunk_size_mb=16, env_file=None)
     assert mp16.chunk_size == 16 * 1024 * 1024
 
-    # large configured chunk grows under mtproto but is capped at 49 MB
+    # large configured chunk grows under mtproto but is capped at 49 MB (default cap)
     mp64 = Settings(backend=Backend.MTPROTO, chunk_size_mb=64, env_file=None)
     assert mp64.chunk_size == 49 * 1024 * 1024
+
+    # the mtproto cap itself is configurable
+    mp256 = Settings(
+        backend=Backend.MTPROTO, chunk_size_mb=256,
+        mtproto_chunk_cap_mb=256, env_file=None,
+    )
+    assert mp256.chunk_size == 256 * 1024 * 1024
+
+    # configured value below the raised cap still wins (cap never raises)
+    mp128 = Settings(
+        backend=Backend.MTPROTO, chunk_size_mb=128,
+        mtproto_chunk_cap_mb=256, env_file=None,
+    )
+    assert mp128.chunk_size == 128 * 1024 * 1024
 
     # same config under bot is capped at 19 MB
     bot64 = Settings(backend=Backend.BOT, chunk_size_mb=64, env_file=None)
