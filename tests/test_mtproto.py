@@ -27,6 +27,13 @@ class _Msg:
         self._data = data
 
 
+class _RawOk:
+    """Stand-in for a BoolTrue RPC response."""
+
+    def __bool__(self) -> bool:
+        return True
+
+
 class FakeClient:
     """Just enough of the Telethon client surface for MTProtoBackend."""
 
@@ -36,6 +43,8 @@ class FakeClient:
         self._next_id = 1
         self.started = False
         self.disconnected = False
+        self._parts: dict[tuple[int, int], bytes] = {}
+        self._last_upload = b""
 
     async def start(self) -> None:
         self.started = True
@@ -57,9 +66,15 @@ class FakeClient:
             payload = file.read()
         elif isinstance(file, bytes):
             payload = file
+        elif hasattr(file, "id") and hasattr(file, "parts"):
+            # InputFileBig handle from _upload_parallel: reassemble parts
+            fid = file.id
+            payload = b"".join(
+                self._parts.get((fid, i * 524288), b"")
+                for i in range(file.parts)
+            )
         else:
-            # uploaded InputFile handle from upload_file(): keep last payload
-            payload = self._last_upload if hasattr(self, "_last_upload") else b""
+            payload = self._last_upload
         self._msgs[msg_id] = _Msg(msg_id, msg_id, payload)
         return self._msgs[msg_id]
 
@@ -70,6 +85,20 @@ class FakeClient:
             self._last_upload = file.read()
         else:
             self._last_upload = b""
+
+    def __call__(self, request):
+        """Support `client(SaveBigFilePartRequest(...))` raw API calls."""
+        from telethon.tl.functions.upload import SaveBigFilePartRequest
+
+        if isinstance(request, SaveBigFilePartRequest):
+            start = request.file_part * len(request.bytes)
+            self._parts[(request.file_id, start)] = request.bytes
+
+            async def _ok():
+                return _RawOk()
+
+            return _ok()
+        raise AssertionError(f"unexpected request {request!r}")
 
     async def get_messages(self, entity, ids=None, **kw):
         mid = ids if not isinstance(ids, (list, tuple)) else ids[0]

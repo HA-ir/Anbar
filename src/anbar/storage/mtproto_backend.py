@@ -9,13 +9,19 @@ itself never authenticates, it just loads the existing session.
 """
 from __future__ import annotations
 
+import asyncio
 import io
+import os
 from pathlib import Path
 
 from .base import ObjectRef, StorageBackend
 
 # Telegram user-account send limit.
 _MAX_SEND_BYTES = 2 * 1024 * 1024 * 1024
+
+# Parallel SaveBigFilePart requests during upload (RTT-bound otherwise).
+_UPLOAD_PART_BYTES = 524288  # 512 KB — Telegram's big-file part ceiling
+_UPLOAD_WORKERS = 8
 
 
 class MTProtoBackend(StorageBackend):
@@ -80,13 +86,12 @@ class MTProtoBackend(StorageBackend):
         deliberately ignored: everything is sent as a force_document so the
         blob stays a byte-exact opaque file in the channel.
 
-        Uploaded through `upload_file` with 512 KB parts: Telethon's
-        `send_file` path ignores part_size and falls back to 128 KB parts,
-        which quarters throughput (RTT-bound).
+        Uploaded with parallel SaveBigFilePart requests (512 KB parts,
+        _UPLOAD_WORKERS in flight): a single Telethon connection is
+        RTT-bound at ~3 MB/s sequentially; modest pipelining reaches
+        ~5 MB/s without tripping flood limits.
         """
-        handle = await self._client.upload_file(
-            io.BytesIO(data), file_size=len(data), part_size_kb=512,
-        )
+        handle = await self._upload_parallel(data, name)
         msg = await self._client.send_file(
             self._peer, handle, file_name=name, force_document=True,
         )
@@ -100,6 +105,32 @@ class MTProtoBackend(StorageBackend):
             name=name,
             message_id=msg.id,
         )
+
+    async def _upload_parallel(self, data: bytes, name: str):
+        """Upload bytes as a big file with pipelined 512 KB part requests.
+
+        Returns the InputFile handle for send_file(). A fresh file_id per
+        upload; md5 is not needed for InputFileBig.
+        """
+        from telethon.tl.functions.upload import SaveBigFilePartRequest
+        from telethon.tl.types import InputFileBig
+
+        file_id = int.from_bytes(os.urandom(8), "big", signed=True)
+        parts = max(1, (len(data) + _UPLOAD_PART_BYTES - 1) // _UPLOAD_PART_BYTES)
+        sem = asyncio.Semaphore(_UPLOAD_WORKERS)
+
+        async def put(index: int) -> None:
+            async with sem:
+                await self._client(SaveBigFilePartRequest(
+                    file_id=file_id,
+                    file_part=index,
+                    bytes=data[index * _UPLOAD_PART_BYTES
+                               :(index + 1) * _UPLOAD_PART_BYTES],
+                    file_total_parts=parts,
+                ))
+
+        await asyncio.gather(*[put(i) for i in range(parts)])
+        return InputFileBig(id=file_id, parts=parts, name=name)
 
     async def open(self, ref: ObjectRef) -> bytes:
         """Re-fetch a blob from Saved Messages (bounded by chunk size)."""
