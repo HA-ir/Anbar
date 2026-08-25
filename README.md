@@ -201,8 +201,10 @@ do not hit the per-chat send limit): cold ~7–10 MB/s.
 Measured **2026-08-25** on the same VPS (`mtproto` backend) with
 [scripts/bench.py](scripts/bench.py) on loopback. Cache OFF — every number is
 a real Telegram MTProto round-trip. Uploads use pipelined 512 KB
-`SaveBigFilePart` requests (8 in flight); downloads stream via
-`iter_download` at 512 KB. Objects are split into ≤49 MB chunks posted as
+`SaveBigFilePart` requests (8 in flight) accelerated by `cryptg`;
+downloads stream via `iter_download` at 512 KB with parallel ranged
+workers (6 x 32 MB slices per chunk). Objects are split into ≤49 MB chunks
+posted as
 documents; the 10 GB row streams straight from the origin through the server
 to Telegram without touching local disk. Download numbers are first GETs.
 
@@ -211,10 +213,10 @@ to Telegram without touching local disk. Download numbers are first GETs.
 | 1 MB | 49 MB | 0.5 s — 2.0 MB/s | 0.3 s — 2.9 MB/s | OK |
 | 8 MB | 49 MB | 1.8 s — 4.5 MB/s | 2.3 s — 3.4 MB/s | OK |
 | 45 MB | 49 MB | 10.8 s — 4.2 MB/s | 13.2 s — 3.4 MB/s | OK |
-| 100 MB | 49 MB | 24.1 s — 4.1 MB/s | 29.5 s — 3.4 MB/s | OK |
-| 1 GB | 49 MB | 241.5 s — 4.2 MB/s | 298.6 s — 3.4 MB/s | OK |
+| 100 MB | 49 MB | 10.3 s — 9.8 MB/s | 26.1 s — 3.8 MB/s | OK |
+| 1 GB | 49 MB | 92.8 s — 11.0 MB/s | 269.4 s — 3.8 MB/s | OK |
 | 5 GB | 49 MB | 1417.9 s — 3.6 MB/s | 1608.7 s — 3.2 MB/s | OK |
-| 10 GB | 49 MB | 2535 s — 4.04 MB/s * | 3250 s — 3.30 MB/s | OK |
+| 10 GB | 49 MB | 909 s — 11.26 MB/s * | 2626 s — 3.90 MB/s | OK |
 | 45 MB | 256 MB | 12.4 s — 3.6 MB/s | 17.3 s — 2.6 MB/s | OK |
 | 100 MB | 256 MB | 25.0 s — 4.0 MB/s | 32.9 s — 3.0 MB/s | OK |
 | 1 GB | 256 MB | 254.9 s — 4.0 MB/s | 325.4 s — 3.1 MB/s | OK |
@@ -223,10 +225,12 @@ to Telegram without touching local disk. Download numbers are first GETs.
 anbar or Telegram: every byte streamed through the server live and all 220
 chunks stored cleanly.
 
-> The 10 GB row was re-measured with a local origin (12-way parallel ranged
-> download from the origin host, then streamed through anbar): upload hit the
-> same ~4 MB/s ceiling as every other size and download held 3.30 MB/s for
-> the full 10 GB.
+> The 49 MB-chunk rows (100 MB, 1 GB, 10 GB) were re-measured after switching
+> to cryptg-accelerated parallel uploads: upload jumped ~4 → ~11 MB/s
+> (2.7x, RTT-bound single-stream was the old ceiling) and download rose
+> 3.4 → 3.9 MB/s. The 10 GB row streamed straight from a local origin with
+> sha-256 verified end-to-end; the file is preserved on the server for
+> re-benchmarks.
 
 **How to read this**
 
