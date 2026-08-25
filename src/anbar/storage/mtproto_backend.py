@@ -182,7 +182,7 @@ class MTProtoBackend(StorageBackend):
                     pos = off
                     async for piece in self._client.iter_download(
                             msg, offset=pos, request_size=524288,
-                            stride=_DOWNLOAD_RANGE, limit=limit):
+                            limit=limit):
                         out[pos:pos + len(piece)] = piece
                         pos += len(piece)
 
