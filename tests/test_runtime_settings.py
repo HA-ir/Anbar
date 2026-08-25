@@ -132,3 +132,50 @@ def test_cache_mb_zero_toggles_live(monkeypatch, tmp_path):
         assert c.post("/api/v1/admin/settings/reset",
                       json={"keys": ["cache_mb"]}).status_code == 200
         assert app.state.cache is not None  # back to env default
+
+
+def test_mtproto_export_conns_toggle(client):
+    """mtproto_export_conns: default 0, settable, clamped 0-8, persisted."""
+    _authed(client)
+    s = client.get("/api/v1/admin/settings").json()["settings"]
+    assert s["mtproto_export_conns"]["default"] == 0
+    assert client.post("/api/v1/admin/settings",
+                       json={"mtproto_export_conns": 4}).status_code == 200
+    s = client.get("/api/v1/admin/settings").json()["settings"]
+    assert s["mtproto_export_conns"]["value"] == 4
+    assert s["mtproto_export_conns"]["overridden"] is True
+    # out of range rejected
+    assert client.post("/api/v1/admin/settings",
+                       json={"mtproto_export_conns": 9}).status_code == 422
+
+
+async def _noop():
+    return None
+
+
+def test_set_export_conns_live_on_backend(client):
+    """POSTing the setting applies it to a live mtproto backend instance."""
+    from fastapi.testclient import TestClient
+
+    from anbar.config import get_settings
+    from anbar.main import create_app
+    from anbar.storage.mtproto_backend import MTProtoBackend
+
+    class _StubClient:
+        async def disconnect(self):
+            pass
+
+    be = MTProtoBackend(api_id=1, api_hash="h", session_file="x",
+                        client=_StubClient())
+    be.connect = lambda: _noop()  # no real session in tests
+    get_settings.cache_clear()
+    app = create_app(backend=be)
+    with TestClient(app) as c:
+        c.post("/ui/login", json={"key": ADMIN})
+        r = c.post("/api/v1/admin/settings", json={"mtproto_export_conns": 3})
+        assert r.status_code == 200, r.text
+        assert be.export_conns == 3
+        # disabling tears down (empty pool) and flips the flag off
+        assert c.post("/api/v1/admin/settings",
+                      json={"mtproto_export_conns": 0}).status_code == 200
+        assert be.export_conns == 0

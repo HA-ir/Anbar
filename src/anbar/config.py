@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     cache_dir: Path = Path("data/cache")
     cache_max_mb: int = Field(default=512, ge=0)
 
+    # mtproto download acceleration (FastTelethon-style exported auth)
+    mtproto_export_conns: int = Field(default=0, ge=0, le=8)  # 0 = off
+
     # data
     data_dir: Path = Path("data")
     db_path: Path = Path("data/anbar.db")

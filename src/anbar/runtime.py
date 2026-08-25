@@ -21,6 +21,10 @@ SPEC = {
     "max_upload_mb": (1, 102400),         # object size ceiling, MB
     "web_session_ttl": (300, 604_800),  # seconds, max 7 days
     "cache_mb": (0, 8192),              # LRU budget; 0 = cache off
+    # mtproto only: extra exported-auth download connections ("FastTelethon").
+    # 0 = off (single connection + ranged workers). Admin-toggleable live via
+    # POST /admin/settings; higher values raise FloodWait risk.
+    "mtproto_export_conns": (0, 8),
 }
 
 

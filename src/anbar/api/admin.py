@@ -35,6 +35,7 @@ def _env_defaults(s) -> dict[str, int]:
         "max_upload_mb": s.max_upload_mb,
         "web_session_ttl": s.web_session_ttl,
         "cache_mb": s.cache_max_mb,
+        "mtproto_export_conns": getattr(s, "mtproto_export_conns", 0),
     }
 
 
@@ -100,6 +101,10 @@ async def settings_update(request: Request):
             raise HTTPException(422, str(e)) from None
     if "cache_mb" in changed:
         _sync_cache(request.app, db)
+    if "mtproto_export_conns" in changed:
+        backend = request.app.state.backend
+        if hasattr(backend, "set_export_conns"):
+            await backend.set_export_conns(changed["mtproto_export_conns"])
     return {"changed": changed,
             "settings": runtime.effective(db, _env_defaults(s))}
 

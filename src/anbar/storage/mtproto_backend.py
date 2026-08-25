@@ -34,16 +34,23 @@ class MTProtoBackend(StorageBackend):
     max_upload_bytes = _MAX_SEND_BYTES
 
     def __init__(self, api_id: int, api_hash: str, session_file: str,
-                 client=None, peer: str | int = "me") -> None:
+                 client=None, peer: str | int = "me",
+                 export_conns: int = 0) -> None:
         if client is None:
             from telethon import TelegramClient  # lazy: optional at import time
 
             client = TelegramClient(str(session_file), api_id, api_hash)
         self._client = client
         self._session_file = str(session_file)
+        self._api_id = api_id
+        self._api_hash = api_hash
         self._peer_spec: str | int = peer  # "me" (Saved) or a channel id
         self._peer = peer  # resolved entity after connect()
         self._connected = False
+        # FastTelethon-style extra download connections (exported auth).
+        self.export_conns = export_conns  # admin-tunable at runtime; 0 = off
+        self._pool: list = []          # connected TelegramClient instances
+        self._pool_lock = asyncio.Lock()
 
     async def connect(self) -> None:
         """Load the session and connect. Fails if `anbarctl login` was never run."""
@@ -172,7 +179,16 @@ class MTProtoBackend(StorageBackend):
             lock = asyncio.Lock()
             idx = {"i": 0}
 
-            async def worker() -> None:
+            # Optional extra connections (admin-tuned mtproto_export_conns).
+            clients = [self._client]
+            if self.export_conns > 0 and doc is not None:
+                try:
+                    dc_id = self._client.session.dc_id
+                    clients += await self._pool_clients(dc_id)
+                except Exception:  # noqa: BLE001 - degrade to single conn
+                    clients = [self._client]
+
+            async def worker(client) -> None:
                 while True:
                     async with lock:
                         if idx["i"] >= len(slices):
@@ -180,13 +196,13 @@ class MTProtoBackend(StorageBackend):
                         off, limit = slices[idx["i"]]
                         idx["i"] += 1
                     pos = off
-                    async for piece in self._client.iter_download(
+                    async for piece in client.iter_download(
                             msg, offset=pos, request_size=524288,
                             limit=limit):
                         out[pos:pos + len(piece)] = piece
                         pos += len(piece)
 
-            await asyncio.gather(*[worker() for _ in range(_DOWNLOAD_WORKERS)])
+            await asyncio.gather(*[worker(c) for c in clients])
             return bytes(out)
 
         return await self._run_healed(_fetch)
@@ -256,3 +272,45 @@ class MTProtoBackend(StorageBackend):
             await self._client.disconnect()
         finally:
             self._connected = False
+        await self._close_pool()
+
+    # ── FastTelethon-style exported-auth download pool ──────────────
+    async def _close_pool(self) -> None:
+        """Disconnect and drop every pooled export client."""
+        async with self._pool_lock:
+            old, self._pool = self._pool, []
+        for c in old:
+            try:
+                await c.disconnect()
+            except Exception:  # noqa: BLE001 - best-effort teardown
+                pass
+
+    async def set_export_conns(self, n: int) -> None:
+        """Admin toggle: 0 disables extra connections, N>0 keeps a pool of
+        N exported-auth clients warm for parallel ranged downloads."""
+        n = max(0, min(8, int(n)))
+        self.export_conns = n
+        if n == 0:
+            await self._close_pool()
+
+    async def _pool_clients(self, dc_id: int) -> list:
+        """Connected export clients (up to self.export_conns), creating any
+        missing ones. Each is a separate TCP connection to the same DC,
+        authorised via auth.exportAuthorization/importAuthorization — the
+        same trick Telegram Desktop uses for fast downloads."""
+        async with self._pool_lock:
+            while len(self._pool) < self.export_conns:
+                from telethon import TelegramClient
+                from telethon.tl.functions.auth import (
+                    ExportAuthorizationRequest,
+                    ImportAuthorizationRequest,
+                )
+                exported = await self._client(ExportAuthorizationRequest(dc_id))
+                tmp = TelegramClient(
+                    f"{self._session_file}.export{len(self._pool)}",
+                    self._api_id, self._api_hash)
+                tmp.session.set_dc(dc_id, "149.154.167.51", 443)
+                await tmp.connect()
+                await tmp(ImportAuthorizationRequest(exported.id, exported.bytes))
+                self._pool.append(tmp)
+            return list(self._pool)
