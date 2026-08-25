@@ -148,10 +148,13 @@ class MTProtoBackend(StorageBackend):
     async def open(self, ref: ObjectRef) -> bytes:
         """Re-fetch a blob from the destination peer (bounded by chunk size).
 
-        Downloads with parallel ranged workers: the document is split into
-        _DOWNLOAD_RANGE slices consumed by _DOWNLOAD_WORKERS concurrent
-        iter_download(offset=…) loops. Small files (<2 ranges) fall back to a
-        single sequential stream.
+        The document is split into _DOWNLOAD_RANGE slices fetched by
+        _DOWNLOAD_WORKERS workers. With ``export_conns == 0`` each worker
+        streams its slice via iter_download; with ``export_conns > 0``
+        slices are downloaded through a pipelined GetFileRequest window
+        (window = export_conns x 4, cap 16) on the main socket — Telegram
+        rejects same-dc auth export, so extra sockets need a second login.
+        Small files (<2 ranges) always stream sequentially.
         """
         if ref.message_id is None:
             raise RuntimeError("mtproto ref without message_id")
@@ -179,30 +182,69 @@ class MTProtoBackend(StorageBackend):
             lock = asyncio.Lock()
             idx = {"i": 0}
 
-            # Optional extra connections (admin-tuned mtproto_export_conns).
-            clients = [self._client]
-            if self.export_conns > 0 and doc is not None:
-                try:
-                    dc_id = self._client.session.dc_id
-                    clients += await self._pool_clients(dc_id)
-                except Exception:  # noqa: BLE001 - degrade to single conn
-                    clients = [self._client]
+            # mtproto_export_conns>0 switches from sequential iter_download
+            # slices to a pipelined GetFileRequest window on the main socket
+            # (Telegram blocks same-dc auth export, so true multi-socket
+            # download needs a second login; pipelining is the honest lever).
+            window = max(1, min(16, self.export_conns * 4)) if self.export_conns else 0
 
-            async def worker(client) -> None:
+            if window <= 2:
+                async def worker() -> None:
+                    while True:
+                        async with lock:
+                            if idx["i"] >= len(slices):
+                                return
+                            off, limit = slices[idx["i"]]
+                            idx["i"] += 1
+                        pos = off
+                        async for piece in self._client.iter_download(
+                                msg, offset=pos, request_size=524288,
+                                limit=limit):
+                            out[pos:pos + len(piece)] = piece
+                            pos += len(piece)
+
+                await asyncio.gather(*[worker() for _ in range(_DOWNLOAD_WORKERS)])
+                return bytes(out)
+
+            from telethon.tl.functions.upload import GetFileRequest
+            from telethon.tl.types import InputDocumentFileLocation
+
+            loc = InputDocumentFileLocation(
+                doc.id, doc.access_hash, doc.file_reference, "")
+            CH = 524288
+
+            async def fetch(off: int) -> tuple[int, bytes]:
+                r = await self._client(GetFileRequest(loc, offset=off, limit=CH))
+                return off, r.bytes
+
+            async def pump_slice(off: int, limit: int) -> None:
+                inflight: set = set()
+                next_off = off
+                end = off + limit
+                while next_off < end and len(inflight) < window:
+                    inflight.add(asyncio.create_task(fetch(next_off)))
+                    next_off += CH
+                while inflight:
+                    done, _ = await asyncio.wait(
+                        inflight, return_when=asyncio.FIRST_COMPLETED)
+                    for f in done:
+                        o, b = f.result()
+                        out[o:o + len(b)] = b
+                        inflight.discard(f)
+                    while next_off < end and len(inflight) < window:
+                        inflight.add(asyncio.create_task(fetch(next_off)))
+                        next_off += CH
+
+            async def worker() -> None:
                 while True:
                     async with lock:
                         if idx["i"] >= len(slices):
                             return
                         off, limit = slices[idx["i"]]
                         idx["i"] += 1
-                    pos = off
-                    async for piece in client.iter_download(
-                            msg, offset=pos, request_size=524288,
-                            limit=limit):
-                        out[pos:pos + len(piece)] = piece
-                        pos += len(piece)
+                    await pump_slice(off, limit)
 
-            await asyncio.gather(*[worker(c) for c in clients])
+            await asyncio.gather(*[worker() for _ in range(_DOWNLOAD_WORKERS)])
             return bytes(out)
 
         return await self._run_healed(_fetch)
@@ -293,24 +335,3 @@ class MTProtoBackend(StorageBackend):
         if n == 0:
             await self._close_pool()
 
-    async def _pool_clients(self, dc_id: int) -> list:
-        """Connected export clients (up to self.export_conns), creating any
-        missing ones. Each is a separate TCP connection to the same DC,
-        authorised via auth.exportAuthorization/importAuthorization — the
-        same trick Telegram Desktop uses for fast downloads."""
-        async with self._pool_lock:
-            while len(self._pool) < self.export_conns:
-                from telethon import TelegramClient
-                from telethon.tl.functions.auth import (
-                    ExportAuthorizationRequest,
-                    ImportAuthorizationRequest,
-                )
-                exported = await self._client(ExportAuthorizationRequest(dc_id))
-                tmp = TelegramClient(
-                    f"{self._session_file}.export{len(self._pool)}",
-                    self._api_id, self._api_hash)
-                tmp.session.set_dc(dc_id, "149.154.167.51", 443)
-                await tmp.connect()
-                await tmp(ImportAuthorizationRequest(exported.id, exported.bytes))
-                self._pool.append(tmp)
-            return list(self._pool)
