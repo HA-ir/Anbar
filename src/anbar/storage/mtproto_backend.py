@@ -91,8 +91,9 @@ class MTProtoBackend(StorageBackend):
         RTT-bound at ~3 MB/s sequentially; modest pipelining reaches
         ~5 MB/s without tripping flood limits.
         """
-        handle = await self._upload_parallel(data, name)
-        msg = await self._client.send_file(
+        handle = await self._run_healed(self._upload_parallel, data, name)
+        msg = await self._run_healed(
+            self._client.send_file,
             self._peer, handle, file_name=name, force_document=True,
         )
         doc = msg.media.document if msg.media else None
@@ -133,17 +134,21 @@ class MTProtoBackend(StorageBackend):
         return InputFileBig(id=file_id, parts=parts, name=name)
 
     async def open(self, ref: ObjectRef) -> bytes:
-        """Re-fetch a blob from Saved Messages (bounded by chunk size)."""
+        """Re-fetch a blob from the destination peer (bounded by chunk size)."""
         if ref.message_id is None:
             raise RuntimeError("mtproto ref without message_id")
-        msg = await self._client.get_messages(self._peer, ids=ref.message_id)
-        if msg is None or msg.media is None:
-            raise FileNotFoundError(
-                f"mtproto: message {ref.message_id} not found or has no document")
-        buf = io.BytesIO()
-        async for piece in self._client.iter_download(msg, request_size=524288):
-            buf.write(piece)
-        return buf.getvalue()
+
+        async def _fetch():
+            msg = await self._client.get_messages(self._peer, ids=ref.message_id)
+            if msg is None or msg.media is None:
+                raise FileNotFoundError(
+                    f"mtproto: message {ref.message_id} not found or has no document")
+            buf = io.BytesIO()
+            async for piece in self._client.iter_download(msg, request_size=524288):
+                buf.write(piece)
+            return buf.getvalue()
+
+        return await self._run_healed(_fetch)
 
     async def delete(self, ref: ObjectRef) -> bool:
         """Delete the Saved Message holding this blob."""
@@ -154,6 +159,50 @@ class MTProtoBackend(StorageBackend):
             return True
         except Exception:  # noqa: BLE001 - best-effort remote cleanup
             return False
+
+    async def _reconnect(self) -> None:
+        """Recover a dead Telethon connection (server drop, session kicked,
+        keepalive crash). Telethon's own reconnect only covers transport
+        errors; after 'Cannot send requests while disconnected' the client
+        object is unusable until disconnect()+start() run again."""
+        try:
+            await self._client.disconnect()
+        except Exception:
+            pass
+        self._connected = False
+        await self.connect()
+
+    def _is_dead_link(self, e: Exception) -> bool:
+        text = str(e).lower()
+        markers = (
+            "cannot send requests while disconnected",
+            "connection reset by peer",
+            "connection closed",
+            "not connected",
+            "brokenpipe",
+            "database or disk is full",  # telegram session-misuse surfacing
+        )
+        return any(m in text for m in markers)
+
+    async def _run_healed(self, op, *args, retries: int = 2, **kwargs):
+        """Run one storage RPC; on a dead link reconnect and retry.
+
+        FloodWait and other Telegram-side refusals propagate unchanged —
+        only broken-transport states are healed here.
+        """
+        last: Exception | None = None
+        for attempt in range(retries + 1):
+            try:
+                if not self._connected:
+                    await self.connect()
+                return await op(*args, **kwargs)
+            except Exception as e:  # noqa: BLE001 - inspect then re-raise
+                if attempt < retries and self._is_dead_link(e):
+                    last = e
+                    await self._reconnect()
+                    continue
+                raise
+        raise last  # pragma: no cover - loop always returns or raises
 
     async def health(self) -> bool:
         try:
