@@ -214,7 +214,7 @@ to Telegram without touching local disk. Download numbers are first GETs.
 | 100 MB | 49 MB | 24.1 s — 4.1 MB/s | 29.5 s — 3.4 MB/s | OK |
 | 1 GB | 49 MB | 241.5 s — 4.2 MB/s | 298.6 s — 3.4 MB/s | OK |
 | 5 GB | 49 MB | 1417.9 s — 3.6 MB/s | 1608.7 s — 3.2 MB/s | OK |
-| 10 GB | 49 MB | 7093 s — 1.44 MB/s * | 3319 s — 3.09 MB/s | OK |
+| 10 GB | 49 MB | 2535 s — 4.04 MB/s * | 3250 s — 3.30 MB/s | OK |
 | 45 MB | 256 MB | 12.4 s — 3.6 MB/s | 17.3 s — 2.6 MB/s | OK |
 | 100 MB | 256 MB | 25.0 s — 4.0 MB/s | 32.9 s — 3.0 MB/s | OK |
 | 1 GB | 256 MB | 254.9 s — 4.0 MB/s | 325.4 s — 3.1 MB/s | OK |
@@ -222,6 +222,11 @@ to Telegram without touching local disk. Download numbers are first GETs.
 \* The 10 GB upload was limited by the test origin (~1.1–1.75 MB/s), not by
 anbar or Telegram: every byte streamed through the server live and all 220
 chunks stored cleanly.
+
+> The 10 GB row was re-measured with a local origin (12-way parallel ranged
+> download from the origin host, then streamed through anbar): upload hit the
+> same ~4 MB/s ceiling as every other size and download held 3.30 MB/s for
+> the full 10 GB.
 
 **How to read this**
 
