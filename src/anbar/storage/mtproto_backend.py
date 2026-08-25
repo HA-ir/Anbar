@@ -23,6 +23,11 @@ _MAX_SEND_BYTES = 2 * 1024 * 1024 * 1024
 _UPLOAD_PART_BYTES = 524288  # 512 KB — Telegram's big-file part ceiling
 _UPLOAD_WORKERS = 8
 
+# Parallel ranged iter_download workers during open() (single-connection
+# iter_download tops out ~3.4 MB/s; 6 workers reach ~2x on DC4).
+_DOWNLOAD_WORKERS = 6
+_DOWNLOAD_RANGE = 32 * 1024 * 1024  # per-worker slice granularity (32 MB)
+
 
 class MTProtoBackend(StorageBackend):
     name = "mtproto"
@@ -134,7 +139,13 @@ class MTProtoBackend(StorageBackend):
         return InputFileBig(id=file_id, parts=parts, name=name)
 
     async def open(self, ref: ObjectRef) -> bytes:
-        """Re-fetch a blob from the destination peer (bounded by chunk size)."""
+        """Re-fetch a blob from the destination peer (bounded by chunk size).
+
+        Downloads with parallel ranged workers: the document is split into
+        _DOWNLOAD_RANGE slices consumed by _DOWNLOAD_WORKERS concurrent
+        iter_download(offset=…) loops. Small files (<2 ranges) fall back to a
+        single sequential stream.
+        """
         if ref.message_id is None:
             raise RuntimeError("mtproto ref without message_id")
 
@@ -143,10 +154,40 @@ class MTProtoBackend(StorageBackend):
             if msg is None or msg.media is None:
                 raise FileNotFoundError(
                     f"mtproto: message {ref.message_id} not found or has no document")
-            buf = io.BytesIO()
-            async for piece in self._client.iter_download(msg, request_size=524288):
-                buf.write(piece)
-            return buf.getvalue()
+            doc = getattr(msg.media, "document", None)
+            size = doc.size if doc is not None and hasattr(doc, "size") else 0
+            if size <= _DOWNLOAD_RANGE:
+                buf = io.BytesIO()
+                async for piece in self._client.iter_download(
+                        msg, request_size=524288):
+                    buf.write(piece)
+                return buf.getvalue()
+
+            # Parallel ranged fetch: queue of (offset, limit) slices.
+            slices = [
+                (off, min(_DOWNLOAD_RANGE, size - off))
+                for off in range(0, size, _DOWNLOAD_RANGE)
+            ]
+            out = bytearray(size)
+            lock = asyncio.Lock()
+            idx = {"i": 0}
+
+            async def worker() -> None:
+                while True:
+                    async with lock:
+                        if idx["i"] >= len(slices):
+                            return
+                        off, limit = slices[idx["i"]]
+                        idx["i"] += 1
+                    pos = off
+                    async for piece in self._client.iter_download(
+                            msg, offset=pos, request_size=524288,
+                            stride=_DOWNLOAD_RANGE, limit=limit):
+                        out[pos:pos + len(piece)] = piece
+                        pos += len(piece)
+
+            await asyncio.gather(*[worker() for _ in range(_DOWNLOAD_WORKERS)])
+            return bytes(out)
 
         return await self._run_healed(_fetch)
 
