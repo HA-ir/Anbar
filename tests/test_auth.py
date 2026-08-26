@@ -1,4 +1,5 @@
 """F4: auth matrix, signed links, runtime toggle, rotation, ownership, listing."""
+
 from __future__ import annotations
 
 import time

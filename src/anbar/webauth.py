@@ -9,6 +9,7 @@ first login), so rotating the download-link HMAC secret does not invalidate
 web sessions — and vice versa. Sessions are short (default 12 h) and the
 cookie is HttpOnly + SameSite=Lax (+ Secure on https deployments).
 """
+
 from __future__ import annotations
 
 import hmac

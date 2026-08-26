@@ -1,4 +1,5 @@
 """Shared test fixtures: app wired with FakeBackend, isolated env + temp DB."""
+
 from __future__ import annotations
 
 import pytest
@@ -17,12 +18,24 @@ def _isolate_env(monkeypatch, tmp_path):
     """
     monkeypatch.chdir(tmp_path)
     for var in (
-        "ANBAR_BACKEND", "ANBAR_DB_PATH", "ANBAR_DATA_DIR", "ANBAR_BASE_URL",
-        "ANBAR_AUTH_ENABLED", "ANBAR_BOT_TOKEN", "ANBAR_CHANNEL_ID",
-        "ANBAR_ADMIN_KEY", "ANBAR_API_KEY", "ANBAR_HMAC_SECRET",
-        "ANBAR_CACHE_ENABLED", "ANBAR_CACHE_DIR", "ANBAR_CACHE_MAX_MB",
-        "ANBAR_MAX_UPLOAD_MB", "ANBAR_CHUNKING", "ANBAR_CHUNK_SIZE_MB",
-        "ANBAR_RATE_DOWNLOAD_PER_MIN", "ANBAR_RATE_UPLOAD_PER_MIN",
+        "ANBAR_BACKEND",
+        "ANBAR_DB_PATH",
+        "ANBAR_DATA_DIR",
+        "ANBAR_BASE_URL",
+        "ANBAR_AUTH_ENABLED",
+        "ANBAR_BOT_TOKEN",
+        "ANBAR_CHANNEL_ID",
+        "ANBAR_ADMIN_KEY",
+        "ANBAR_API_KEY",
+        "ANBAR_HMAC_SECRET",
+        "ANBAR_CACHE_ENABLED",
+        "ANBAR_CACHE_DIR",
+        "ANBAR_CACHE_MAX_MB",
+        "ANBAR_MAX_UPLOAD_MB",
+        "ANBAR_CHUNKING",
+        "ANBAR_CHUNK_SIZE_MB",
+        "ANBAR_RATE_DOWNLOAD_PER_MIN",
+        "ANBAR_RATE_UPLOAD_PER_MIN",
     ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("ANBAR_DB_PATH", str(tmp_path / "test.db"))

@@ -4,6 +4,7 @@ The chunker is backend-agnostic: it yields fixed-size chunks from an async
 byte stream while maintaining an incremental SHA-256 over the joined bytes.
 Small files produce a single-element manifest — one code path for all sizes.
 """
+
 from __future__ import annotations
 
 import hashlib

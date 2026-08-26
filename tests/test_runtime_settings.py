@@ -1,4 +1,5 @@
 """F8 — runtime settings: overrides, validation, live application, reset."""
+
 from __future__ import annotations
 
 ADMIN = "test-admin-key"
@@ -59,9 +60,11 @@ def test_rate_download_live(client):
 
     name = "rt-%s.bin" % uuid.uuid4().hex[:8]  # noqa: UP031 — kept for readability
     data = os.urandom(4096)
-    up = client.post("/api/v1/upload",
-                     headers={"Authorization": f"Bearer {API}"},
-                     files={"file": (name, data, "application/octet-stream")})
+    up = client.post(
+        "/api/v1/upload",
+        headers={"Authorization": f"Bearer {API}"},
+        files={"file": (name, data, "application/octet-stream")},
+    )
     assert up.status_code == 200, up.text
     obj = up.json()["id"]
     h = {"Authorization": f"Bearer {API}"}
@@ -97,6 +100,7 @@ def test_settings_reset(client):
     assert s["rate_upload"]["value"] == s["rate_upload"]["default"]
     assert s["rate_upload"]["overridden"] is False
 
+
 def test_cache_stays_off_when_master_disabled(client):
     """Regression: changing cache_mb must NOT enable the disk cache while
     ANBAR_CACHE_ENABLED=false (the zero-retention default)."""
@@ -126,11 +130,11 @@ def test_cache_mb_zero_toggles_live(monkeypatch, tmp_path):
     with TestClient(app) as c:
         c.post("/ui/login", json={"key": ADMIN})
         assert app.state.cache is not None  # master ON + default 512MB
-        assert c.post("/api/v1/admin/settings",
-                      json={"cache_mb": 0}).status_code == 200
+        assert c.post("/api/v1/admin/settings", json={"cache_mb": 0}).status_code == 200
         assert app.state.cache is None  # torn down live
-        assert c.post("/api/v1/admin/settings/reset",
-                      json={"keys": ["cache_mb"]}).status_code == 200
+        assert (
+            c.post("/api/v1/admin/settings/reset", json={"keys": ["cache_mb"]}).status_code == 200
+        )
         assert app.state.cache is not None  # back to env default
 
 
@@ -139,14 +143,16 @@ def test_mtproto_export_conns_toggle(client):
     _authed(client)
     s = client.get("/api/v1/admin/settings").json()["settings"]
     assert s["mtproto_export_conns"]["default"] == 0
-    assert client.post("/api/v1/admin/settings",
-                       json={"mtproto_export_conns": 4}).status_code == 200
+    assert (
+        client.post("/api/v1/admin/settings", json={"mtproto_export_conns": 4}).status_code == 200
+    )
     s = client.get("/api/v1/admin/settings").json()["settings"]
     assert s["mtproto_export_conns"]["value"] == 4
     assert s["mtproto_export_conns"]["overridden"] is True
     # out of range rejected
-    assert client.post("/api/v1/admin/settings",
-                       json={"mtproto_export_conns": 9}).status_code == 422
+    assert (
+        client.post("/api/v1/admin/settings", json={"mtproto_export_conns": 9}).status_code == 422
+    )
 
 
 async def _noop():
@@ -165,8 +171,7 @@ def test_set_export_conns_live_on_backend(client):
         async def disconnect(self):
             pass
 
-    be = MTProtoBackend(api_id=1, api_hash="h", session_file="x",
-                        client=_StubClient())
+    be = MTProtoBackend(api_id=1, api_hash="h", session_file="x", client=_StubClient())
     be.connect = lambda: _noop()  # no real session in tests
     get_settings.cache_clear()
     app = create_app(backend=be)
@@ -176,6 +181,5 @@ def test_set_export_conns_live_on_backend(client):
         assert r.status_code == 200, r.text
         assert be.export_conns == 3
         # disabling tears down (empty pool) and flips the flag off
-        assert c.post("/api/v1/admin/settings",
-                      json={"mtproto_export_conns": 0}).status_code == 200
+        assert c.post("/api/v1/admin/settings", json={"mtproto_export_conns": 0}).status_code == 200
         assert be.export_conns == 0

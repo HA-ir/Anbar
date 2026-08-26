@@ -1,4 +1,5 @@
 """v0.9: password-protected share links + ingest notification wiring."""
+
 from __future__ import annotations
 
 ADMIN = {"Authorization": "Bearer test-admin-key"}
@@ -7,8 +8,11 @@ ADMIN = {"Authorization": "Bearer test-admin-key"}
 def _upload(client, name="pw.bin", data=b"hello protected"):
     import io
 
-    r = client.post("/api/v1/upload", headers=ADMIN,
-                    files={"file": (name, io.BytesIO(data), "application/octet-stream")})
+    r = client.post(
+        "/api/v1/upload",
+        headers=ADMIN,
+        files={"file": (name, io.BytesIO(data), "application/octet-stream")},
+    )
     assert r.status_code == 200, r.text
     j = r.json()
     obj = j.get("object") or j

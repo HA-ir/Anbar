@@ -4,6 +4,7 @@ Regression test for the 500 MB bench bug — the bench wrote only 7×64 MiB
 (448 MiB) but declared 500 MiB, so the server waited forever on body bytes
 that never came. v0.8.4 aborts such uploads with 408 + rollback.
 """
+
 from __future__ import annotations
 
 import asyncio

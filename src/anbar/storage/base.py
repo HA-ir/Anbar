@@ -3,6 +3,7 @@
 Backends store files in Telegram and expose an opaque `file_id`.
 The object layer (F2/F3) sits above this and uses chunking transparently.
 """
+
 from __future__ import annotations
 
 import abc
@@ -32,8 +33,7 @@ class StorageBackend(abc.ABC):
     max_upload_bytes: int = 0
 
     @abc.abstractmethod
-    async def store(self, data: bytes, name: str,
-                    content_type: str | None = None) -> ObjectRef:
+    async def store(self, data: bytes, name: str, content_type: str | None = None) -> ObjectRef:
         """Store a single chunk/blob, return its ref."""
 
     @abc.abstractmethod
@@ -67,8 +67,7 @@ class FakeBackend(StorageBackend):
         self.store_calls = 0
         self._next_msg = 1
 
-    async def store(self, data: bytes, name: str,
-                    content_type: str | None = None) -> ObjectRef:
+    async def store(self, data: bytes, name: str, content_type: str | None = None) -> ObjectRef:
         self.store_calls += 1
         ref = f"fake-{len(self._store)}"
         self._store[ref] = bytes(data)

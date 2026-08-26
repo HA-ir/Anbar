@@ -1,4 +1,5 @@
 """F1: storage interface contract — FakeBackend implements what bot/mtproto must."""
+
 from __future__ import annotations
 
 import pytest

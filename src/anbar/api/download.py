@@ -11,8 +11,10 @@ Auth (F4):
   - DELETE    → owner (the bearer key that uploaded it) or admin
   - /f/{id}/link → mint a signed link (bearer key required)
 """
+
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -171,12 +173,12 @@ document.getElementById('eyebtn').onclick=function(){
 </script>
 </body>
 </html>"""
-    html = html.replace("__SIG__", sig).replace(
-        "__EXP__", str(int(exp))).replace(
-        "__FAILED__", "err.style.display='block';" if failed else "")
+    html = (
+        html.replace("__SIG__", sig)
+        .replace("__EXP__", str(int(exp)))
+        .replace("__FAILED__", "err.style.display='block';" if failed else "")
+    )
     return html
-
-
 
 
 def _authenticate_download(request: Request, obj_id: str) -> None:
@@ -214,11 +216,13 @@ def _authenticate_download(request: Request, obj_id: str) -> None:
         given = request.query_params.get("pw", "")
         configured2 = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
         secret2 = effective_hmac_secret(db, configured2) or ""
-        want = hmac.new(secret2.encode(), f"pw:{obj_id}:{given}".encode(),
-                        hashlib.sha256).hexdigest()[:32]
+        want = hmac.new(
+            secret2.encode(), f"pw:{obj_id}:{given}".encode(), hashlib.sha256
+        ).hexdigest()[:32]
         if not hmac.compare_digest(want, pw_tag):
-            raise HTTPException(403, "password required",
-                                headers={"WWW-Authenticate": 'xBasic realm="anbar-pw"'})
+            raise HTTPException(
+                403, "password required", headers={"WWW-Authenticate": 'xBasic realm="anbar-pw"'}
+            )
 
 
 @router.get("/{obj_id}")
@@ -232,8 +236,9 @@ async def download(request: Request, obj_id: str):
         if resolved:
             obj_id = resolved
     # rate limit before auth: an anonymous hammerer gets 429, not endless 401s
-    limit_download(db, request, obj_id,
-                   runtime.get_int(db, "rate_download", settings.rate_download_per_min))
+    limit_download(
+        db, request, obj_id, runtime.get_int(db, "rate_download", settings.rate_download_per_min)
+    )
     row = db.get_object(obj_id)
     if row is None:
         raise HTTPException(404, "object not found")
@@ -241,24 +246,26 @@ async def download(request: Request, obj_id: str):
     # gets the unlock page. A carried valid sig/exp is reused in the form;
     # pretty-slug opens get a fresh 1h window (the pw tag only exists while
     # a live link does, so revoking the last link kills the page too).
-    if ("text/html" in request.headers.get("accept", "")
-            and effective_auth_enabled(db, settings.auth_enabled)
-            and whoami(request) not in ("admin", "uploader")):
+    if (
+        "text/html" in request.headers.get("accept", "")
+        and effective_auth_enabled(db, settings.auth_enabled)
+        and whoami(request) not in ("admin", "uploader")
+    ):
         pw_tag = db.kv_get(f"pw:{obj_id}")
         if pw_tag:
             given = request.query_params.get("pw", "")
-            configured0 = (settings.hmac_secret.get_secret_value()
-                           if settings.hmac_secret else None)
+            configured0 = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
             # v0.10.3 fix: the tag is an HMAC (same as mint_link), not a
             # bare sha256 — the old precheck never matched, so even the
             # CORRECT password re-showed the "wrong password" page.
             secret0 = effective_hmac_secret(db, configured0) or ""
-            want = hmac.new(secret0.encode(),
-                            f"pw:{obj_id}:{given}".encode(),
-                            hashlib.sha256).hexdigest()[:32]
+            want = hmac.new(
+                secret0.encode(), f"pw:{obj_id}:{given}".encode(), hashlib.sha256
+            ).hexdigest()[:32]
             if not hmac.compare_digest(want, pw_tag):
-                configured = (settings.hmac_secret.get_secret_value()
-                              if settings.hmac_secret else None)
+                configured = (
+                    settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
+                )
                 secret = effective_hmac_secret(db, configured)
                 sig_q = request.query_params.get("sig")
                 exp_q = request.query_params.get("exp")
@@ -268,10 +275,11 @@ async def download(request: Request, obj_id: str):
                         exp_v = int(exp_q)
                         from .. import links as links_registry
 
-                        if (verify_sig(obj_id, exp_v, sig_q, secret)
-                                and exp_v > int(time.time())
-                                and not links_registry.is_revoked(
-                                    db, obj_id, exp_v)):
+                        if (
+                            verify_sig(obj_id, exp_v, sig_q, secret)
+                            and exp_v > int(time.time())
+                            and not links_registry.is_revoked(db, obj_id, exp_v)
+                        ):
                             use_sig, use_exp = sig_q, exp_v
                     except ValueError:
                         pass
@@ -279,8 +287,9 @@ async def download(request: Request, obj_id: str):
                     use_exp = int(time.time()) + 3600
                     use_sig = sign(obj_id, use_exp, secret)
                 if use_sig:
-                    return HTMLResponse(_password_page(
-                        obj_id, use_sig, use_exp, failed=bool(given)))
+                    return HTMLResponse(
+                        _password_page(obj_id, use_sig, use_exp, failed=bool(given))
+                    )
                 # invalid/revoked/expired carried link → real error below
     _authenticate_download(request, obj_id)
 
@@ -408,8 +417,9 @@ async def download(request: Request, obj_id: str):
 
 
 @router.post("/{obj_id}/link")
-async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL,
-                    password: str = "", max_dl: int = 0):
+async def mint_link(
+    request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL, password: str = "", max_dl: int = 0
+):
     """Mint a signed download link: `{base_url}/f/{id}?sig=...&exp=...`.
 
     `ttl` is the validity window in seconds (default 1 h, capped at 7 d;
@@ -440,8 +450,7 @@ async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL,
     slug = (request.query_params.get("slug") or "").strip().strip("/")
     if slug:
         if not _SLUG_RE.fullmatch(slug):
-            raise HTTPException(
-                400, "invalid slug: use 1-64 chars of [a-z0-9-_] (no leading '-')")
+            raise HTTPException(400, "invalid slug: use 1-64 chars of [a-z0-9-_] (no leading '-')")
         owner = db.kv_get(f"slug:{slug}")
         if owner and owner != obj_id:
             raise HTTPException(409, "link name already taken")
@@ -458,12 +467,13 @@ async def mint_link(request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL,
 
     from .. import links as links_registry
 
-    links_registry.register_link(db, obj_id, exp, slug=slug or None,
-                                 password_protected=bool(password.strip()),
-                                 max_dl=max_dl)
+    links_registry.register_link(
+        db, obj_id, exp, slug=slug or None, password_protected=bool(password.strip()), max_dl=max_dl
+    )
     if password.strip():
-        pw_tag = hmac.new(secret.encode(), f"pw:{obj_id}:{password.strip()}".encode(),
-                          hashlib.sha256).hexdigest()[:32]
+        pw_tag = hmac.new(
+            secret.encode(), f"pw:{obj_id}:{password.strip()}".encode(), hashlib.sha256
+        ).hexdigest()[:32]
         db.kv_set(f"pw:{obj_id}", pw_tag)
         out["password_protected"] = True
     if max_dl > 0:
@@ -485,8 +495,7 @@ async def qr(request: Request, obj_id: str):
     if row is None:
         raise HTTPException(404, "object not found")
     role = whoami(request)
-    if effective_auth_enabled(request.app.state.db,
-                              settings.auth_enabled) and role == "anon":
+    if effective_auth_enabled(request.app.state.db, settings.auth_enabled) and role == "anon":
         raise HTTPException(401, "authentication required")
     configured = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
     secret = effective_hmac_secret(request.app.state.db, configured)
@@ -496,8 +505,9 @@ async def qr(request: Request, obj_id: str):
     exp = int(time.time()) + ttl
     sig = sign(obj_id, exp, secret)
     url = f"{settings.base_url.rstrip('/')}/f/{obj_id}?sig={sig}&exp={exp}"
-    return Response(content=qr_svg(url), media_type="image/svg+xml",
-                    headers={"Cache-Control": "no-store"})
+    return Response(
+        content=qr_svg(url), media_type="image/svg+xml", headers={"Cache-Control": "no-store"}
+    )
 
 
 @router.delete("/{obj_id}")
@@ -528,8 +538,7 @@ async def delete(request: Request, obj_id: str, purge: bool = False):
             cache = getattr(request.app.state, "cache", None)
             if cache is not None:
                 cache.remove(obj_id)
-            return {"trashed": True, "id": obj_id,
-                    "restore_within_s": Database.TRASH_TTL_S}
+            return {"trashed": True, "id": obj_id, "restore_within_s": Database.TRASH_TTL_S}
         # already trashed → fall through to a real purge (idempotent UI)
 
     deleted_blobs = await _purge_object_blobs(backend, db, row)
@@ -599,8 +608,7 @@ async def _purge_object_blobs(backend, db, row: dict) -> int:
 
     for k, v in list(db.kv_all()):
         if (v == obj_id and k.startswith("slug:")) or (
-            k.startswith((_LK, _RV)) and len(k.split(":", 2)) == 3
-            and k.split(":", 2)[1] == obj_id
+            k.startswith((_LK, _RV)) and len(k.split(":", 2)) == 3 and k.split(":", 2)[1] == obj_id
         ):
             db.kv_delete(k)
     for tag in ("pw:", "maxdl:", "dlc:"):
@@ -681,8 +689,7 @@ async def zip_download(request: Request):
 
     backend = request.app.state.backend
 
-    async def fetch_chunk(obj_id: str, chunk_index: int,
-                          chunk_offset: int, length: int) -> bytes:
+    async def fetch_chunk(obj_id: str, chunk_index: int, chunk_offset: int, length: int) -> bytes:
         row = db.get_object(obj_id)
         if row is None:
             return b"\0" * length  # vanished mid-zip: keep offsets intact
@@ -693,7 +700,7 @@ async def zip_download(request: Request):
         c = chunks[chunk_index]
         ref = ObjectRef(file_id=c["f"], message_id=c.get("m"), backend=row["backend"])
         blob = await backend.open(ref)
-        return blob[chunk_offset:chunk_offset + length]
+        return blob[chunk_offset : chunk_offset + length]
 
     from ..zipper import stream_zip
 
@@ -746,19 +753,23 @@ async def album_create(request: Request):
     for oid in [str(i) for i in ids][:100]:
         row = db.get_object(str(oid))
         if row is not None:
-            clean.append({"id": oid, "filename": row["filename"],
-                          "size": row["size"]})
+            clean.append({"id": oid, "filename": row["filename"], "size": row["size"]})
     if not clean:
         raise HTTPException(404, "no valid objects")
     token = _album_token()
-    db.kv_set(f"{ALBUM_PREFIX}{token}", json.dumps({
-        "ids": [c["id"] for c in clean],
-        "title": title,
-        "created_at": int(time.time()),
-    }, separators=(",", ":")))
+    db.kv_set(
+        f"{ALBUM_PREFIX}{token}",
+        json.dumps(
+            {
+                "ids": [c["id"] for c in clean],
+                "title": title,
+                "created_at": int(time.time()),
+            },
+            separators=(",", ":"),
+        ),
+    )
     base = settings.base_url.rstrip("/")
-    return {"token": token, "count": len(clean),
-            "url": f"{base}/f/a/{token}"}
+    return {"token": token, "count": len(clean), "url": f"{base}/f/a/{token}"}
 
 
 @router.get("/a/{token}", include_in_schema=False)
@@ -769,11 +780,13 @@ async def album_page(request: Request, token: str):
     raw = db.kv_get(f"{ALBUM_PREFIX}{token}")
     if not raw:
         return HTMLResponse(
-            "<!DOCTYPE html><html lang=\"fa\" dir=\"rtl\"><head>"
-            "<meta charset=\"utf-8\"><title>anbar</title></head>"
-            "<body style=\"font-family:sans-serif;text-align:center;"
-            "padding-top:20vh;color:#889\">این آلبوم موجود نیست یا حذف شده."
-            "</body></html>", status_code=404)
+            '<!DOCTYPE html><html lang="fa" dir="rtl"><head>'
+            '<meta charset="utf-8"><title>anbar</title></head>'
+            '<body style="font-family:sans-serif;text-align:center;'
+            'padding-top:20vh;color:#889">این آلبوم موجود نیست یا حذف شده.'
+            "</body></html>",
+            status_code=404,
+        )
     data = json.loads(raw)
     items = []
     for oid in data.get("ids", []):
@@ -784,31 +797,46 @@ async def album_page(request: Request, token: str):
         ext = (row["filename"] or "").rsplit(".", 1)[-1].lower()
         ct = row["content_type"] or ""
         if ct.startswith(("image/", "photo")) or ext in {
-                "jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"}:
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "webp",
+            "bmp",
+            "svg",
+            "avif",
+        }:
             kind = "image"
-        elif ct.startswith("video/") or ext in {
-                "mp4", "webm", "mkv", "mov", "avi", "m4v"}:
+        elif ct.startswith("video/") or ext in {"mp4", "webm", "mkv", "mov", "avi", "m4v"}:
             kind = "video"
-        elif ct.startswith("audio/") or ext in {
-                "mp3", "ogg", "wav", "flac", "m4a", "opus", "aac"}:
+        elif ct.startswith("audio/") or ext in {"mp3", "ogg", "wav", "flac", "m4a", "opus", "aac"}:
             kind = "audio"
         elif ext == "pdf":
             kind = "pdf"
-        items.append({
-            "id": oid, "name": row["filename"], "kind": kind,
-            "ct": ct or "application/octet-stream",
-            "size": row["size"],
-            "sig": sign(oid, int(data["created_at"]) + 86400 * 30,
-                        effective_hmac_secret(
-                            db, settings.hmac_secret.get_secret_value()
-                            if settings.hmac_secret else None)),
-            "exp": int(data["created_at"]) + 86400 * 30,
-        })
+        items.append(
+            {
+                "id": oid,
+                "name": row["filename"],
+                "kind": kind,
+                "ct": ct or "application/octet-stream",
+                "size": row["size"],
+                "sig": sign(
+                    oid,
+                    int(data["created_at"]) + 86400 * 30,
+                    effective_hmac_secret(
+                        db,
+                        settings.hmac_secret.get_secret_value() if settings.hmac_secret else None,
+                    ),
+                ),
+                "exp": int(data["created_at"]) + 86400 * 30,
+            }
+        )
     title = data.get("title") or f"anbar · {len(items)} فایل"
     import html as _html
 
     payload = json.dumps(items).replace("</", "<\\/")
-    return HTMLResponse(f"""<!DOCTYPE html>
+    return HTMLResponse(
+        f"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
@@ -924,4 +952,5 @@ document.addEventListener('keydown',e=>{{
   if(e.key==='Escape'){{lb.classList.remove('on');cnt.innerHTML='';}}}});
 </script>
 </body>
-</html>""".replace("__PAYLOAD__", payload))
+</html>""".replace("__PAYLOAD__", payload)
+    )

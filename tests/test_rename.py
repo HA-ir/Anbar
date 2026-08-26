@@ -1,4 +1,5 @@
 """v0.9: rename endpoint + pw cleanup on delete."""
+
 from __future__ import annotations
 
 import io
@@ -7,8 +8,11 @@ ADMIN = {"Authorization": "Bearer test-admin-key"}
 
 
 def _upload(client, name="old.bin"):
-    r = client.post("/api/v1/upload", headers=ADMIN,
-                    files={"file": (name, io.BytesIO(b"data"), "application/octet-stream")})
+    r = client.post(
+        "/api/v1/upload",
+        headers=ADMIN,
+        files={"file": (name, io.BytesIO(b"data"), "application/octet-stream")},
+    )
     assert r.status_code == 200, r.text
     j = r.json()
     obj = j.get("object") or j
@@ -40,6 +44,7 @@ def test_delete_clears_pw_tag(client):
     client.post(f"/f/{oid}/link?ttl=600&password=pp", headers=ADMIN)
     # confirm protected
     from urllib.parse import urlparse
+
     u = urlparse(client.post(f"/f/{oid}/link?ttl=600", headers=ADMIN).json()["url"])
     assert client.get(u.path + "?" + u.query).status_code == 403
     # delete → v0.10 trashes the object; purge destroys it for real

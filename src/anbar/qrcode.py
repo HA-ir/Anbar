@@ -4,6 +4,7 @@ Generates a byte-mode, ECC-L, version 1-10 QR code as SVG path data.
 Sufficient for URLs up to ~270 chars. Based on the QR spec (ISO/IEC
 18004) with the standard Reed-Solomon ECC over GF(256).
 """
+
 from __future__ import annotations
 
 # ── GF(256) tables ──────────────────────────────────────────────────────────
@@ -55,23 +56,31 @@ def _rs_encode(data: bytes, nsym: int) -> bytearray:
         if coef:
             for j in range(len(gen)):
                 res[i + j] ^= _gmul(gen[j], coef)
-    return bytearray(res[len(data):])
+    return bytearray(res[len(data) :])
 
 
 # ── QR matrix construction ──────────────────────────────────────────────────
 def _version_for(nbits: int) -> tuple[int, int]:
     """Return (version, data capacity bits) for ECC-L byte mode."""
-    caps = {1: 19 * 8, 2: 34 * 8, 3: 55 * 8, 4: 80 * 8,
-            5: 108 * 8, 6: 136 * 8, 7: 156 * 8, 8: 194 * 8,
-            9: 232 * 8, 10: 274 * 8}
+    caps = {
+        1: 19 * 8,
+        2: 34 * 8,
+        3: 55 * 8,
+        4: 80 * 8,
+        5: 108 * 8,
+        6: 136 * 8,
+        7: 156 * 8,
+        8: 194 * 8,
+        9: 232 * 8,
+        10: 274 * 8,
+    }
     for v, cap in caps.items():
         if nbits <= cap:
             return v, cap
     raise ValueError("payload too long for versions 1-10 (use shorter URL)")
 
 
-_EC_PER_BLOCK = {1: 7, 2: 10, 3: 15, 4: 20, 5: 26, 6: 18, 7: 20, 8: 24,
-                 9: 30, 10: 18}
+_EC_PER_BLOCK = {1: 7, 2: 10, 3: 15, 4: 20, 5: 26, 6: 18, 7: 20, 8: 24, 9: 30, 10: 18}
 
 
 def _build_matrix(payload: bytes) -> list[list[bool]]:
@@ -88,8 +97,7 @@ def _build_matrix(payload: bytes) -> list[list[bool]]:
             bits.append((byte >> i) & 1)
 
     ec = _EC_PER_BLOCK[ver]
-    total_data = {1: 19, 2: 34, 3: 55, 4: 80, 5: 108,
-                  6: 136, 7: 156, 8: 194, 9: 232, 10: 274}[ver]
+    total_data = {1: 19, 2: 34, 3: 55, 4: 80, 5: 108, 6: 136, 7: 156, 8: 194, 9: 232, 10: 274}[ver]
     # terminator + pad to byte boundary
     bits += [0] * min(4, max(0, total_data * 8 - len(bits)))
     while len(bits) % 8:
@@ -138,9 +146,17 @@ def _build_matrix(payload: bytes) -> list[list[bool]]:
 
     # alignment patterns for v>=2 (simplified: only the standard centers)
     if ver >= 2:
-        align_pos = {2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30],
-                     6: [6, 34], 7: [6, 22, 38], 8: [6, 24, 42],
-                     9: [6, 26, 46], 10: [6, 28, 50]}[ver]
+        align_pos = {
+            2: [6, 18],
+            3: [6, 22],
+            4: [6, 26],
+            5: [6, 30],
+            6: [6, 34],
+            7: [6, 22, 38],
+            8: [6, 24, 42],
+            9: [6, 26, 46],
+            10: [6, 28, 50],
+        }[ver]
         for r in align_pos:
             for c in align_pos:
                 if m[r][c] is not None:
@@ -225,8 +241,11 @@ def qr_svg(text: str, box_px: int = 160) -> str:
         for c in range(n):
             if m[r][c]:
                 rects.append(
-                    f'<rect x="{(c + quiet) * 4}" y="{(r + quiet) * 4}" width="4" height="4"/>')
+                    f'<rect x="{(c + quiet) * 4}" y="{(r + quiet) * 4}" width="4" height="4"/>'
+                )
     body = "".join(rects)
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {dim} {dim}" '
-            f'width="{box_px}" height="{box_px}" shape-rendering="crispEdges">'
-            f'<rect width="{dim}" height="{dim}" fill="#fff"/>{body}</svg>')
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {dim} {dim}" '
+        f'width="{box_px}" height="{box_px}" shape-rendering="crispEdges">'
+        f'<rect width="{dim}" height="{dim}" fill="#fff"/>{body}</svg>'
+    )

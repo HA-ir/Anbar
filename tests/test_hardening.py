@@ -1,4 +1,5 @@
 """F6: rate limiting (SQLite fixed windows) + LRU disk cache + anbarctl install."""
+
 from __future__ import annotations
 
 import os
@@ -25,6 +26,7 @@ def _app(monkeypatch, backend: FakeBackend, extra_env: dict[str, str]):
     for k, v in extra_env.items():
         monkeypatch.setenv(k, v)
     from anbar.config import get_settings
+
     get_settings.cache_clear()
     try:
         return create_app(backend=backend)
@@ -33,6 +35,7 @@ def _app(monkeypatch, backend: FakeBackend, extra_env: dict[str, str]):
 
 
 # ---------------------------------------------------------------- rate limits
+
 
 def test_download_rate_limit_429_with_retry_after(monkeypatch, tmp_path):
     monkeypatch.setenv("ANBAR_RATE_DOWNLOAD_PER_MIN", "2")
@@ -92,6 +95,7 @@ def test_rate_check_window_recycles(tmp_path):
 
 # ---------------------------------------------------------------- LRU cache
 
+
 def test_cache_off_by_default_no_files(monkeypatch):
     be = FakeBackend()
     app = _app(monkeypatch, be, {})
@@ -99,8 +103,9 @@ def test_cache_off_by_default_no_files(monkeypatch):
         assert app.state.cache is None
         oid = _upload(c, b"x" * 1000)
         c.get(f"/f/{oid}", headers=UP)
-        assert c.get("/api/v1/admin/status", headers={"Authorization": "Bearer test-admin-key"})\
-            .json()["cache"] == {"enabled": False}
+        assert c.get(
+            "/api/v1/admin/status", headers={"Authorization": "Bearer test-admin-key"}
+        ).json()["cache"] == {"enabled": False}
 
 
 def test_cache_hit_skips_backend(monkeypatch, tmp_path):
@@ -171,12 +176,23 @@ def test_lru_skips_oversized_entries(tmp_path):
     except OSError:
         pass
 
+
 def test_cli_install_writes_unit(tmp_path):
     env = tmp_path / ".env"
     env.write_text("ANBAR_BACKEND=bot\n")
     unit = tmp_path / "anbar.service"
-    rc = cli_main(["install", "--unit", str(unit), "--env-file", str(env),
-                   "--workdir", "/srv/anbar", "--loopback"])
+    rc = cli_main(
+        [
+            "install",
+            "--unit",
+            str(unit),
+            "--env-file",
+            str(env),
+            "--workdir",
+            "/srv/anbar",
+            "--loopback",
+        ]
+    )
     assert rc == 0
     body = unit.read_text()
     assert "ExecStart=" in body and "anbar.main:create_app" in body
@@ -185,6 +201,15 @@ def test_cli_install_writes_unit(tmp_path):
 
 
 def test_cli_install_missing_env_file_fails(tmp_path):
-    rc = cli_main(["install", "--unit", str(tmp_path / "u.service"),
-                   "--env-file", str(tmp_path / "nope.env"), "--workdir", "/srv/anbar"])
+    rc = cli_main(
+        [
+            "install",
+            "--unit",
+            str(tmp_path / "u.service"),
+            "--env-file",
+            str(tmp_path / "nope.env"),
+            "--workdir",
+            "/srv/anbar",
+        ]
+    )
     assert rc == 1

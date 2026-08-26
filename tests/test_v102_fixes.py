@@ -1,4 +1,5 @@
 """v0.10.2 fixes: unlock form keeps sig/exp + eye toggle; live-only listing."""
+
 from __future__ import annotations
 
 import io
@@ -8,8 +9,11 @@ ADMIN = {"Authorization": "Bearer test-admin-key"}
 
 
 def _upload(client, name="f.bin", content=b"data"):
-    r = client.post("/api/v1/upload", headers=ADMIN,
-                    files={"file": (name, io.BytesIO(content), "application/octet-stream")})
+    r = client.post(
+        "/api/v1/upload",
+        headers=ADMIN,
+        files={"file": (name, io.BytesIO(content), "application/octet-stream")},
+    )
     return r.json()["id"]
 
 
@@ -22,8 +26,7 @@ def _signed(client, oid):
 def test_unlock_form_keeps_sig_exp(client):
     """The unlock page's form must carry sig/exp (a bare ?pw= would 401)."""
     oid = _upload(client)
-    client.post(f"/f/{oid}/link?ttl=600&password=abc&slug=formsig",
-                headers=ADMIN)
+    client.post(f"/f/{oid}/link?ttl=600&password=abc&slug=formsig", headers=ADMIN)
     path = _signed(client, oid)  # visit the signed URL like a real user
     r = client.get(path, headers={"Accept": "text/html"})
     assert r.status_code == 200
@@ -44,8 +47,7 @@ def test_unlock_form_keeps_sig_exp(client):
 def test_unlock_from_slug_gets_fresh_window(client):
     """Opening via pretty slug: page mints a fresh 1h window in its form."""
     oid = _upload(client)
-    client.post(f"/f/{oid}/link?ttl=600&password=k1&slug=freshwin",
-                headers=ADMIN)
+    client.post(f"/f/{oid}/link?ttl=600&password=k1&slug=freshwin", headers=ADMIN)
     r = client.get("/f/freshwin", headers={"Accept": "text/html"})
     assert r.status_code == 200
     import re
@@ -74,8 +76,7 @@ def test_revoked_link_hidden_after_refresh(client):
     """Live view: revoked links disappear from /admin/links for good."""
     o1 = _upload(client)
     o2 = _upload(client)
-    url1 = client.post(f"/f/{o1}/link?ttl=3600&slug=a-live",
-                       headers=ADMIN).json()
+    url1 = client.post(f"/f/{o1}/link?ttl=3600&slug=a-live", headers=ADMIN).json()
     exp1 = int(url1["expires_at"])
     client.post(f"/f/{o2}/link?ttl=3600&slug=b-live", headers=ADMIN)
     client.post(f"/api/v1/admin/links/{o1}/revoke/{exp1}", headers=ADMIN)

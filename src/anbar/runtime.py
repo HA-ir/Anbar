@@ -7,6 +7,7 @@ kv overrides the env default; deleting the kv row restores the env value.
 Every value is validated against a fixed spec (type + inclusive range) —
 the API rejects out-of-range input with 422 before anything is written.
 """
+
 from __future__ import annotations
 
 from .db import Database
@@ -15,12 +16,12 @@ KV_PREFIX = "cfg_"
 
 # name: (min, max) — all int settings; 0 means "disabled" where meaningful
 SPEC = {
-    "rate_download": (0, 100_000),      # per (client IP, object) / min
-    "rate_upload": (0, 100_000),        # per API key / min
-    "rate_login": (0, 10_000),          # per client IP / min
-    "max_upload_mb": (1, 102400),         # object size ceiling, MB
+    "rate_download": (0, 100_000),  # per (client IP, object) / min
+    "rate_upload": (0, 100_000),  # per API key / min
+    "rate_login": (0, 10_000),  # per client IP / min
+    "max_upload_mb": (1, 102400),  # object size ceiling, MB
     "web_session_ttl": (300, 604_800),  # seconds, max 7 days
-    "cache_mb": (0, 8192),              # LRU budget; 0 = cache off
+    "cache_mb": (0, 8192),  # LRU budget; 0 = cache off
     # mtproto only: extra exported-auth download connections ("FastTelethon").
     # 0 = off (single connection + ranged workers). Admin-toggleable live via
     # POST /admin/settings; higher values raise FloodWait risk.

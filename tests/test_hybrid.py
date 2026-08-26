@@ -1,10 +1,12 @@
 """Unit tests for hybrid store and bot harvester."""
-import asyncio
-import pytest
 
+import pytest
+from pydantic import SecretStr
+
+from anbar.config import Settings
 from anbar.objects import Chunk, Manifest
-from anbar.storage.base import FakeBackend, ObjectRef
 from anbar.storage.bot_harvester import BotHarvester
+from anbar.storage.bot_pool import BotPool
 
 
 def test_chunk_manifest_serialization_with_bot_file_id():
@@ -46,8 +48,6 @@ async def test_bot_harvester_event_resolution():
 
 
 def test_bot_pool_initialization_and_properties():
-    from anbar.storage.bot_pool import BotPool
-
     pool = BotPool(["TOKEN_A", "TOKEN_B", "TOKEN_C"], "-100123456789")
     assert pool.size == 3
     assert pool.primary is not None
@@ -55,9 +55,6 @@ def test_bot_pool_initialization_and_properties():
 
 
 def test_config_bot_tokens_parsing():
-    from pydantic import SecretStr
-    from anbar.config import Settings
-
     s = Settings(
         channel_id="-100123",
         ANBAR_BOT_TOKENS="tok1, tok2 , tok3",

@@ -3,6 +3,7 @@
 Downloads here go through a minted signed link (the public path), which also
 exercises the F4 signature verification on every request.
 """
+
 from __future__ import annotations
 
 import hashlib

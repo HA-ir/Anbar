@@ -4,6 +4,7 @@ zipfile computes central-directory offsets from ``fileobj.tell()``. Our
 bridge counts forwarded bytes so offsets are exact; the worker thread hands
 chunks to an asyncio queue that the consumer streams out.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -11,7 +12,7 @@ import threading
 import zipfile
 from collections.abc import AsyncIterator
 
-_END = object()   # sentinel: archive complete
+_END = object()  # sentinel: archive complete
 
 
 class _LoopBridge:
@@ -26,8 +27,7 @@ class _LoopBridge:
     def write(self, data: bytes | bytearray | memoryview) -> int:
         view = bytes(data)
         self._pos += len(view)
-        asyncio.run_coroutine_threadsafe(self._sink.put(view),
-                                         self._q_loop).result(120)
+        asyncio.run_coroutine_threadsafe(self._sink.put(view), self._q_loop).result(120)
         return len(view)
 
     def flush(self) -> None:
@@ -40,8 +40,7 @@ class _LoopBridge:
         return False  # data descriptors mode; offsets come from tell()
 
 
-async def stream_zip(entries: list[tuple[str, str, dict]],
-                     fetch_chunk) -> AsyncIterator[bytes]:
+async def stream_zip(entries: list[tuple[str, str, dict]], fetch_chunk) -> AsyncIterator[bytes]:
     """Yield zip bytes for `entries` = [(arcname, obj_id, manifest_dict)].
 
     `fetch_chunk(obj_id, chunk_index, chunk_offset, length) -> bytes` pulls
@@ -60,8 +59,9 @@ async def stream_zip(entries: list[tuple[str, str, dict]],
         try:
             asyncio.set_event_loop(work_loop)
             bridge = _LoopBridge(q, q_loop)
-            with zipfile.ZipFile(bridge, "w", compression=zipfile.ZIP_STORED,
-                                 allowZip64=True) as zf:
+            with zipfile.ZipFile(
+                bridge, "w", compression=zipfile.ZIP_STORED, allowZip64=True
+            ) as zf:
                 for name, obj_id, manifest in entries:
                     info = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
                     info.external_attr = 0o644 << 16
@@ -69,8 +69,7 @@ async def stream_zip(entries: list[tuple[str, str, dict]],
                     # force_zip64 keeps the local header honest (data desc).
                     with zf.open(info, "w", force_zip64=True) as dst:
                         for i, off, length in _segments(manifest):
-                            data = work_loop.run_until_complete(
-                                fetch_chunk(obj_id, i, off, length))
+                            data = work_loop.run_until_complete(fetch_chunk(obj_id, i, off, length))
                             dst.write(data)
         except Exception as e:  # noqa: BLE001 - surfaced on the consumer side
             import traceback

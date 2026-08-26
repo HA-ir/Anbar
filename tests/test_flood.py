@@ -1,4 +1,5 @@
 """Flood management for large uploads (v0.8.3) — see README 'Why 1 GB...'."""
+
 import asyncio
 
 import httpx
@@ -18,6 +19,7 @@ def _stub_sleep(monkeypatch, log=None):
     if log is None:
         monkeypatch.setattr(asyncio, "sleep", lambda d: REAL_SLEEP(0))
     else:
+
         def rec(d):
             log.append(d)
             return REAL_SLEEP(0)
@@ -193,6 +195,7 @@ def test_flood_budget_counts_cumulative_waits(monkeypatch):
         # each 429 asks to wait 30 s; budget is only 10 s → over after the
         # first wait is about to be applied
         with pytest.raises(FloodBudgetExceeded):
+
             async def fake_multipart(method, fields, files):
                 raise TelegramError(429, "Too Many Requests", retry_after=30)
 

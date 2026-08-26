@@ -1,4 +1,5 @@
 """Media-aware store: video → sendVideo, audio → sendAudio, else sendDocument."""
+
 from __future__ import annotations
 
 import pytest
@@ -15,8 +16,11 @@ class RecordingBackend(BotBackend):
 
     async def _call_multipart(self, method, fields, files):
         self.calls.append((method, dict(fields), dict(files)))
-        return {"message_id": 1, "document": {"file_id": "fid"}} if method == "sendDocument" \
+        return (
+            {"message_id": 1, "document": {"file_id": "fid"}}
+            if method == "sendDocument"
             else {"message_id": 2, method[4:].lower(): {"file_id": "fid"}}
+        )
 
 
 @pytest.fixture

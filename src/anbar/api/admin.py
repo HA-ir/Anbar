@@ -3,6 +3,7 @@
 F8 adds runtime settings (rate limits, size ceiling, session TTL, cache
 budget) and a cache purge.
 """
+
 from __future__ import annotations
 
 import json
@@ -54,15 +55,18 @@ async def status(request: Request):
         "auth_enabled": effective_auth_enabled(db, s.auth_enabled),
         "objects": len(db.list_objects(limit=1000)),
         "cache": (
-            {"enabled": False} if cache is None
-            else {"enabled": True, "entries": cache.count(),
-                  "bytes": cache.size(),
-                  "max_bytes": cache_mb * 1024 * 1024}
+            {"enabled": False}
+            if cache is None
+            else {
+                "enabled": True,
+                "entries": cache.count(),
+                "bytes": cache.size(),
+                "max_bytes": cache_mb * 1024 * 1024,
+            }
         ),
         # master switch from .env — UI shows "disabled" when false
         "cache_master": s.cache_enabled,
-        "max_upload_bytes": runtime.get_int(db, "max_upload_mb", s.max_upload_mb)
-        * 1024 * 1024,
+        "max_upload_bytes": runtime.get_int(db, "max_upload_mb", s.max_upload_mb) * 1024 * 1024,
         "settings": runtime.effective(db, _env_defaults(s)),
         "time": int(time.time()),
     }
@@ -107,8 +111,7 @@ async def settings_update(request: Request):
         backend = request.app.state.backend
         if hasattr(backend, "set_export_conns"):
             await backend.set_export_conns(changed["mtproto_export_conns"])
-    return {"changed": changed,
-            "settings": runtime.effective(db, _env_defaults(s))}
+    return {"changed": changed, "settings": runtime.effective(db, _env_defaults(s))}
 
 
 def _sync_cache(app, db) -> None:
@@ -124,8 +127,7 @@ def _sync_cache(app, db) -> None:
     if old is not None:
         old.close()
     app.state.cache = (
-        DiskLRU(s.cache_dir, cache_mb * 1024 * 1024)
-        if s.cache_enabled and cache_mb else None
+        DiskLRU(s.cache_dir, cache_mb * 1024 * 1024) if s.cache_enabled and cache_mb else None
     )
 
 
@@ -147,8 +149,7 @@ async def settings_reset(request: Request):
     reset = {k: runtime.reset(db, k) for k in names}
     if "cache_mb" in names:
         _sync_cache(request.app, db)
-    return {"reset": reset,
-            "settings": runtime.effective(db, _env_defaults(s))}
+    return {"reset": reset, "settings": runtime.effective(db, _env_defaults(s))}
 
 
 @router.post("/admin/cache/purge")
@@ -214,22 +215,49 @@ async def export_metadata(request: Request, format: str = "json"):
     if format == "csv":
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow(["id", "filename", "size", "chunks", "downloads",
-                    "created_at", "content_type", "sha256"])
+        w.writerow(
+            [
+                "id",
+                "filename",
+                "size",
+                "chunks",
+                "downloads",
+                "created_at",
+                "content_type",
+                "sha256",
+            ]
+        )
         for r in rows:
             m = r.get("manifest") or ""
             chunks = m.count('"f"') if isinstance(m, str) else 0
-            w.writerow([r["id"], r["filename"], r["size"], chunks,
-                        r.get("downloaded", 0), r.get("created_at", ""),
-                        r.get("content_type", ""), (r.get("sha256") or "")[:16]])
+            w.writerow(
+                [
+                    r["id"],
+                    r["filename"],
+                    r["size"],
+                    chunks,
+                    r.get("downloaded", 0),
+                    r.get("created_at", ""),
+                    r.get("content_type", ""),
+                    (r.get("sha256") or "")[:16],
+                ]
+            )
         return Response(
             content=buf.getvalue(),
             media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": 'attachment; filename="anbar-objects.csv"'},
         )
-    out = [{"id": r["id"], "filename": r["filename"], "size": r["size"],
-            "downloaded": r.get("downloaded", 0), "created_at": r.get("created_at"),
-            "sha256": (r.get("sha256") or "")} for r in rows]
+    out = [
+        {
+            "id": r["id"],
+            "filename": r["filename"],
+            "size": r["size"],
+            "downloaded": r.get("downloaded", 0),
+            "created_at": r.get("created_at"),
+            "sha256": (r.get("sha256") or ""),
+        }
+        for r in rows
+    ]
     return Response(
         content=json.dumps({"exported": len(out), "objects": out}, ensure_ascii=False, indent=1),
         media_type="application/json",
@@ -255,8 +283,12 @@ async def api_keys_create(request: Request):
         body = {}
     name = (body or {}).get("name", "") if isinstance(body, dict) else ""
     entry = add_api_key(request.app.state.db, name or "")
-    return {"id": entry["id"], "name": entry["name"], "key": entry["key"],
-            "note": "copy this key now — it is not shown again"}
+    return {
+        "id": entry["id"],
+        "name": entry["name"],
+        "key": entry["key"],
+        "note": "copy this key now — it is not shown again",
+    }
 
 
 @router.delete("/admin/api-keys/{key_id}")
@@ -296,8 +328,7 @@ async def link_info(request: Request, obj_id: str):
     require_admin(request)
     from ..links import list_links
 
-    rows = [r for r in list_links(request.app.state.db, limit=500)
-            if r["obj_id"] == obj_id]
+    rows = [r for r in list_links(request.app.state.db, limit=500) if r["obj_id"] == obj_id]
     return {"links": rows}
 
 
@@ -314,8 +345,9 @@ async def link_manage_page(request: Request, obj_id: str, exp: int):
     db = request.app.state.db
     from ..links import list_links
 
-    row = next((x for x in list_links(db, limit=500)
-                if x["obj_id"] == obj_id and x["exp"] == exp), None)
+    row = next(
+        (x for x in list_links(db, limit=500) if x["obj_id"] == obj_id and x["exp"] == exp), None
+    )
     if row is None:
         raise HTTPException(404, "link not found")
 
@@ -327,11 +359,17 @@ async def link_manage_page(request: Request, obj_id: str, exp: int):
     fname = esc(row["filename"])
     pw_checked = "checked" if row["pw"] else ""
     slug_js = esc(row["slug"]) if row["slug"] else ""
-    ttl_opts = [(3600, "۱ ساعت"), (86400, "۲۴ ساعت"), (604800, "۷ روز"),
-                (6048000, "۷۰ روز"), (0, "هرگز (بدون انقضا)")]
+    ttl_opts = [
+        (3600, "۱ ساعت"),
+        (86400, "۲۴ ساعت"),
+        (604800, "۷ روز"),
+        (6048000, "۷۰ روز"),
+        (0, "هرگز (بدون انقضا)"),
+    ]
     opts = "\n".join(
         f'<option value="{v}"{" selected" if v == 86400 else ""}>{lbl}</option>'
-        for v, lbl in ttl_opts)
+        for v, lbl in ttl_opts
+    )
     maxdl = int(row["max_dl"] or 0)
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -477,11 +515,13 @@ async def trash_list(request: Request):
     items = []
     for r in db.list_objects(limit=500, trash=True):
         deleted_at = r.get("deleted_at") or 0
-        items.append({
-            **{k: v for k, v in r.items() if k != "deleted_at"},
-            "deleted_at": deleted_at,
-            "purge_in_s": max(0, db.TRASH_TTL_S - (now - deleted_at)),
-        })
+        items.append(
+            {
+                **{k: v for k, v in r.items() if k != "deleted_at"},
+                "deleted_at": deleted_at,
+                "purge_in_s": max(0, db.TRASH_TTL_S - (now - deleted_at)),
+            }
+        )
     return {"items": items, "count": len(items)}
 
 

@@ -7,6 +7,7 @@ The session file is created by a one-time interactive `anbarctl login`
 (phone + code, optional 2FA) and reused on every server start: the server
 itself never authenticates, it just loads the existing session.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -33,9 +34,15 @@ class MTProtoBackend(StorageBackend):
     name = "mtproto"
     max_upload_bytes = _MAX_SEND_BYTES
 
-    def __init__(self, api_id: int, api_hash: str, session_file: str,
-                 client=None, peer: str | int = "me",
-                 export_conns: int = 0) -> None:
+    def __init__(
+        self,
+        api_id: int,
+        api_hash: str,
+        session_file: str,
+        client=None,
+        peer: str | int = "me",
+        export_conns: int = 0,
+    ) -> None:
         if client is None:
             from telethon import TelegramClient  # lazy: optional at import time
 
@@ -49,7 +56,7 @@ class MTProtoBackend(StorageBackend):
         self._connected = False
         # FastTelethon-style extra download connections (exported auth).
         self.export_conns = export_conns  # admin-tunable at runtime; 0 = off
-        self._pool: list = []          # connected TelegramClient instances
+        self._pool: list = []  # connected TelegramClient instances
         self._pool_lock = asyncio.Lock()
 
     async def connect(self) -> None:
@@ -90,8 +97,7 @@ class MTProtoBackend(StorageBackend):
         self._connected = True
 
     # ── StorageBackend contract ─────────────────────────────────────
-    async def store(self, data: bytes, name: str,
-                    content_type: str | None = None) -> ObjectRef:
+    async def store(self, data: bytes, name: str, content_type: str | None = None) -> ObjectRef:
         """Upload one blob as a document into the destination peer.
 
         `content_type` is accepted for the StorageBackend contract but
@@ -106,7 +112,10 @@ class MTProtoBackend(StorageBackend):
         handle = await self._run_healed(self._upload_parallel, data, name)
         msg = await self._run_healed(
             self._client.send_file,
-            self._peer, handle, file_name=name, force_document=True,
+            self._peer,
+            handle,
+            file_name=name,
+            force_document=True,
         )
         doc = msg.media.document if msg.media else None
         if doc is None:
@@ -134,13 +143,14 @@ class MTProtoBackend(StorageBackend):
 
         async def put(index: int) -> None:
             async with sem:
-                await self._client(SaveBigFilePartRequest(
-                    file_id=file_id,
-                    file_part=index,
-                    bytes=data[index * _UPLOAD_PART_BYTES
-                               :(index + 1) * _UPLOAD_PART_BYTES],
-                    file_total_parts=parts,
-                ))
+                await self._client(
+                    SaveBigFilePartRequest(
+                        file_id=file_id,
+                        file_part=index,
+                        bytes=data[index * _UPLOAD_PART_BYTES : (index + 1) * _UPLOAD_PART_BYTES],
+                        file_total_parts=parts,
+                    )
+                )
 
         await asyncio.gather(*[put(i) for i in range(parts)])
         return InputFileBig(id=file_id, parts=parts, name=name)
@@ -163,20 +173,19 @@ class MTProtoBackend(StorageBackend):
             msg = await self._client.get_messages(self._peer, ids=ref.message_id)
             if msg is None or msg.media is None:
                 raise FileNotFoundError(
-                    f"mtproto: message {ref.message_id} not found or has no document")
+                    f"mtproto: message {ref.message_id} not found or has no document"
+                )
             doc = getattr(msg.media, "document", None)
             size = doc.size if doc is not None and hasattr(doc, "size") else 0
             if size <= _DOWNLOAD_RANGE:
                 buf = io.BytesIO()
-                async for piece in self._client.iter_download(
-                        msg, request_size=524288):
+                async for piece in self._client.iter_download(msg, request_size=524288):
                     buf.write(piece)
                 return buf.getvalue()
 
             # Parallel ranged fetch: queue of (offset, limit) slices.
             slices = [
-                (off, min(_DOWNLOAD_RANGE, size - off))
-                for off in range(0, size, _DOWNLOAD_RANGE)
+                (off, min(_DOWNLOAD_RANGE, size - off)) for off in range(0, size, _DOWNLOAD_RANGE)
             ]
             out = bytearray(size)
             lock = asyncio.Lock()
@@ -189,6 +198,7 @@ class MTProtoBackend(StorageBackend):
             window = max(1, min(16, self.export_conns * 4)) if self.export_conns else 0
 
             if window <= 2:
+
                 async def worker() -> None:
                     while True:
                         async with lock:
@@ -198,9 +208,9 @@ class MTProtoBackend(StorageBackend):
                             idx["i"] += 1
                         pos = off
                         async for piece in self._client.iter_download(
-                                msg, offset=pos, request_size=524288,
-                                limit=limit):
-                            out[pos:pos + len(piece)] = piece
+                            msg, offset=pos, request_size=524288, limit=limit
+                        ):
+                            out[pos : pos + len(piece)] = piece
                             pos += len(piece)
 
                 await asyncio.gather(*[worker() for _ in range(_DOWNLOAD_WORKERS)])
@@ -209,8 +219,7 @@ class MTProtoBackend(StorageBackend):
             from telethon.tl.functions.upload import GetFileRequest
             from telethon.tl.types import InputDocumentFileLocation
 
-            loc = InputDocumentFileLocation(
-                doc.id, doc.access_hash, doc.file_reference, "")
+            loc = InputDocumentFileLocation(doc.id, doc.access_hash, doc.file_reference, "")
             CH = 524288
 
             async def fetch(off: int) -> tuple[int, bytes]:
@@ -225,11 +234,10 @@ class MTProtoBackend(StorageBackend):
                     inflight.add(asyncio.create_task(fetch(next_off)))
                     next_off += CH
                 while inflight:
-                    done, _ = await asyncio.wait(
-                        inflight, return_when=asyncio.FIRST_COMPLETED)
+                    done, _ = await asyncio.wait(inflight, return_when=asyncio.FIRST_COMPLETED)
                     for f in done:
                         o, b = f.result()
-                        out[o:o + len(b)] = b
+                        out[o : o + len(b)] = b
                         inflight.discard(f)
                     while next_off < end and len(inflight) < window:
                         inflight.add(asyncio.create_task(fetch(next_off)))
@@ -334,4 +342,3 @@ class MTProtoBackend(StorageBackend):
         self.export_conns = n
         if n == 0:
             await self._close_pool()
-

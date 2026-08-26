@@ -5,6 +5,7 @@ Optional and OFF by default. Cached entries are plain temp files under
 *permanent* storage — these files are evicted when the budget fills or the
 container restarts. Advisory only: a miss just refetches from the backend.
 """
+
 from __future__ import annotations
 
 import asyncio

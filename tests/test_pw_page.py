@@ -1,4 +1,5 @@
 """v0.10.1: password unlock page for pw-protected links opened without ?pw."""
+
 from __future__ import annotations
 
 import io
@@ -8,8 +9,11 @@ ADMIN = {"Authorization": "Bearer test-admin-key"}
 
 
 def _upload(client, name="secret.bin", content=b"top-secret-data"):
-    r = client.post("/api/v1/upload", headers=ADMIN,
-                    files={"file": (name, io.BytesIO(content), "application/octet-stream")})
+    r = client.post(
+        "/api/v1/upload",
+        headers=ADMIN,
+        files={"file": (name, io.BytesIO(content), "application/octet-stream")},
+    )
     return r.json()["id"]
 
 
@@ -22,8 +26,7 @@ def _signed_url(client, oid, extra=""):
 
 def test_browser_without_pw_gets_unlock_page(client):
     oid = _upload(client)
-    client.post(f"/f/{oid}/link?ttl=600&password=hunter2&slug=vault",
-                headers=ADMIN)
+    client.post(f"/f/{oid}/link?ttl=600&password=hunter2&slug=vault", headers=ADMIN)
     base = _signed_url(client, oid)
     # browser visit → HTML unlock page, not a bare 403
     r = client.get(base, headers={"Accept": "text/html"})
@@ -63,8 +66,7 @@ def test_correct_pw_downloads_directly(client):
     """
     oid = _upload(client, content=b"payload")
     path = _signed_url(client, oid)  # plain signed URL of this object
-    client.post(f"/f/{oid}/link?ttl=600&password=pw123&slug=gated",
-                headers=ADMIN)
+    client.post(f"/f/{oid}/link?ttl=600&password=pw123&slug=gated", headers=ADMIN)
     r = client.get(path + "&pw=pw123")
     assert r.status_code == 200 and r.content == b"payload"
 
@@ -72,8 +74,7 @@ def test_correct_pw_downloads_directly(client):
 def test_unlock_flow_via_signed_link(client):
     """Full visitor journey: open link → page → type pw → file bytes."""
     oid = _upload(client, content=b"final-check")
-    client.post(f"/f/{oid}/link?ttl=600&password=s3cret&slug=journey",
-                headers=ADMIN)
+    client.post(f"/f/{oid}/link?ttl=600&password=s3cret&slug=journey", headers=ADMIN)
     path = _signed_url(client, oid)
     # step 1: open without pw → unlock page
     page = client.get(path, headers={"Accept": "text/html"})

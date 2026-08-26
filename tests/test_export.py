@@ -1,4 +1,5 @@
 """v0.9.3: metadata export endpoint."""
+
 from __future__ import annotations
 
 import io
@@ -7,8 +8,11 @@ ADMIN = {"Authorization": "Bearer test-admin-key"}
 
 
 def test_export_json_and_csv(client):
-    r = client.post("/api/v1/upload", headers=ADMIN,
-                    files={"file": ("x.bin", io.BytesIO(b"data"), "application/octet-stream")})
+    r = client.post(
+        "/api/v1/upload",
+        headers=ADMIN,
+        files={"file": ("x.bin", io.BytesIO(b"data"), "application/octet-stream")},
+    )
     assert r.status_code == 200
     j = client.get("/api/v1/admin/export", headers=ADMIN)
     assert j.status_code == 200

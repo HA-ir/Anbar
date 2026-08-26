@@ -4,6 +4,7 @@ Talks to a running anbar server over HTTP. The admin key comes from the
 ANBAR_ADMIN_KEY env var (or --admin-key); the base URL from ANBAR_BASE_URL
 (or --base-url, default http://127.0.0.1:8567).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -14,8 +15,9 @@ import urllib.error
 import urllib.request
 
 
-def _http(method: str, url: str, admin_key: str | None,
-          body: dict | None = None) -> tuple[int, dict]:
+def _http(
+    method: str, url: str, admin_key: str | None, body: dict | None = None
+) -> tuple[int, dict]:
     """Issue an admin request; return (status_code, parsed_json)."""
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method)
@@ -55,8 +57,9 @@ def _cmd_auth(args: argparse.Namespace) -> int:
 
 
 def _cmd_link(args: argparse.Namespace) -> int:
-    code, body = _http("POST", f"{args.base_url}/f/{args.object_id}/link?ttl={args.ttl}",
-                       args.admin_key)
+    code, body = _http(
+        "POST", f"{args.base_url}/f/{args.object_id}/link?ttl={args.ttl}", args.admin_key
+    )
     if code != 200:
         print(f"error: link mint failed: HTTP {code} {body}", file=sys.stderr)
         return 1
@@ -65,8 +68,9 @@ def _cmd_link(args: argparse.Namespace) -> int:
 
 
 def _cmd_objects(args: argparse.Namespace) -> int:
-    code, body = _http("GET", f"{args.base_url}/api/v1/admin/objects?limit={args.limit}",
-                       args.admin_key)
+    code, body = _http(
+        "GET", f"{args.base_url}/api/v1/admin/objects?limit={args.limit}", args.admin_key
+    )
     if code != 200:
         print(f"error: listing failed: HTTP {code} {body}", file=sys.stderr)
         return 1
@@ -82,8 +86,7 @@ def _cmd_objects(args: argparse.Namespace) -> int:
 
 
 def _cmd_rotate(args: argparse.Namespace) -> int:
-    code, body = _http("POST", f"{args.base_url}/api/v1/admin/auth/rotate-secret",
-                       args.admin_key)
+    code, body = _http("POST", f"{args.base_url}/api/v1/admin/auth/rotate-secret", args.admin_key)
     if code != 200:
         print(f"error: rotation failed: HTTP {code} {body}", file=sys.stderr)
         return 1
@@ -104,8 +107,11 @@ def _cmd_login(args: argparse.Namespace) -> int:
     from telethon import TelegramClient
 
     if not args.api_id or not args.api_hash:
-        print("error: need --api-id/--api-hash or $ANBAR_API_ID/$ANBAR_API_HASH "
-              "(get them from my.telegram.org)", file=sys.stderr)
+        print(
+            "error: need --api-id/--api-hash or $ANBAR_API_ID/$ANBAR_API_HASH "
+            "(get them from my.telegram.org)",
+            file=sys.stderr,
+        )
         return 1
     if not args.phone:
         print("error: need --phone or $ANBAR_LOGIN_PHONE", file=sys.stderr)
@@ -136,8 +142,9 @@ def _cmd_install(args: argparse.Namespace) -> int:
     unit_path = os.path.expanduser(args.unit)
     env_file = os.path.expanduser(args.env_file)
     if not os.path.isfile(env_file):
-        print(f"error: env file not found: {env_file} (copy your .env there first)",
-              file=sys.stderr)
+        print(
+            f"error: env file not found: {env_file} (copy your .env there first)", file=sys.stderr
+        )
         return 1
 
     # find uvicorn: prefer the venv in --workdir, then the running interpreter's
@@ -153,8 +160,10 @@ def _cmd_install(args: argparse.Namespace) -> int:
         candidates.append(os.path.join(uvicorn_py, "uvicorn"))
     uvicorn_bin = next((c for c in candidates if os.path.exists(c)), None)
     if uvicorn_bin is None:
-        print("error: could not locate an `uvicorn` executable "
-              f"(looked at: {', '.join(candidates)})", file=sys.stderr)
+        print(
+            f"error: could not locate an `uvicorn` executable (looked at: {', '.join(candidates)})",
+            file=sys.stderr,
+        )
         return 1
 
     host = "127.0.0.1" if args.loopback else "0.0.0.0"
@@ -183,8 +192,10 @@ WantedBy=multi-user.target
 """
     unit_dir = os.path.dirname(unit_path)
     if unit_dir and not os.path.isdir(unit_dir):
-        print(f"error: {unit_dir} does not exist (run as root, or pass a user-unit path)",
-              file=sys.stderr)
+        print(
+            f"error: {unit_dir} does not exist (run as root, or pass a user-unit path)",
+            file=sys.stderr,
+        )
         return 1
     with open(unit_path, "w") as f:
         f.write(unit)
@@ -208,15 +219,17 @@ def _cmd_put(args: argparse.Namespace) -> int:
     with open(path, "rb") as f:
         payload = f.read()
     body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="file"; filename="{name}"\r\n'
-        f"Content-Type: application/octet-stream\r\n\r\n"
-    ).encode() + payload + f"\r\n--{boundary}--\r\n".encode()
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{name}"\r\n'
+            f"Content-Type: application/octet-stream\r\n\r\n"
+        ).encode()
+        + payload
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
     key = args.key or args.admin_key
-    req = urllib.request.Request(
-        f"{args.base_url}/api/v1/upload", data=body, method="POST")
-    req.add_header("Content-Type",
-                   f"multipart/form-data; boundary={boundary}")
+    req = urllib.request.Request(f"{args.base_url}/api/v1/upload", data=body, method="POST")
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
     if key:
         req.add_header("Authorization", f"Bearer {key}")
     try:
@@ -234,16 +247,14 @@ def _cmd_put(args: argparse.Namespace) -> int:
 
 def _cmd_get(args: argparse.Namespace) -> int:
     """Download an object to a local file via a freshly minted signed link."""
-    code, body = _http("POST", f"{args.base_url}/f/{args.object_id}/link?ttl=120",
-                       args.admin_key)
+    code, body = _http("POST", f"{args.base_url}/f/{args.object_id}/link?ttl=120", args.admin_key)
     if code != 200:
         print(f"error: link mint failed: HTTP {code} {body}", file=sys.stderr)
         return 1
     url = body["url"]
     req = urllib.request.Request(url)
     req.add_header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) anbarctl")
-    with urllib.request.urlopen(req, timeout=1800) as resp, \
-            open(args.out, "wb") as f:
+    with urllib.request.urlopen(req, timeout=1800) as resp, open(args.out, "wb") as f:
         while True:
             chunk = resp.read(1 << 20)
             if not chunk:
@@ -255,11 +266,16 @@ def _cmd_get(args: argparse.Namespace) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="anbarctl", description=__doc__)
-    parser.add_argument("--base-url",
-                        default=os.environ.get("ANBAR_BASE_URL", "http://127.0.0.1:8567"),
-                        help="anbar server base URL (default: $ANBAR_BASE_URL)")
-    parser.add_argument("--admin-key", default=os.environ.get("ANBAR_ADMIN_KEY"),
-                        help="admin API key (default: $ANBAR_ADMIN_KEY)")
+    parser.add_argument(
+        "--base-url",
+        default=os.environ.get("ANBAR_BASE_URL", "http://127.0.0.1:8567"),
+        help="anbar server base URL (default: $ANBAR_BASE_URL)",
+    )
+    parser.add_argument(
+        "--admin-key",
+        default=os.environ.get("ANBAR_ADMIN_KEY"),
+        help="admin API key (default: $ANBAR_ADMIN_KEY)",
+    )
 
     sub = parser.add_subparsers(dest="command")
 
@@ -271,8 +287,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_link = sub.add_parser("link", help="mint a signed download link")
     p_link.add_argument("object_id")
-    p_link.add_argument("--ttl", type=int, default=3600,
-                        help="validity in seconds (default 3600, clamped 60..604800)")
+    p_link.add_argument(
+        "--ttl",
+        type=int,
+        default=3600,
+        help="validity in seconds (default 3600, clamped 60..604800)",
+    )
     p_link.set_defaults(func=_cmd_link)
 
     p_obj = sub.add_parser("objects", help="list stored objects (newest first)")
@@ -284,8 +304,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_put = sub.add_parser("put", help="upload a local file; prints its object id")
     p_put.add_argument("file", help="path of the file to upload")
-    p_put.add_argument("--key", default=os.environ.get("ANBAR_API_KEY"),
-                       help="uploader API key (default: $ANBAR_API_KEY)")
+    p_put.add_argument(
+        "--key",
+        default=os.environ.get("ANBAR_API_KEY"),
+        help="uploader API key (default: $ANBAR_API_KEY)",
+    )
     p_put.set_defaults(func=_cmd_put)
 
     p_get = sub.add_parser("get", help="download an object to a local file")
@@ -297,31 +320,45 @@ def _build_parser() -> argparse.ArgumentParser:
         "login",
         help="one-time MTProto account login (creates the session file; needs a TTY)",
     )
-    p_login.add_argument("--api-id", type=int,
-                         default=os.environ.get("ANBAR_API_ID"),
-                         help="api_id from my.telegram.org (default: $ANBAR_API_ID)")
-    p_login.add_argument("--api-hash", default=os.environ.get("ANBAR_API_HASH"),
-                         help="api_hash (default: $ANBAR_API_HASH)")
-    p_login.add_argument("--phone", default=os.environ.get("ANBAR_LOGIN_PHONE"),
-                         help="account phone, e.g. +98... (default: $ANBAR_LOGIN_PHONE)")
-    p_login.add_argument("--session",
-                         default=os.environ.get("ANBAR_SESSION_FILE", "secrets/session.session"),
-                         help="where to save the session (default: $ANBAR_SESSION_FILE)")
+    p_login.add_argument(
+        "--api-id",
+        type=int,
+        default=os.environ.get("ANBAR_API_ID"),
+        help="api_id from my.telegram.org (default: $ANBAR_API_ID)",
+    )
+    p_login.add_argument(
+        "--api-hash",
+        default=os.environ.get("ANBAR_API_HASH"),
+        help="api_hash (default: $ANBAR_API_HASH)",
+    )
+    p_login.add_argument(
+        "--phone",
+        default=os.environ.get("ANBAR_LOGIN_PHONE"),
+        help="account phone, e.g. +98... (default: $ANBAR_LOGIN_PHONE)",
+    )
+    p_login.add_argument(
+        "--session",
+        default=os.environ.get("ANBAR_SESSION_FILE", "secrets/session.session"),
+        help="where to save the session (default: $ANBAR_SESSION_FILE)",
+    )
     p_login.set_defaults(func=_cmd_login)
 
     p_inst = sub.add_parser(
         "install",
         help="write a systemd unit for non-Docker hosts (does not enable it)",
     )
-    p_inst.add_argument("--unit", default="/etc/systemd/system/anbar.service",
-                        help="where to write the unit (user units also work)")
-    p_inst.add_argument("--env-file", default="/etc/anbar/.env",
-                        help="the .env file the service should load")
+    p_inst.add_argument(
+        "--unit",
+        default="/etc/systemd/system/anbar.service",
+        help="where to write the unit (user units also work)",
+    )
+    p_inst.add_argument(
+        "--env-file", default="/etc/anbar/.env", help="the .env file the service should load"
+    )
     p_inst.add_argument("--user", default="anbar", help="system user to run as")
     p_inst.add_argument("--workdir", default=".", help="project root (finds .venv)")
     p_inst.add_argument("--port", type=int, default=8000)
-    p_inst.add_argument("--loopback", action="store_true",
-                        help="bind 127.0.0.1 instead of 0.0.0.0")
+    p_inst.add_argument("--loopback", action="store_true", help="bind 127.0.0.1 instead of 0.0.0.0")
     p_inst.set_defaults(func=_cmd_install)
 
     return parser

@@ -5,6 +5,7 @@ the precheck used bare sha256 instead of keyed HMAC, so it never matched
 for real browsers (httpx tests don't send Accept: text/html and skipped
 the precheck entirely).
 """
+
 from __future__ import annotations
 
 import io
@@ -14,9 +15,11 @@ ADMIN = {"Authorization": "Bearer test-admin-key"}
 
 
 def _upload(client, content=b"real-browser-check"):
-    r = client.post("/api/v1/upload", headers=ADMIN,
-                    files={"file": (name_or(), io.BytesIO(content),
-                                    "application/octet-stream")})
+    r = client.post(
+        "/api/v1/upload",
+        headers=ADMIN,
+        files={"file": (name_or(), io.BytesIO(content), "application/octet-stream")},
+    )
     return r.json()["id"]
 
 
@@ -49,8 +52,7 @@ def test_wrong_pw_still_shows_error_page(client):
 def test_correct_pw_with_slug_via_browser(client):
     """Slug journey: open /f/name → page → submit → file bytes."""
     oid = _upload(client)
-    client.post(f"/f/{oid}/link?ttl=600&password=k2&slug=loopslug",
-                headers=ADMIN)
+    client.post(f"/f/{oid}/link?ttl=600&password=k2&slug=loopslug", headers=ADMIN)
     page = client.get("/f/loopslug", headers=BROWSER)
     assert page.status_code == 200 and "text/html" in page.headers["content-type"]
     import re

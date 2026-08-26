@@ -23,6 +23,7 @@ Two mechanisms keep large files (64+ chunks) working:
   with no log trail. `asyncio.wait_for` hard-caps each sendDocument;
   a hit is a transient 502, so the flood-retry loop retries the chunk.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -79,12 +80,8 @@ class BotBackend(StorageBackend):
         self.bot_token = bot_token
         self._channel = channel_id
         self.send_gap_s = send_gap_s if send_gap_s is not None else self.send_gap_s
-        self.flood_budget_s = (
-            flood_budget_s if flood_budget_s is not None else self.flood_budget_s
-        )
-        self.send_timeout_s = (
-            send_timeout_s if send_timeout_s is not None else self.send_timeout_s
-        )
+        self.flood_budget_s = flood_budget_s if flood_budget_s is not None else self.flood_budget_s
+        self.send_timeout_s = send_timeout_s if send_timeout_s is not None else self.send_timeout_s
         self._http = httpx.AsyncClient(
             base_url=f"{API_BASE}/bot{bot_token}",
             timeout=httpx.Timeout(300.0, connect=15.0),
@@ -113,8 +110,9 @@ class BotBackend(StorageBackend):
         try:
             r = await self._http.post(f"/{method}", data=params)
         except httpx.HTTPError as e:
-            raise TelegramError(502, f"telegram transport: {e.__class__.__name__}",
-                                http_status=502) from e
+            raise TelegramError(
+                502, f"telegram transport: {e.__class__.__name__}", http_status=502
+            ) from e
         return self._parse(r.json())
 
     async def _call_multipart(self, method: str, fields: dict, files: dict) -> dict:
@@ -135,8 +133,9 @@ class BotBackend(StorageBackend):
                 http_status=502,
             ) from None
         except httpx.HTTPError as e:
-            raise TelegramError(502, f"telegram transport: {e.__class__.__name__}",
-                                http_status=502) from e
+            raise TelegramError(
+                502, f"telegram transport: {e.__class__.__name__}", http_status=502
+            ) from e
         return self._parse(r.json())
 
     def _is_rate_limited(self, e: TelegramError) -> bool:
@@ -146,8 +145,7 @@ class BotBackend(StorageBackend):
         return e.code in (429, 402, 500, 502)
 
     # ── StorageBackend contract ─────────────────────────────────────
-    async def store(self, data: bytes, name: str,
-                    content_type: str | None = None) -> ObjectRef:
+    async def store(self, data: bytes, name: str, content_type: str | None = None) -> ObjectRef:
         """Post one blob to the channel, return its file_id ref.
 
         Paced by a single send queue and retried through FloodWait up to
@@ -214,9 +212,7 @@ class BotBackend(StorageBackend):
             if gap > 0:
                 await asyncio.sleep(gap)
             try:
-                field = {"sendVideo": "video", "sendAudio": "audio"}.get(
-                    method, "document"
-                )
+                field = {"sendVideo": "video", "sendAudio": "audio"}.get(method, "document")
                 mime = {
                     "sendVideo": "video/mp4",
                     "sendAudio": "audio/mpeg",
@@ -251,26 +247,41 @@ class BotBackend(StorageBackend):
                         retry_after = int(r.headers.get("retry-after", "5"))
                     except ValueError:
                         pass
-                    log.warning("file CDN rate limited (429), waiting %ds (attempt %d/%d)",
-                                retry_after, attempt, max_retries)
+                    log.warning(
+                        "file CDN rate limited (429), waiting %ds (attempt %d/%d)",
+                        retry_after,
+                        attempt,
+                        max_retries,
+                    )
                     await asyncio.sleep(retry_after)
                     continue
                 if r.status_code >= 500:
-                    log.warning("file CDN returned %d, retrying (attempt %d/%d)",
-                                r.status_code, attempt, max_retries)
-                    await asyncio.sleep(min(2 ** attempt, 10))
+                    log.warning(
+                        "file CDN returned %d, retrying (attempt %d/%d)",
+                        r.status_code,
+                        attempt,
+                        max_retries,
+                    )
+                    await asyncio.sleep(min(2**attempt, 10))
                     continue
                 raise RuntimeError(f"file CDN returned {r.status_code} for {path}")
             except (httpx.HTTPError, TelegramError, TimeoutError) as e:
                 last_exc = e
-                wait = min(2 ** attempt, 10)
-                log.warning("bot_backend.open failed (%s: %s), retrying in %ds (attempt %d/%d)",
-                            type(e).__name__, e, wait, attempt, max_retries)
+                wait = min(2**attempt, 10)
+                log.warning(
+                    "bot_backend.open failed (%s: %s), retrying in %ds (attempt %d/%d)",
+                    type(e).__name__,
+                    e,
+                    wait,
+                    attempt,
+                    max_retries,
+                )
                 await asyncio.sleep(wait)
             except Exception as e:
                 last_exc = e
                 break
-        raise RuntimeError(f"bot_backend.open failed after {max_retries} attempts: {last_exc}") from last_exc
+        msg = f"bot_backend.open failed after {max_retries} attempts: {last_exc}"
+        raise RuntimeError(msg) from last_exc
 
     async def delete(self, ref: ObjectRef) -> bool:
         """Delete the channel message holding this blob.

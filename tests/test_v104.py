@@ -1,4 +1,5 @@
 """v0.10.4: gallery audio/pdf previews, per-link stats, shared albums."""
+
 from __future__ import annotations
 
 import io
@@ -8,8 +9,9 @@ BROWSER = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;
 
 
 def _upload(client, name, content, ct="application/octet-stream"):
-    r = client.post("/api/v1/upload", headers=ADMIN,
-                    files={"file": (name, io.BytesIO(content), ct)})
+    r = client.post(
+        "/api/v1/upload", headers=ADMIN, files={"file": (name, io.BytesIO(content), ct)}
+    )
     assert r.status_code == 200, r.text
     return r.json()["id"]
 
@@ -38,8 +40,7 @@ def test_range_requests_do_not_count(client):
 def test_album_create_and_page(client):
     o1 = _upload(client, "a.png", b"\x89PNG fake", "image/png")
     o2 = _upload(client, "b.mp3", b"ID3 fake", "audio/mpeg")
-    r = client.post("/f/album", headers=ADMIN,
-                    json={"ids": [o1, o2], "title": "تست آلبوم"})
+    r = client.post("/f/album", headers=ADMIN, json={"ids": [o1, o2], "title": "تست آلبوم"})
     assert r.status_code == 200
     j = r.json()
     assert j["count"] == 2 and "/f/a/" in j["url"]
@@ -58,8 +59,7 @@ def test_album_requires_admin_and_validates(client):
     r = client.post("/f/album", headers=ADMIN, json={"ids": ["nope12345678"]})
     assert r.status_code == 404
     # empty body → 400
-    assert client.post("/f/album", headers=ADMIN,
-                       json={"ids": []}).status_code == 400
+    assert client.post("/f/album", headers=ADMIN, json={"ids": []}).status_code == 400
 
 
 def test_album_missing_token_404(client):
@@ -71,8 +71,7 @@ def test_album_missing_token_404(client):
 def test_album_hides_deleted_files(client):
     o1 = _upload(client, "keep.txt", b"k")
     o2 = _upload(client, "gone.txt", b"g")
-    tok = client.post("/f/album", headers=ADMIN,
-                      json={"ids": [o1, o2]}).json()["token"]
+    tok = client.post("/f/album", headers=ADMIN, json={"ids": [o1, o2]}).json()["token"]
     client.delete(f"/f/{o2}", headers=ADMIN)  # trash it
     page = client.get(f"/f/a/{tok}")
     assert b"keep.txt" in page.content

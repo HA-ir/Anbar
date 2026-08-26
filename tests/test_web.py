@@ -1,4 +1,5 @@
 """F7 — Web UI: login flow, signed session cookie, cookie-authenticated API."""
+
 from __future__ import annotations
 
 ADMIN = "test-admin-key"
@@ -6,8 +7,11 @@ API = "test-key"
 
 
 def _upload(client, name="ui-test.bin", size=4096) -> dict:
-    r = client.post("/api/v1/upload", files={"file": (name, b"x" * size)},
-                    headers={"Authorization": f"Bearer {API}"})
+    r = client.post(
+        "/api/v1/upload",
+        files={"file": (name, b"x" * size)},
+        headers={"Authorization": f"Bearer {API}"},
+    )
     assert r.status_code == 200, r.text
     return r.json()
 

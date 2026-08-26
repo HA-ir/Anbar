@@ -3,6 +3,7 @@
 Auth is enforced by the middleware layer (F4); F2 records the uploader for
 ownership (used by DELETE in F4).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -45,8 +46,9 @@ def _max_upload_bytes(request: Request) -> int:
     return mb * 1024 * 1024
 
 
-async def _commit(request: Request, manifest: Manifest, sha_hex: str, filename: str,
-                  content_type: str) -> JSONResponse:
+async def _commit(
+    request: Request, manifest: Manifest, sha_hex: str, filename: str, content_type: str
+) -> JSONResponse:
     settings = request.app.state.settings
     backend = request.app.state.backend
     db = request.app.state.db
@@ -77,11 +79,14 @@ async def _commit(request: Request, manifest: Manifest, sha_hex: str, filename: 
     )
 
 
-async def _store_stream(request: Request, stream, filename: str,
-                        content_type: str | None = None,
-                        upload_id: str | None = None,
-                        resume_from: int = 0,
-                        ) -> tuple[Manifest, str]:
+async def _store_stream(
+    request: Request,
+    stream,
+    filename: str,
+    content_type: str | None = None,
+    upload_id: str | None = None,
+    resume_from: int = 0,
+) -> tuple[Manifest, str]:
     """Drive the chunker over `stream`; return (manifest, sha256).
 
     With `upload_id` set, every stored chunk bumps the kv checkpoint
@@ -108,17 +113,19 @@ async def _store_stream(request: Request, stream, filename: str,
         # pre-seed the manifest with the already-stored chunks
         for i, c in enumerate(prior[:resume_from]):
             manifest.chunks.append(
-                Chunk(index=i, size=c["s"], file_id=c["f"],
-                      message_id=c.get("m"))
+                Chunk(index=i, size=c["s"], file_id=c["f"], message_id=c.get("m"))
             )
     skip_remaining = resume_from
 
     def _checkpoint() -> None:
         if ck_key:
-            db.kv_set(ck_key, json.dumps(
-                [{"s": c.size, "f": c.file_id, "m": c.message_id}
-                 for c in manifest.chunks], separators=(",", ":")
-            ))
+            db.kv_set(
+                ck_key,
+                json.dumps(
+                    [{"s": c.size, "f": c.file_id, "m": c.message_id} for c in manifest.chunks],
+                    separators=(",", ":"),
+                ),
+            )
 
     harvester = getattr(request.app.state, "harvester", None)
 
@@ -128,7 +135,8 @@ async def _store_stream(request: Request, stream, filename: str,
             skip_remaining -= 1  # duplicate of an already-stored chunk: drain
             return ""
         ref = await backend.store(
-            data, f"{filename}.part",
+            data,
+            f"{filename}.part",
             content_type=content_type if media else None,
         )
         bot_fid = None
@@ -139,36 +147,40 @@ async def _store_stream(request: Request, stream, filename: str,
                 log.debug("harvester error for msg %s: %s", ref.message_id, e)
 
         manifest.chunks.append(
-            Chunk(index=len(manifest.chunks), size=len(data), file_id=ref.file_id,
-                  message_id=ref.message_id, bot_file_id=bot_fid)
+            Chunk(
+                index=len(manifest.chunks),
+                size=len(data),
+                file_id=ref.file_id,
+                message_id=ref.message_id,
+                bot_file_id=bot_fid,
+            )
         )
         _checkpoint()
         return ref.file_id
 
     try:
         _, sha_hex = await chunk_stream(
-            stream, settings.chunk_size, on_chunk,
+            stream,
+            settings.chunk_size,
+            on_chunk,
             is_first_chunk_media=bool(content_type),
         )
     except BodyReadTimeout as e:
         for c in manifest.chunks:  # best-effort rollback of posted blobs
             try:
                 await backend.delete(
-                    ObjectRef(file_id=c.file_id, message_id=c.message_id,
-                              backend=backend.name)
+                    ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=backend.name)
                 )
             except Exception:  # noqa: BLE001
                 pass
-        log.warning("upload aborted: %s (%d chunks rolled back)",
-                    e, len(manifest.chunks))
+        log.warning("upload aborted: %s (%d chunks rolled back)", e, len(manifest.chunks))
         raise HTTPException(408, f"client stalled: {e}") from e
     except Exception as e:
         log.exception("upload chunk failed with error: %s", e)
         for c in manifest.chunks:  # best-effort rollback of posted blobs
             try:
                 await backend.delete(
-                    ObjectRef(file_id=c.file_id, message_id=c.message_id,
-                              backend=backend.name)
+                    ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=backend.name)
                 )
             except Exception:  # noqa: BLE001
                 pass
@@ -190,7 +202,9 @@ async def upload_multipart(request: Request, file: Annotated[UploadFile, File(..
     if (await _peek_size(file)) > _max_upload_bytes(request):
         raise HTTPException(413, "object exceeds configured ceiling")
     manifest, sha_hex = await _store_stream(
-        request, _UploadFileReader(file), filename,
+        request,
+        _UploadFileReader(file),
+        filename,
         content_type=file.content_type,
     )
     return await _commit(request, manifest, sha_hex, filename, content_type)
@@ -227,10 +241,12 @@ async def upload_raw(request: Request):
             raise HTTPException(400, "X-Resume-From must be an integer") from None
 
     manifest, sha_hex = await _store_stream(
-        request, _RequestBodyReader(
-            request, request.app.state.settings.body_idle_timeout_s
-        ), filename, content_type=content_type,
-        upload_id=upload_id, resume_from=resume_from,
+        request,
+        _RequestBodyReader(request, request.app.state.settings.body_idle_timeout_s),
+        filename,
+        content_type=content_type,
+        upload_id=upload_id,
+        resume_from=resume_from,
     )
     return await _commit(request, manifest, sha_hex, filename, content_type)
 
@@ -273,9 +289,7 @@ class _RequestBodyReader:
     async def read(self, n: int) -> bytes:
         while len(self._buf) < n and not self._eof:
             try:
-                self._buf += await asyncio.wait_for(
-                    self._iter.__anext__(), timeout=self._timeout
-                )
+                self._buf += await asyncio.wait_for(self._iter.__anext__(), timeout=self._timeout)
             except StopAsyncIteration:
                 self._eof = True
             except TimeoutError as e:

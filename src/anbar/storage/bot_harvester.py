@@ -5,6 +5,7 @@ and the Bot in the channel reads the channel_post updates to capture the Bot API
 `file_id` for each chunk. The file_id is stored in the object chunk manifest,
 enabling fast CDN download via getFile with fallback to MTProto.
 """
+
 from __future__ import annotations
 
 import asyncio

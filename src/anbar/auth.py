@@ -6,6 +6,7 @@ Signed URL format:  /f/{obj_id}?sig=<hex>&exp=<unix-ts>
 The secret comes from the kv override (after rotate-secret) or settings.
 Keys are compared in constant time.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -69,6 +70,7 @@ def new_secret(nbytes: int = 32) -> str:
 def list_api_keys(db) -> list[dict]:
     """All dynamic uploader keys (v0.8.7): [{id, key, name, created_at}]."""
     import json as _json
+
     try:
         return _json.loads(db.kv_get("api_keys", "[]") or "[]")
     except Exception:  # noqa: BLE001 - corrupted value behaves like "none"
@@ -149,16 +151,14 @@ def whoami(request) -> str:
 def require_uploader(request):
     role = whoami(request)
     if _auth_on(request) and role == "anon":
-        raise HTTPException(401, "authentication required",
-                            headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(401, "authentication required", headers={"WWW-Authenticate": "Bearer"})
     return role
 
 
 def require_admin(request):
     role = whoami(request)
     if _auth_on(request) and role == "anon":
-        raise HTTPException(401, "authentication required",
-                            headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(401, "authentication required", headers={"WWW-Authenticate": "Bearer"})
     if role != "admin":
         raise HTTPException(403, "admin key required")
     return role

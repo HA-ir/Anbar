@@ -14,6 +14,7 @@ tombstone check instead of a token store. The tombstone is per-(object,
 expiry) — cheap to look up, trivially deleted, and never touches unrelated
 links. Password/cap/slug tags are cleaned up when their last link goes.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,16 +24,29 @@ KV_PREFIX = "link:"  # link:<obj_id>:<exp> -> {slug?, pw?, max_dl?}
 REV_PREFIX = "rev:"  # rev:<obj_id>:<exp> = "1" while revoked
 
 
-def register_link(db, obj_id: str, exp: int, *, slug: str | None = None,
-                  password_protected: bool = False, max_dl: int = 0) -> None:
+def register_link(
+    db,
+    obj_id: str,
+    exp: int,
+    *,
+    slug: str | None = None,
+    password_protected: bool = False,
+    max_dl: int = 0,
+) -> None:
     """Record a freshly minted link so it can be listed and later revoked."""
-    db.kv_set(f"{KV_PREFIX}{obj_id}:{exp}", json.dumps({
-        "slug": slug or None,
-        "pw": bool(password_protected),
-        "max_dl": max_dl or None,
-        "created_at": int(time.time()),
-        "downloads": 0,
-    }, separators=(",", ":")))
+    db.kv_set(
+        f"{KV_PREFIX}{obj_id}:{exp}",
+        json.dumps(
+            {
+                "slug": slug or None,
+                "pw": bool(password_protected),
+                "max_dl": max_dl or None,
+                "created_at": int(time.time()),
+                "downloads": 0,
+            },
+            separators=(",", ":"),
+        ),
+    )
 
 
 def bump_link_downloads(db, request, obj_id: str) -> None:
@@ -46,7 +60,7 @@ def bump_link_downloads(db, request, obj_id: str) -> None:
         for k, v in list(db.kv_all()):
             if not k.startswith(KV_PREFIX):
                 continue
-            rest = k[len(KV_PREFIX):]
+            rest = k[len(KV_PREFIX) :]
             oid, exp_s = rest.rsplit(":", 1)
             if oid != obj_id or is_revoked(db, oid, exp_s):
                 continue
@@ -98,7 +112,7 @@ def list_links(db, limit: int = 200, *, include_dead: bool = False) -> list[dict
         if not k.startswith(KV_PREFIX):
             continue
         try:
-            rest = k[len(KV_PREFIX):]
+            rest = k[len(KV_PREFIX) :]
             obj_id, exp_s = rest.rsplit(":", 1)
             exp = int(exp_s)
             meta = json.loads(v)
@@ -108,26 +122,36 @@ def list_links(db, limit: int = 200, *, include_dead: bool = False) -> list[dict
         if not include_dead and (is_rev or exp <= now):
             continue  # live view skips dead links entirely
         row = db.get_object(obj_id)
-        rows.append({
-            "obj_id": obj_id,
-            "filename": (row["filename"] if row else None),
-            "exists": row is not None,
-            "exp": exp,
-            "expired": exp <= now,
-            "revoked": is_rev,
-            **meta,
-        })
+        rows.append(
+            {
+                "obj_id": obj_id,
+                "filename": (row["filename"] if row else None),
+                "exists": row is not None,
+                "exp": exp,
+                "expired": exp <= now,
+                "revoked": is_rev,
+                **meta,
+            }
+        )
     if include_dead:
         # tombstones whose registration was already purged still show
         known = {(r["obj_id"], r["exp"]) for r in rows}
-        for (obj_id, exp) in revoked:
+        for obj_id, exp in revoked:
             if (obj_id, exp) not in known:
                 row = db.get_object(obj_id)
-                rows.append({"obj_id": obj_id,
-                             "filename": (row["filename"] if row else None),
-                             "exists": row is not None, "exp": exp,
-                             "expired": exp <= now, "revoked": True,
-                             "slug": None, "pw": False, "max_dl": None})
+                rows.append(
+                    {
+                        "obj_id": obj_id,
+                        "filename": (row["filename"] if row else None),
+                        "exists": row is not None,
+                        "exp": exp,
+                        "expired": exp <= now,
+                        "revoked": True,
+                        "slug": None,
+                        "pw": False,
+                        "max_dl": None,
+                    }
+                )
     rows.sort(key=lambda r: r["exp"], reverse=True)
     return rows[: max(1, limit)]
 
@@ -161,7 +185,7 @@ def purge_expired(db, now: int | None = None) -> int:
 def _cleanup_tags(db, obj_id: str) -> None:
     """When an object has no live links left, drop its pw/maxdl/slug tags."""
     for k, _ in db.kv_all():
-        if k.startswith(KV_PREFIX) and k[len(KV_PREFIX):].startswith(obj_id + ":"):
+        if k.startswith(KV_PREFIX) and k[len(KV_PREFIX) :].startswith(obj_id + ":"):
             return  # another live link remains
     for tag in ("pw:", "maxdl:", "dlc:"):
         db.kv_delete(f"{tag}{obj_id}")

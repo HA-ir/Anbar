@@ -1,4 +1,5 @@
 """URL ingest: job lifecycle, filename derivation, error paths."""
+
 from __future__ import annotations
 
 import asyncio
@@ -24,6 +25,7 @@ def test_url_reader_buffers_and_eof():
             async def gen():
                 for p in self._p:
                     yield p
+
             return gen()
 
     async def run():
@@ -46,6 +48,7 @@ def test_url_reader_idle_timeout():
             async def gen():
                 yield b"x"
                 await asyncio.sleep(3600)
+
             return gen()
 
     async def run():
@@ -58,6 +61,7 @@ def test_url_reader_idle_timeout():
 
 def test_run_job_rejects_bad_status(client, monkeypatch):
     """Origin 404 → job state=error with message."""
+
     class FakeResp:
         status_code = 404
         headers = {}
@@ -83,8 +87,15 @@ def test_run_job_rejects_bad_status(client, monkeypatch):
 
     monkeypatch.setattr("anbar.api.ingest.httpx.AsyncClient", FakeClient)
     app = client.app
-    JOBS["t1"] = {"state": "pulling", "bytes": 0, "chunks": 0,
-                  "started": 0.0, "key": None, "object": None, "error": None}
+    JOBS["t1"] = {
+        "state": "pulling",
+        "bytes": 0,
+        "chunks": 0,
+        "started": 0.0,
+        "key": None,
+        "object": None,
+        "error": None,
+    }
     asyncio.run(_run_job(app, "t1", "https://x/nope.bin", None))
     assert JOBS["t1"]["state"] == "error"
     assert "HTTP 404" in JOBS["t1"]["error"]

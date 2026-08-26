@@ -4,12 +4,13 @@ When multiple bot tokens are configured, BotPool round-robins CDN download
 requests across different bot tokens to distribute Telegram's per-bot rate
 limits and eliminate CDN queuing stalls on massive multi-gigabyte transfers.
 """
+
 from __future__ import annotations
 
 import asyncio
 import itertools
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 from .base import ObjectRef
 from .bot_backend import BotBackend

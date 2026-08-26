@@ -1,4 +1,5 @@
 """anbarctl put/get round-trip end-to-end (threaded uvicorn + real files)."""
+
 from __future__ import annotations
 
 import os
@@ -25,9 +26,12 @@ def _free_port() -> int:
 def _run(base: str, key: str, *args, timeout: int = 30):
     env = {**os.environ, "ANBAR_BASE_URL": base, "ANBAR_ADMIN_KEY": key}
     return subprocess.run(
-        [sys.executable, "-m", "anbar.cli", "--base-url", base,
-         "--admin-key", key, *args],
-        capture_output=True, text=True, timeout=timeout, env=env)
+        [sys.executable, "-m", "anbar.cli", "--base-url", base, "--admin-key", key, *args],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=env,
+    )
 
 
 def test_cli_put_get_roundtrip(monkeypatch):
@@ -40,8 +44,7 @@ def test_cli_put_get_roundtrip(monkeypatch):
     s.close()
     monkeypatch.setenv("ANBAR_BASE_URL", f"http://127.0.0.1:{port}")
     app = create_app(FakeBackend())
-    config = uvicorn.Config(app, host="127.0.0.1", port=port,
-                            log_level="error")
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()

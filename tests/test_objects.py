@@ -1,4 +1,5 @@
 """F2: object layer — manifest round-trip and range mapping (pure logic)."""
+
 from __future__ import annotations
 
 import pytest

@@ -8,6 +8,7 @@ uploads, so memory stays bounded by chunk size. The job runs in the
 background; the UI polls `GET /api/v1/upload/url/{job_id}` for progress
 (bytes pulled, chunk count) and the finished object payload.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -34,7 +35,7 @@ _SEM = asyncio.Semaphore(MAX_CONCURRENT)
 
 # streaming knobs
 CONNECT_TIMEOUT = 15.0
-IDLE_TIMEOUT = 60.0          # no bytes from origin for this long → abort
+IDLE_TIMEOUT = 60.0  # no bytes from origin for this long → abort
 MAX_REDIRECTS = 5
 
 
@@ -51,15 +52,11 @@ class _UrlReader:
         while len(self._buf) < n and not self._eof:
             piece = b""
             try:
-                piece = await asyncio.wait_for(
-                    self._aiter.__anext__(), timeout=self._timeout
-                )
+                piece = await asyncio.wait_for(self._aiter.__anext__(), timeout=self._timeout)
             except StopAsyncIteration:
                 self._eof = True
             except TimeoutError as e:
-                raise RuntimeError(
-                    f"origin stalled: no bytes for {self._timeout:.0f}s"
-                ) from e
+                raise RuntimeError(f"origin stalled: no bytes for {self._timeout:.0f}s") from e
             if piece:
                 self._buf += piece
         out, self._buf = self._buf[:n], self._buf[n:]
@@ -93,18 +90,18 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
     settings = app.state.settings
     async with _SEM:
         try:
-            timeout = httpx.Timeout(settings.ingest_read_timeout_s,
-                                    connect=CONNECT_TIMEOUT)
+            timeout = httpx.Timeout(settings.ingest_read_timeout_s, connect=CONNECT_TIMEOUT)
             async with httpx.AsyncClient(
-                follow_redirects=True, max_redirects=MAX_REDIRECTS,
-                timeout=timeout, headers={"user-agent": "anbar-ingest/0.8"},
+                follow_redirects=True,
+                max_redirects=MAX_REDIRECTS,
+                timeout=timeout,
+                headers={"user-agent": "anbar-ingest/0.8"},
             ) as client:
                 async with client.stream("GET", url) as resp:
                     if resp.status_code >= 400:
                         raise RuntimeError(f"origin returned HTTP {resp.status_code}")
                     fname = filename or _filename_from_url(url, resp.headers)
-                    ctype = _guess_content_type(resp.headers,
-                                                "application/octet-stream")
+                    ctype = _guess_content_type(resp.headers, "application/octet-stream")
                     decl = int(resp.headers.get("content-length", "0") or 0)
                     if decl and decl > settings.max_upload_mb * 1024 * 1024:
                         raise RuntimeError("remote file exceeds configured ceiling")
@@ -129,8 +126,12 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                     async def put(data: bytes, media: bool = False) -> None:
                         ref = await on_chunk(data)
                         manifest.chunks.append(
-                            Chunk(index=len(manifest.chunks), size=len(data),
-                                  file_id=ref.file_id, message_id=ref.message_id)
+                            Chunk(
+                                index=len(manifest.chunks),
+                                size=len(data),
+                                file_id=ref.file_id,
+                                message_id=ref.message_id,
+                            )
                         )
 
                     try:
@@ -139,9 +140,11 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                         for c in manifest.chunks:  # best-effort rollback
                             try:
                                 await app.state.backend.delete(
-                                    ObjectRef(file_id=c.file_id,
-                                              message_id=c.message_id,
-                                              backend=app.state.backend.name)
+                                    ObjectRef(
+                                        file_id=c.file_id,
+                                        message_id=c.message_id,
+                                        backend=app.state.backend.name,
+                                    )
                                 )
                             except Exception:  # noqa: BLE001
                                 pass
@@ -151,17 +154,19 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                     # commit into the DB exactly like a normal upload
                     obj_id = new_object_id()
                     db = app.state.db
-                    db.insert_object({
-                        "id": obj_id,
-                        "file_id": manifest.chunks[0].file_id,
-                        "backend": app.state.backend.name,
-                        "filename": fname,
-                        "size": manifest.total_size,
-                        "content_type": ctype,
-                        "sha256": sha,
-                        "manifest": manifest.to_json(),
-                        "uploader_key": job.get("key"),
-                    })
+                    db.insert_object(
+                        {
+                            "id": obj_id,
+                            "file_id": manifest.chunks[0].file_id,
+                            "backend": app.state.backend.name,
+                            "filename": fname,
+                            "size": manifest.total_size,
+                            "content_type": ctype,
+                            "sha256": sha,
+                            "manifest": manifest.to_json(),
+                            "uploader_key": job.get("key"),
+                        }
+                    )
                     job["object"] = {
                         "id": obj_id,
                         "url": f"/f/{obj_id}",
@@ -179,10 +184,13 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                     try:
                         await asyncio.wait_for(
                             notify_ingest_done(
-                                app.state.backend, settings.base_url,
-                                job["object"], url,
+                                app.state.backend,
+                                settings.base_url,
+                                job["object"],
+                                url,
                                 _t.time() - job["started"],
-                            ), timeout=10,
+                            ),
+                            timeout=10,
                         )
                     except Exception:  # noqa: BLE001
                         pass
@@ -208,13 +216,16 @@ async def upload_url(request: Request):
 
     job_id = uuid.uuid4().hex[:12]
     JOBS[job_id] = {
-        "state": "pulling", "bytes": 0, "chunks": 0, "total": 0,
-        "started": time.time(), "key": None,
-        "object": None, "error": None,
+        "state": "pulling",
+        "bytes": 0,
+        "chunks": 0,
+        "total": 0,
+        "started": time.time(),
+        "key": None,
+        "object": None,
+        "error": None,
     }
-    asyncio.get_running_loop().create_task(
-        _run_job(request.app, job_id, url, filename)
-    )
+    asyncio.get_running_loop().create_task(_run_job(request.app, job_id, url, filename))
     return {"job_id": job_id}
 
 

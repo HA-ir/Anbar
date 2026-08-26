@@ -1,4 +1,5 @@
 """F5: MTProto backend contract with a mock Telethon client + wiring."""
+
 from __future__ import annotations
 
 import io
@@ -69,17 +70,15 @@ class FakeClient:
         elif hasattr(file, "id") and hasattr(file, "parts"):
             # InputFileBig handle from _upload_parallel: reassemble parts
             fid = file.id
-            payload = b"".join(
-                self._parts.get((fid, i * 524288), b"")
-                for i in range(file.parts)
-            )
+            payload = b"".join(self._parts.get((fid, i * 524288), b"") for i in range(file.parts))
         else:
             payload = self._last_upload
         self._msgs[msg_id] = _Msg(msg_id, msg_id, payload)
         return self._msgs[msg_id]
 
-    async def upload_file(self, file, file_size: int | None = None,
-                          part_size_kb: float | None = None, **kw):
+    async def upload_file(
+        self, file, file_size: int | None = None, part_size_kb: float | None = None, **kw
+    ):
         if isinstance(file, io.BytesIO):
             file.seek(0)
             self._last_upload = file.read()
@@ -107,6 +106,7 @@ class FakeClient:
     def iter_download(self, msg, request_size: int = 1048576):
         async def _gen():
             yield msg._data
+
         return _gen()
 
     async def delete_messages(self, entity, message_id: int) -> None:
@@ -114,8 +114,7 @@ class FakeClient:
 
 
 def _backend(client: FakeClient, session_file: str = "/tmp/x.session") -> MTProtoBackend:
-    return MTProtoBackend(api_id=1, api_hash="h", session_file=session_file,
-                          client=client)
+    return MTProtoBackend(api_id=1, api_hash="h", session_file=session_file, client=client)
 
 
 def _touch(path: str) -> str:
@@ -179,8 +178,13 @@ async def test_delete_without_message_id_is_noop():
 
 
 async def test_default_backend_wires_mtproto():
-    settings = Settings(backend=Backend.MTPROTO, api_id=123, api_hash="abc",
-                        session_file="/tmp/s.session", env_file=None)
+    settings = Settings(
+        backend=Backend.MTPROTO,
+        api_id=123,
+        api_hash="abc",
+        session_file="/tmp/s.session",
+        env_file=None,
+    )
     be = _default_backend(settings)
     assert isinstance(be, MTProtoBackend)
     assert be.max_upload_bytes == 2 * 1024 * 1024 * 1024
@@ -206,15 +210,19 @@ async def test_chunk_size_backend_aware():
 
     # the mtproto cap itself is configurable
     mp256 = Settings(
-        backend=Backend.MTPROTO, chunk_size_mb=256,
-        mtproto_chunk_cap_mb=256, env_file=None,
+        backend=Backend.MTPROTO,
+        chunk_size_mb=256,
+        mtproto_chunk_cap_mb=256,
+        env_file=None,
     )
     assert mp256.chunk_size == 256 * 1024 * 1024
 
     # configured value below the raised cap still wins (cap never raises)
     mp128 = Settings(
-        backend=Backend.MTPROTO, chunk_size_mb=128,
-        mtproto_chunk_cap_mb=256, env_file=None,
+        backend=Backend.MTPROTO,
+        chunk_size_mb=128,
+        mtproto_chunk_cap_mb=256,
+        env_file=None,
     )
     assert mp128.chunk_size == 128 * 1024 * 1024
 

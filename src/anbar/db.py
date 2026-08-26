@@ -1,4 +1,5 @@
 """SQLite metadata store (WAL mode). Metadata only — files never live here."""
+
 from __future__ import annotations
 
 import json
@@ -71,18 +72,22 @@ class Database:
                 manifest, uploader_key, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                obj["id"], obj["file_id"], obj["backend"], obj["filename"],
-                obj["size"], obj.get("content_type"), obj.get("sha256"),
-                obj.get("manifest"), obj.get("uploader_key"),
+                obj["id"],
+                obj["file_id"],
+                obj["backend"],
+                obj["filename"],
+                obj["size"],
+                obj.get("content_type"),
+                obj.get("sha256"),
+                obj.get("manifest"),
+                obj.get("uploader_key"),
                 obj.get("created_at", int(time.time())),
             ),
         )
         self._conn.commit()
 
     def get_object(self, obj_id: str, *, include_trashed: bool = False) -> dict[str, Any] | None:
-        row = self._conn.execute(
-            "SELECT * FROM objects WHERE id = ?", (obj_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM objects WHERE id = ?", (obj_id,)).fetchone()
         if row is None:
             return None
         d = dict(row)
@@ -90,10 +95,11 @@ class Database:
             return None  # soft-deleted rows vanish from the normal path
         return d
 
-    def list_objects(self, limit: int = 50, offset: int = 0,
-                     trash: bool = False) -> list[dict[str, Any]]:
+    def list_objects(
+        self, limit: int = 50, offset: int = 0, trash: bool = False
+    ) -> list[dict[str, Any]]:
         where = "WHERE deleted_at IS NOT NULL" if trash else "WHERE deleted_at IS NULL"
-        order = ("deleted_at DESC" if trash else "created_at DESC")
+        order = "deleted_at DESC" if trash else "created_at DESC"
         rows = self._conn.execute(
             f"SELECT id, filename, size, backend, created_at, downloaded, deleted_at "
             f"FROM objects {where} ORDER BY {order} LIMIT ? OFFSET ?",
@@ -102,8 +108,7 @@ class Database:
         out = [{**dict(r), "chunks": 0} for r in rows]
         return out
 
-    def list_objects_full(self, limit: int = 500,
-                          trash: bool = False) -> list[dict[str, Any]]:
+    def list_objects_full(self, limit: int = 500, trash: bool = False) -> list[dict[str, Any]]:
         """Listing that includes manifests (needed for ZIP/purge work)."""
         where = "WHERE deleted_at IS NOT NULL" if trash else "WHERE deleted_at IS NULL"
         rows = self._conn.execute(
@@ -117,9 +122,20 @@ class Database:
                 d["chunks"] = len(json.loads(d["manifest"])["chunks"]) if d.get("manifest") else 0
             except (json.JSONDecodeError, KeyError, TypeError):
                 d["chunks"] = 0
-            return_list = ["id", "filename", "size", "backend", "created_at",
-                           "downloaded", "chunks", "content_type", "manifest",
-                           "uploader_key", "file_id", "deleted_at"]
+            return_list = [
+                "id",
+                "filename",
+                "size",
+                "backend",
+                "created_at",
+                "downloaded",
+                "chunks",
+                "content_type",
+                "manifest",
+                "uploader_key",
+                "file_id",
+                "deleted_at",
+            ]
             out.append({k: d[k] for k in return_list if k in d})
         return out
 
@@ -147,7 +163,8 @@ class Database:
 
     def trash_count(self) -> int:
         row = self._conn.execute(
-            "SELECT COUNT(*) AS n FROM objects WHERE deleted_at IS NOT NULL").fetchone()
+            "SELECT COUNT(*) AS n FROM objects WHERE deleted_at IS NOT NULL"
+        ).fetchone()
         return row["n"]
 
     def purge_expired_trash(self) -> list[str]:
@@ -164,20 +181,17 @@ class Database:
         ).fetchall()
         ids = [r["id"] for r in rows]
         if ids:
-            self._conn.executemany(
-                "DELETE FROM objects WHERE id = ?", [(i,) for i in ids])
+            self._conn.executemany("DELETE FROM objects WHERE id = ?", [(i,) for i in ids])
             self._conn.commit()
         return ids
 
     def rename_object(self, obj_id: str, filename: str) -> bool:
-        cur = self._conn.execute(
-            "UPDATE objects SET filename = ? WHERE id = ?", (filename, obj_id))
+        cur = self._conn.execute("UPDATE objects SET filename = ? WHERE id = ?", (filename, obj_id))
         self._conn.commit()
         return cur.rowcount > 0
 
     def bump_downloads(self, obj_id: str) -> None:
-        self._conn.execute("UPDATE objects SET downloaded = downloaded + 1 WHERE id = ?",
-                           (obj_id,))
+        self._conn.execute("UPDATE objects SET downloaded = downloaded + 1 WHERE id = ?", (obj_id,))
         self._conn.commit()
 
     # -- kv (toggles, stats) ---------------------------------------------
@@ -221,8 +235,7 @@ class Database:
             (key, win_start, win_start, win_start, now, win_start),
         )
         self._conn.commit()
-        row = self._conn.execute(
-            "SELECT window_start, n FROM rate WHERE k = ?", (key,)).fetchone()
+        row = self._conn.execute("SELECT window_start, n FROM rate WHERE k = ?", (key,)).fetchone()
         n = row["n"] if row else 1
         if row is not None and row["window_start"] < win_start:  # pragma: no cover
             n = 1

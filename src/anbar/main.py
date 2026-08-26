@@ -1,4 +1,5 @@
 """anbar: Telegram-backed object storage (zero local file retention)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -99,6 +100,7 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
 
     app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
     from .api import ingest  # local import: optional URL-ingest feature
+
     app.include_router(ingest.router, prefix="/api/v1", tags=["ingest"])
     app.include_router(download.router, prefix="/f", tags=["download"])
     app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
@@ -157,6 +159,7 @@ def _build_cache(settings, db=None):
     budget_mb = settings.cache_max_mb
     if db is not None:
         from . import runtime
+
         budget_mb = runtime.get_int(db, "cache_mb", settings.cache_max_mb)
     if budget_mb <= 0:
         return None

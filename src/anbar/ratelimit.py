@@ -1,4 +1,5 @@
 """Fixed-window rate limits backed by SQLite (F6). No Redis required."""
+
 from __future__ import annotations
 
 import hashlib
@@ -19,7 +20,8 @@ def _client_ip(request: Request) -> str:
 
 def _raise_limited(retry_after: int) -> None:
     raise HTTPException(
-        status_code=429, detail="rate limited",
+        status_code=429,
+        detail="rate limited",
         headers={"Retry-After": str(retry_after)},
     )
 
@@ -29,8 +31,7 @@ def limit_download(db: Database, request: Request, obj_id: str, limit: int) -> N
     an anonymous hammerer gets 429, not an endless 401/403 loop."""
     if limit <= 0:
         return
-    ok, retry_after, _n = db.rate_check(f"dl:{_client_ip(request)}:{obj_id}",
-                                        _WINDOW_S, limit)
+    ok, retry_after, _n = db.rate_check(f"dl:{_client_ip(request)}:{obj_id}", _WINDOW_S, limit)
     if not ok:
         _raise_limited(retry_after)
 

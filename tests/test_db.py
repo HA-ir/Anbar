@@ -1,4 +1,5 @@
 """F1: DB layer contract (WAL, objects CRUD, kv)."""
+
 from __future__ import annotations
 
 import time
@@ -8,9 +9,15 @@ from anbar.db import Database
 
 def _obj(id: str, **kw) -> dict:
     base = {
-        "id": id, "file_id": "fake-1", "backend": "fake",
-        "filename": f"{id}.bin", "size": 123, "content_type": "application/octet-stream",
-        "sha256": "0" * 64, "manifest": None, "uploader_key": None,
+        "id": id,
+        "file_id": "fake-1",
+        "backend": "fake",
+        "filename": f"{id}.bin",
+        "size": 123,
+        "content_type": "application/octet-stream",
+        "sha256": "0" * 64,
+        "manifest": None,
+        "uploader_key": None,
         "created_at": int(time.time()),
     }
     base.update(kw)

@@ -1,4 +1,5 @@
 """F4: anbarctl end-to-end against a live server (threaded uvicorn)."""
+
 from __future__ import annotations
 
 import socket
@@ -52,7 +53,11 @@ def test_cli_auth_toggle_and_objects():
         # version (no server needed)
         r = subprocess.run(
             [sys.executable, "-m", "anbar.cli", "version"],
-            capture_output=True, text=True, env=env, timeout=30)
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=30,
+        )
         assert r.returncode == 0 and "anbar" in r.stdout
 
         # auth on -> off -> on

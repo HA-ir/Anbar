@@ -1,4 +1,5 @@
 """Resume: checkpoint kv bumps per chunk; resume drains stored chunks."""
+
 from __future__ import annotations
 
 import pytest
@@ -47,14 +48,13 @@ async def test_resume_flow(client, monkeypatch):
     # chunker reads 8-byte pieces; settings.chunk_size is huge in tests,
     # so the reader's own read(n) drives piece boundaries — one chunk per
     # EOF. To get 3 chunks we monkeypatch the effective chunk size.
-    monkeypatch.setattr(type(app.state.settings), "chunk_size",
-                        property(lambda self: 8))
+    monkeypatch.setattr(type(app.state.settings), "chunk_size", property(lambda self: 8))
 
     req = FakeReq(app)
     with pytest.raises(Exception, match="storage error: boom"):
-        await up._store_stream(req, req.stream(), "f.bin",
-                               upload_id="u1", resume_from=0)
+        await up._store_stream(req, req.stream(), "f.bin", upload_id="u1", resume_from=0)
     import json as _json
+
     ck = _json.loads(db.kv_get("upres:u1") or "[]")
     assert len(ck) == 2  # two chunks checkpointed before the failure
 
@@ -62,9 +62,13 @@ async def test_resume_flow(client, monkeypatch):
     calls["n"] = 0
     req2 = FakeReq(app)
     manifest, sha = await up._store_stream(
-        req2, req2.stream(), "f.bin", upload_id="u1", resume_from=2,
+        req2,
+        req2.stream(),
+        "f.bin",
+        upload_id="u1",
+        resume_from=2,
     )
-    assert calls["n"] == 1          # only the third chunk hit the backend
+    assert calls["n"] == 1  # only the third chunk hit the backend
     assert len(manifest.chunks) == 3
     # pre-seeded chunk metadata preserved from the checkpoint
     assert [c.size for c in manifest.chunks] == [8, 8, 8]

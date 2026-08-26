@@ -1,4 +1,5 @@
 """Dynamic API keys: create → use → list (masked) → revoke."""
+
 from __future__ import annotations
 
 ADMIN = {"Authorization": "Bearer test-admin-key"}

@@ -1,4 +1,5 @@
 """v0.9.5: pretty link names (slugs) + ttl=0 "never" links."""
+
 from __future__ import annotations
 
 import io
@@ -8,8 +9,11 @@ ADMIN = {"Authorization": "Bearer test-admin-key"}
 
 
 def _upload(client, name="doc.bin", content=b"data"):
-    r = client.post("/api/v1/upload", headers=ADMIN,
-                    files={"file": (name, io.BytesIO(content), "application/octet-stream")})
+    r = client.post(
+        "/api/v1/upload",
+        headers=ADMIN,
+        files={"file": (name, io.BytesIO(content), "application/octet-stream")},
+    )
     assert r.status_code == 200, r.text
     j = r.json()
     obj = j.get("object") or j
@@ -34,6 +38,7 @@ def test_slug_signed_link_roundtrip(client):
     r = client.post(f"/f/{oid}/link?ttl=600&slug=pretty", headers=ADMIN).json()
     # mint a signed link too, then fetch via the pretty path with its query
     import urllib.parse
+
     u = urllib.parse.urlparse(r["url"])
     got = client.get("/f/pretty?" + u.query)
     assert got.status_code == 200, got.text
