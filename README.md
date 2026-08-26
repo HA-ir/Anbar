@@ -232,6 +232,17 @@ chunks stored cleanly.
 > sha-256 verified end-to-end; the file is preserved on the server for
 > re-benchmarks.
 
+**Download acceleration (`mtproto_export_conns`)** — an admin-tunable
+runtime setting (0–8, default **0** = off) exposed via `POST /admin/settings`.
+Telegram's MTProto rejects `auth.exportAuthorization` for the DC the session
+already lives on (`DC_ID_INVALID`), so true multi-socket downloads would need
+a second account login; with one session the setting instead widens the
+pipelined `upload.GetFile` window (value × 4 requests in flight, cap 16).
+Measured effect: short bursts reach ~9 MB/s but sustained throughput drops
+below the plain baseline (~3.1 vs ~3.9 MB/s at 1 GB) because Telegram paces
+per-IP `GetFile` volume — hence the default stays off unless future testing
+shows otherwise.
+
 **How to read this**
 
 - **Upload** holds ~4 MB/s from 8 MB up to multi-GB sizes — one pipelined
