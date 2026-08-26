@@ -210,9 +210,9 @@ to Telegram without touching local disk. Download numbers are first GETs.
 
 | Size | Chunk | Upload | Download | SHA-256 |
 |------|-------|--------|----------|---------|
-| 1 MB | 49 MB | 0.5 s — 2.0 MB/s | 0.3 s — 2.9 MB/s | OK |
-| 8 MB | 49 MB | 1.8 s — 4.5 MB/s | 2.3 s — 3.4 MB/s | OK |
-| 45 MB | 49 MB | 10.8 s — 4.2 MB/s | 13.2 s — 3.4 MB/s | OK |
+| 1 MB | 49 MB | 0.3 s — 3.1 MB/s | 0.2 s — 6.2 MB/s | OK |
+| 8 MB | 49 MB | 0.9 s — 9.4 MB/s | 1.3 s — 6.3 MB/s | OK |
+| 45 MB | 49 MB | 4.7 s — 9.6 MB/s | 8.9 s — 5.0 MB/s | OK |
 | 100 MB | 49 MB | 10.3 s — 9.8 MB/s | 26.1 s — 3.8 MB/s | OK |
 | 1 GB | 49 MB | 92.8 s — 11.0 MB/s | 269.4 s — 3.8 MB/s | OK |
 | 5 GB | 49 MB | 1417.9 s — 3.6 MB/s | 1608.7 s — 3.2 MB/s | OK |
@@ -225,12 +225,13 @@ to Telegram without touching local disk. Download numbers are first GETs.
 anbar or Telegram: every byte streamed through the server live and all 220
 chunks stored cleanly.
 
-> The 49 MB-chunk rows (100 MB, 1 GB, 10 GB) were re-measured after switching
-> to cryptg-accelerated parallel uploads: upload jumped ~4 → ~11 MB/s
-> (2.7x, RTT-bound single-stream was the old ceiling) and download rose
-> 3.4 → 3.9 MB/s. The 10 GB row streamed straight from a local origin with
-> sha-256 verified end-to-end; the file is preserved on the server for
-> re-benchmarks.
+> All 49 MB-chunk rows were re-measured on the cryptg build
+> (2026-08-25): upload jumped ~4 → ~11 MB/s at ≥100 MB and 4.2–4.5 →
+> 9.4–9.6 MB/s for the small rows (RTT-bound single-stream was the old
+> ceiling); download rose to 5–6.3 MB/s below 50 MB and holds ~3.9 MB/s
+> beyond that (Telegram's per-IP GetFile pacing). Every row is sha-256
+> verified end-to-end; the 10 GB payload streamed straight from a local
+> origin and the file is preserved on the server for re-benchmarks.
 
 **Download acceleration (`mtproto_export_conns`)** — an admin-tunable
 runtime setting (0–8, default **0** = off) exposed via `POST /admin/settings`.
@@ -248,8 +249,11 @@ shows otherwise.
 - **Upload** holds ~4 MB/s from 8 MB up to multi-GB sizes — one pipelined
   MTProto connection, no flood pacing needed (raw part uploads do not hit the
   per-chat message limit that `sendDocument` does).
-- **Download** is flat ~3.2–3.4 MB/s regardless of size: bounded by a single
-  `iter_download` connection to Telegram's DC.
+- **Download** runs 5–6.3 MB/s for small objects and settles at ~3.9 MB/s
+  for large ones: bounded by Telegram's per-IP `GetFile` pacing on a single
+  MTProto connection (the bot backend rides Telegram's public CDN edge, so
+  its download column in the v0.10.8 table is faster — different transport,
+  not a faster anbar).
 - Chunk size barely matters for throughput (compare the 49 MB vs 256 MB
   rows); smaller chunks resume cheaper and keep per-chunk RAM low, so 49 MB
   stays the default.
