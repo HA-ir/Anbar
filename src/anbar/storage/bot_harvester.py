@@ -81,15 +81,7 @@ class BotHarvester:
         chat = msg.get("chat", {})
         chat_id_str = str(chat.get("id", ""))
         log.info("harvester update: msg_id=%s chat_id=%s", msg.get("message_id"), chat_id_str)
-        # Filter by channel if configured
-        if self.channel_id and chat_id_str and chat_id_str != self.channel_id:
-            # Handle possible -100 prefix discrepancies
-            norm_conf = self.channel_id.removeprefix("-100")
-            norm_chat = chat_id_str.removeprefix("-100")
-            if norm_conf != norm_chat:
-                log.info("harvester skipping chat_id %s (conf: %s)", chat_id_str, self.channel_id)
-                return
-
+        # Process document uploads from any channel the bot is member of (or match configured)
         extracted = self._extract_file_id(msg)
         if extracted:
             mid, fid = extracted
