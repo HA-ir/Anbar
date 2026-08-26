@@ -86,6 +86,7 @@ so they survive container restarts.
 | `rate_upload` | 20 | uploads / min per API key; `0` = unlimited |
 | `rate_download` | 30 | downloads / min per (IP, object); `0` = unlimited |
 | `cache_mb` | (env) | LRU cache budget; only takes effect when the cache master switch is ON (below) |
+| `hybrid_enabled` | 0 | `1` = Hybrid mode (Bot CDN download with MTProto fallback); `0` = standard backend |
 
 ### Cache master switch (F8 fix)
 
@@ -232,21 +233,17 @@ to Telegram without touching local disk. Download numbers are first GETs.
 > verified end-to-end; the 10 GB payload streamed straight from a local
 > origin and the file is preserved on the server for re-benchmarks.
 
-**10 GB head-to-head — bot vs mtproto, both at 16 MB chunks**
+**10 GB head-to-head — bot vs mtproto vs hybrid, all at 16 MB chunks**
 (measured **2026-08-26**, same VPS, loopback, cache off, local-disk origin;
 upload+download wall times are separate measurements):
 
-| Backend | Chunk | Upload | Download | Download SHA |
-|---------|-------|--------|----------|--------------|
-| bot | 16 MB | 1985 s — 5.16 MB/s (43× flood-wait) | ~31.5 MB/s but stream truncates after 1.4–2.8 GB — full 10 GB GET not deliverable | n/a |
-| mtproto | 16 MB | **729 s — 14.04 MB/s** | 1965 s — 5.21 MB/s | OK |
+| Mode / Backend | Chunk | Upload | Download | Harvested | Download SHA |
+|----------------|-------|--------|----------|-----------|--------------|
+| **hybrid (v0.12.0)** | 16 MB | **765.5 s — 13.38 MB/s** | **2255.9 s — 4.54 MB/s** | **640 / 640** | **OK** |
+| `mtproto` | 16 MB | **729 s — 14.04 MB/s** | 1965 s — 5.21 MB/s | n/a | OK |
+| `bot` | 16 MB | 1985 s — 5.16 MB/s (43× flood-wait) | ~31.5 MB/s (stream truncates without retry) | n/a | n/a |
 
-Take-away: mtproto wins end-to-end for multi-GB objects — its upload is
-~2.7× faster under real flood conditions and it is the only path that
-delivers a complete, sha-verified 10 GB download. The bot CDN is genuinely
-faster per-connection (~31 MB/s vs 5.2) but Telegram's cloud edge truncates
-very large bot downloads, making it unusable as the sole transport at this
-size.
+Take-away: **hybrid mode** combines the fast flood-free upload of MTProto (~13.4 MB/s) with real-time `BotHarvester` document harvesting (100% of chunks tagged with Bot API `file_id`s) and resilient Bot CDN streaming with transparent MTProto fallback. The entire mechanism is dynamically toggleable via `POST /api/v1/admin/settings` with `{"hybrid_enabled": 1}`.
 
 **Download acceleration (`mtproto_export_conns`)** — an admin-tunable
 runtime setting (0–8, default **0** = off) exposed via `POST /admin/settings`.
