@@ -87,6 +87,7 @@ so they survive container restarts.
 | `rate_download` | 30 | downloads / min per (IP, object); `0` = unlimited |
 | `cache_mb` | (env) | LRU cache budget; only takes effect when the cache master switch is ON (below) |
 | `hybrid_enabled` | 0 | `1` = Hybrid mode (Bot CDN download with MTProto fallback); `0` = standard backend |
+| `hybrid_bot_timeout_ms` | 1500 | Max milliseconds to wait for Bot CDN response before falling back to MTProto (default 1.5s) |
 
 ### Cache master switch (F8 fix)
 
@@ -244,6 +245,14 @@ upload+download wall times are separate measurements):
 | `bot` | 16 MB | 1985 s — 5.16 MB/s (43× flood-wait) | ~31.5 MB/s (stream truncates without retry) | n/a | n/a |
 
 Take-away: **hybrid mode** combines the fast flood-free upload of MTProto (~13.4 MB/s) with real-time `BotHarvester` document harvesting (100% of chunks tagged with Bot API `file_id`s) and resilient Bot CDN streaming with transparent MTProto fallback. The entire mechanism is dynamically toggleable via `POST /api/v1/admin/settings` with `{"hybrid_enabled": 1}`.
+
+### Multi-Bot Token Pool (`ANBAR_BOT_TOKENS`)
+
+To scale Bot CDN downloads beyond Telegram's per-bot rate limitations, multiple bot tokens can be supplied via `ANBAR_BOT_TOKENS="tok1,tok2,tok3"` (or via `ANBAR_BOT_TOKEN`). When multiple bots are present:
+- All bots are added as administrators to the storage channel.
+- `BotPool` round-robins CDN chunk retrieval across the token pool.
+- Bot rate limits and 120s queue stalls are distributed across bots, drastically multiplying multi-gigabyte sustained CDN throughput.
+- If any bot encounter stalls or errors, the fast-failover immediately routes the chunk to MTProto.
 
 **Download acceleration (`mtproto_export_conns`)** — an admin-tunable
 runtime setting (0–8, default **0** = off) exposed via `POST /admin/settings`.

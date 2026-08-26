@@ -28,6 +28,8 @@ SPEC = {
     # hybrid mode: when enabled and backend is mtproto, chunks with bot_file_id
     # are downloaded via high-speed Bot CDN with fallback to mtproto.
     "hybrid_enabled": (0, 1),
+    # hybrid bot fallback timeout in milliseconds (e.g. 1500 = 1.5s)
+    "hybrid_bot_timeout_ms": (200, 30_000),
 }
 
 

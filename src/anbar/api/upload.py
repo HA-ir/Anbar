@@ -163,6 +163,7 @@ async def _store_stream(request: Request, stream, filename: str,
                     e, len(manifest.chunks))
         raise HTTPException(408, f"client stalled: {e}") from e
     except Exception as e:
+        log.exception("upload chunk failed with error: %s", e)
         for c in manifest.chunks:  # best-effort rollback of posted blobs
             try:
                 await backend.delete(

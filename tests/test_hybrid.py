@@ -43,3 +43,25 @@ async def test_bot_harvester_event_resolution():
     fid = await harvester.get_file_id_for_message(999, timeout=0.1)
     assert fid == "bot_harvested_abc123"
     await harvester.stop()
+
+
+def test_bot_pool_initialization_and_properties():
+    from anbar.storage.bot_pool import BotPool
+
+    pool = BotPool(["TOKEN_A", "TOKEN_B", "TOKEN_C"], "-100123456789")
+    assert pool.size == 3
+    assert pool.primary is not None
+    assert pool.primary.bot_token == "TOKEN_A"
+
+
+def test_config_bot_tokens_parsing():
+    from pydantic import SecretStr
+    from anbar.config import Settings
+
+    s = Settings(
+        channel_id="-100123",
+        ANBAR_BOT_TOKENS="tok1, tok2 , tok3",
+        bot_token=SecretStr("tok4"),
+    )
+    assert s.bot_tokens == ["tok1", "tok2", "tok3", "tok4"]
+    assert s.hybrid_bot_timeout_s == 1.5

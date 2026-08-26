@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     # storage
     backend: Backend = Backend.BOT
     bot_token: SecretStr | None = None
+    bot_tokens_raw: str | None = Field(default=None, alias="ANBAR_BOT_TOKENS")
     channel_id: str = ""  # private channel the bot administers (backend=bot)
     api_id: int | None = None
     api_hash: str = ""
@@ -80,6 +81,19 @@ class Settings(BaseSettings):
 
     # hybrid store (v0.12.0)
     hybrid_enabled: bool = False
+    hybrid_bot_timeout_s: float = Field(default=1.5, ge=0.2, le=30.0)
+
+    @property
+    def bot_tokens(self) -> list[str]:
+        """List of all available bot tokens (pool)."""
+        tokens: list[str] = []
+        if self.bot_tokens_raw:
+            tokens.extend(t.strip() for t in self.bot_tokens_raw.split(",") if t.strip())
+        if self.bot_token:
+            val = self.bot_token.get_secret_value().strip()
+            if val and val not in tokens:
+                tokens.append(val)
+        return tokens
 
     # data
     data_dir: Path = Path("data")

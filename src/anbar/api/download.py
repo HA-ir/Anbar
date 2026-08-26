@@ -344,16 +344,24 @@ async def download(request: Request, obj_id: str):
         return StreamingResponse(cached_stream(), status_code=status, headers=headers)
 
     hybrid_on = bool(runtime.get_int(db, "hybrid_enabled", 1 if settings.hybrid_enabled else 0))
+    bot_pool = getattr(request.app.state, "bot_pool", None)
     bot_client = getattr(request.app.state, "bot_client", None)
+    bot_provider = bot_pool or bot_client
+    bot_timeout_ms = runtime.get_int(
+        db,
+        "hybrid_bot_timeout_ms",
+        int(getattr(settings, "hybrid_bot_timeout_s", 1.5) * 1000),
+    )
+    bot_timeout_s = max(0.2, bot_timeout_ms / 1000.0)
 
     async def _fetch_chunk_bytes(chunk_obj) -> bytes:
-        # If hybrid mode is active and we have a bot_file_id and bot_client, try Bot CDN first
-        if hybrid_on and bot_client is not None and chunk_obj.bot_file_id:
+        # If hybrid mode is active and we have a bot_file_id and bot_provider, try Bot CDN first
+        if hybrid_on and bot_provider is not None and chunk_obj.bot_file_id:
             try:
-                # Fast timeout: if Bot CDN is in a 120s queue, fallback to MTProto after 10s
+                # Fast failover: if Bot CDN is in a 120s queue, fallback to MTProto quickly
                 bot_ref = ObjectRef(file_id=chunk_obj.bot_file_id, backend="bot")
-                return await asyncio.wait_for(bot_client.open(bot_ref), timeout=10.0)
-            except Exception as e:
+                return await asyncio.wait_for(bot_provider.open(bot_ref), timeout=bot_timeout_s)
+            except Exception:
                 # Fallback to main backend (MTProto)
                 pass
         ref = ObjectRef(

@@ -76,6 +76,7 @@ class BotBackend(StorageBackend):
         flood_budget_s: float | None = None,
         send_timeout_s: float | None = None,
     ) -> None:
+        self.bot_token = bot_token
         self._channel = channel_id
         self.send_gap_s = send_gap_s if send_gap_s is not None else self.send_gap_s
         self.flood_budget_s = (
