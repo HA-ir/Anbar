@@ -221,9 +221,8 @@ to Telegram without touching local disk. Download numbers are first GETs.
 | 100 MB | 256 MB | 25.0 s — 4.0 MB/s | 32.9 s — 3.0 MB/s | OK |
 | 1 GB | 256 MB | 254.9 s — 4.0 MB/s | 325.4 s — 3.1 MB/s | OK |
 
-\* The 10 GB upload was limited by the test origin (~1.1–1.75 MB/s), not by
-anbar or Telegram: every byte streamed through the server live and all 220
-chunks stored cleanly.
+\* The 10 GB payload streams from local disk (12 x 854 MB parts, sha-256
+`b626371c…` verified on both sides); every chunk stored cleanly.
 
 > All 49 MB-chunk rows were re-measured on the cryptg build
 > (2026-08-25): upload jumped ~4 → ~11 MB/s at ≥100 MB and 4.2–4.5 →
@@ -232,6 +231,22 @@ chunks stored cleanly.
 > beyond that (Telegram's per-IP GetFile pacing). Every row is sha-256
 > verified end-to-end; the 10 GB payload streamed straight from a local
 > origin and the file is preserved on the server for re-benchmarks.
+
+**10 GB head-to-head — bot vs mtproto, both at 16 MB chunks**
+(measured **2026-08-26**, same VPS, loopback, cache off, local-disk origin;
+upload+download wall times are separate measurements):
+
+| Backend | Chunk | Upload | Download | Download SHA |
+|---------|-------|--------|----------|--------------|
+| bot | 16 MB | 1985 s — 5.16 MB/s (43× flood-wait) | ~31.5 MB/s but stream truncates after 1.4–2.8 GB — full 10 GB GET not deliverable | n/a |
+| mtproto | 16 MB | **729 s — 14.04 MB/s** | 1965 s — 5.21 MB/s | OK |
+
+Take-away: mtproto wins end-to-end for multi-GB objects — its upload is
+~2.7× faster under real flood conditions and it is the only path that
+delivers a complete, sha-verified 10 GB download. The bot CDN is genuinely
+faster per-connection (~31 MB/s vs 5.2) but Telegram's cloud edge truncates
+very large bot downloads, making it unusable as the sole transport at this
+size.
 
 **Download acceleration (`mtproto_export_conns`)** — an admin-tunable
 runtime setting (0–8, default **0** = off) exposed via `POST /admin/settings`.
