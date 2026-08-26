@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     # mtproto download acceleration (FastTelethon-style exported auth)
     mtproto_export_conns: int = Field(default=0, ge=0, le=8)  # 0 = off
 
+    # hybrid store (v0.12.0)
+    hybrid_enabled: bool = False
+
     # data
     data_dir: Path = Path("data")
     db_path: Path = Path("data/anbar.db")

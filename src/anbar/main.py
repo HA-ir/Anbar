@@ -46,6 +46,26 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
             await app.state.backend.connect()
         app.state.cache = _build_cache(settings, db)
 
+        # Hybrid support: initialize bot_client and harvester if bot credentials exist
+        app.state.bot_client = None
+        app.state.harvester = None
+        if settings.bot_token and settings.channel_id:
+            from .storage.bot_backend import BotBackend
+            from .storage.bot_harvester import BotHarvester
+            bot_tok = settings.bot_token.get_secret_value()
+            if isinstance(app.state.backend, BotBackend):
+                app.state.bot_client = app.state.backend
+            else:
+                app.state.bot_client = BotBackend(
+                    bot_tok,
+                    settings.channel_id,
+                    send_gap_s=settings.flood_send_gap_s,
+                    flood_budget_s=settings.flood_budget_s,
+                    send_timeout_s=settings.send_timeout_s,
+                )
+            app.state.harvester = BotHarvester(bot_tok, settings.channel_id, db=db)
+            await app.state.harvester.start()
+
         async def _prune_rate_loop() -> None:
             """Drop finished rate windows so the table doesn't grow forever."""
             while True:
@@ -58,6 +78,10 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         prune_task = asyncio.create_task(_prune_rate_loop())
         yield
         prune_task.cancel()
+        if app.state.harvester is not None:
+            await app.state.harvester.stop()
+        if app.state.bot_client is not None and app.state.bot_client is not app.state.backend:
+            await app.state.bot_client.close()
         if app.state.cache is not None:
             app.state.cache.close()
         db.close()

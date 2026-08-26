@@ -231,14 +231,45 @@ class BotBackend(StorageBackend):
             finally:
                 self._last_send_at = asyncio.get_running_loop().time()
 
-    async def open(self, ref: ObjectRef) -> bytes:
-        """Fetch full blob bytes via getFile + CDN (bounded by chunk size)."""
-        info = await self._call("getFile", file_id=ref.file_id)
-        path = info["file_path"]
-        r = await self._file_client.get(path)
-        if r.status_code != 200:
-            raise RuntimeError(f"file CDN returned {r.status_code} for {path}")
-        return r.content
+    async def open(self, ref: ObjectRef, max_retries: int = 5) -> bytes:
+        """Fetch full blob bytes via getFile + CDN (bounded by chunk size).
+
+        Retries on transient network/transport errors, 429, or 5xx responses.
+        """
+        last_exc: Exception | None = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                info = await self._call("getFile", file_id=ref.file_id)
+                path = info["file_path"]
+                r = await self._file_client.get(path)
+                if r.status_code == 200:
+                    return r.content
+                if r.status_code == 429:
+                    retry_after = 5
+                    try:
+                        retry_after = int(r.headers.get("retry-after", "5"))
+                    except ValueError:
+                        pass
+                    log.warning("file CDN rate limited (429), waiting %ds (attempt %d/%d)",
+                                retry_after, attempt, max_retries)
+                    await asyncio.sleep(retry_after)
+                    continue
+                if r.status_code >= 500:
+                    log.warning("file CDN returned %d, retrying (attempt %d/%d)",
+                                r.status_code, attempt, max_retries)
+                    await asyncio.sleep(min(2 ** attempt, 10))
+                    continue
+                raise RuntimeError(f"file CDN returned {r.status_code} for {path}")
+            except (httpx.HTTPError, TelegramError, TimeoutError) as e:
+                last_exc = e
+                wait = min(2 ** attempt, 10)
+                log.warning("bot_backend.open failed (%s: %s), retrying in %ds (attempt %d/%d)",
+                            type(e).__name__, e, wait, attempt, max_retries)
+                await asyncio.sleep(wait)
+            except Exception as e:
+                last_exc = e
+                break
+        raise RuntimeError(f"bot_backend.open failed after {max_retries} attempts: {last_exc}") from last_exc
 
     async def delete(self, ref: ObjectRef) -> bool:
         """Delete the channel message holding this blob.

@@ -36,6 +36,7 @@ def _env_defaults(s) -> dict[str, int]:
         "web_session_ttl": s.web_session_ttl,
         "cache_mb": s.cache_max_mb,
         "mtproto_export_conns": getattr(s, "mtproto_export_conns", 0),
+        "hybrid_enabled": 1 if getattr(s, "hybrid_enabled", False) else 0,
     }
 
 

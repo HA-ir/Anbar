@@ -25,6 +25,9 @@ SPEC = {
     # 0 = off (single connection + ranged workers). Admin-toggleable live via
     # POST /admin/settings; higher values raise FloodWait risk.
     "mtproto_export_conns": (0, 8),
+    # hybrid mode: when enabled and backend is mtproto, chunks with bot_file_id
+    # are downloaded via high-speed Bot CDN with fallback to mtproto.
+    "hybrid_enabled": (0, 1),
 }
 
 

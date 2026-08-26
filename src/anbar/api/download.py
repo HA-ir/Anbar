@@ -343,6 +343,26 @@ async def download(request: Request, obj_id: str):
 
         return StreamingResponse(cached_stream(), status_code=status, headers=headers)
 
+    hybrid_on = bool(runtime.get_int(db, "hybrid_enabled", 1 if settings.hybrid_enabled else 0))
+    bot_client = getattr(request.app.state, "bot_client", None)
+
+    async def _fetch_chunk_bytes(chunk_obj) -> bytes:
+        # If hybrid mode is active and we have a bot_file_id and bot_client, try Bot CDN first
+        if hybrid_on and bot_client is not None and chunk_obj.bot_file_id:
+            try:
+                # Fast timeout: if Bot CDN is in a 120s queue, fallback to MTProto after 10s
+                bot_ref = ObjectRef(file_id=chunk_obj.bot_file_id, backend="bot")
+                return await asyncio.wait_for(bot_client.open(bot_ref), timeout=10.0)
+            except Exception as e:
+                # Fallback to main backend (MTProto)
+                pass
+        ref = ObjectRef(
+            file_id=chunk_obj.file_id,
+            message_id=chunk_obj.message_id,
+            backend=backend.name,
+        )
+        return await backend.open(ref)
+
     if use_cache:
         # cache miss: stream from the backend AND fill a temp file; commit to
         # the cache only if the stream completes (client abort drops the file).
@@ -354,10 +374,7 @@ async def download(request: Request, obj_id: str):
             try:
                 with open(tmp, "wb") as out:
                     for idx, off, n in segments:
-                        ref = ObjectRef(file_id=manifest.chunks[idx].file_id,
-                                        message_id=manifest.chunks[idx].message_id,
-                                        backend=backend.name)
-                        chunk = await backend.open(ref)
+                        chunk = await _fetch_chunk_bytes(manifest.chunks[idx])
                         part = chunk[off : off + n]
                         out.write(part)
                         size += len(part)
@@ -376,10 +393,7 @@ async def download(request: Request, obj_id: str):
     async def stream():
         # one chunk in flight per request — never the whole object
         for idx, off, n in segments:
-            ref = ObjectRef(file_id=manifest.chunks[idx].file_id,
-                            message_id=manifest.chunks[idx].message_id,
-                            backend=backend.name)
-            chunk = await backend.open(ref)
+            chunk = await _fetch_chunk_bytes(manifest.chunks[idx])
             yield chunk[off : off + n]
 
     return StreamingResponse(stream(), status_code=status, headers=headers)

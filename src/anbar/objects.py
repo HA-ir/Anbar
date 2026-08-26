@@ -27,6 +27,7 @@ class Chunk:
     size: int
     file_id: str = ""  # filled by the storage layer
     message_id: int | None = None  # bot backend: channel message holding the blob
+    bot_file_id: str | None = None  # hybrid: bot-harvested file_id for CDN download
 
 
 @dataclass
@@ -40,7 +41,13 @@ class Manifest:
         import json
 
         chunks = [
-            {"i": c.index, "s": c.size, "f": c.file_id, "m": c.message_id}
+            {
+                "i": c.index,
+                "s": c.size,
+                "f": c.file_id,
+                **({"m": c.message_id} if c.message_id is not None else {}),
+                **({"b": c.bot_file_id} if c.bot_file_id is not None else {}),
+            }
             for c in self.chunks
         ]
         return json.dumps({"chunks": chunks, "size": self.total_size}, separators=(",", ":"))
@@ -52,8 +59,13 @@ class Manifest:
         d = json.loads(raw)
         return cls(
             chunks=[
-                Chunk(index=c["i"], size=c["s"], file_id=c["f"],
-                      message_id=c.get("m"))
+                Chunk(
+                    index=c["i"],
+                    size=c["s"],
+                    file_id=c["f"],
+                    message_id=c.get("m"),
+                    bot_file_id=c.get("b"),
+                )
                 for c in d["chunks"]
             ],
             total_size=d["size"],

@@ -120,6 +120,8 @@ async def _store_stream(request: Request, stream, filename: str,
                  for c in manifest.chunks], separators=(",", ":")
             ))
 
+    harvester = getattr(request.app.state, "harvester", None)
+
     async def on_chunk(data: bytes, media: bool = False) -> str:
         nonlocal skip_remaining
         if skip_remaining > 0:
@@ -129,9 +131,16 @@ async def _store_stream(request: Request, stream, filename: str,
             data, f"{filename}.part",
             content_type=content_type if media else None,
         )
+        bot_fid = None
+        if harvester and ref.message_id is not None:
+            try:
+                bot_fid = await harvester.get_file_id_for_message(ref.message_id, timeout=2.0)
+            except Exception as e:
+                log.debug("harvester error for msg %s: %s", ref.message_id, e)
+
         manifest.chunks.append(
             Chunk(index=len(manifest.chunks), size=len(data), file_id=ref.file_id,
-                  message_id=ref.message_id)
+                  message_id=ref.message_id, bot_file_id=bot_fid)
         )
         _checkpoint()
         return ref.file_id
