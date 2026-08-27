@@ -532,6 +532,16 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
       </div>
     </div>
     <div class="sec">
+      <h3 data-i18n="secS3">سرویس S3 و تلگرام</h3>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="s3Endpoint">اندپوینت S3</span><small style="direction:ltr;text-align:left;font-family:ui-monospace,monospace">/s3/{bucket}/{key}</small></div>
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="tgAppEndpoint">مینی‌اپ تلگرام</span><small style="direction:ltr;text-align:left;font-family:ui-monospace,monospace">/tg-app</small></div>
+        <a href="/tg-app" target="_blank" class="btn btn-ghost" style="width:auto;padding:6px 12px;font-size:12px">باز کردن ↗</a>
+      </div>
+    </div>
+    <div class="sec">
       <h3 data-i18n="secCrypto">امنیت و رمزنگاری</h3>
       <div class="set-row">
         <div class="lab"><span data-i18n="encLab">رمزنگاری سرتاسری (AES-256-GCM)</span><small data-i18n="encSub">رمزنگاری چانک‌ها قبل از ارسال به تلگرام (Zero-Knowledge)</small></div>
@@ -740,6 +750,7 @@ const I18N={
   thName:"نام فایل", thSize:"حجم", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
   empty:"هنوز فایلی آپلود نکرده‌ای",
   setT:"تنظیمات ادمین", secAuth:"احراز هویت", secRate:"محدودیت سرعت (در دقیقه)",
+ secS3:"سرویس S3 و تلگرام", s3Endpoint:"اندپوینت S3", tgAppEndpoint:"مینی‌اپ تلگرام",
  secCrypto:"امنیت و رمزنگاری", encLab:"رمزنگاری سرتاسری (AES-256-GCM)", encSub:"رمزنگاری چانک‌ها قبل از ارسال به تلگرام (Zero-Knowledge)",
  download:"دانلود",
   secLimits:"سقف‌ها", secCache:"کش دانلود",
@@ -798,6 +809,7 @@ const I18N={
   thName:"File name", thSize:"Size", thDate:"Date", thDl:"Downloads", thAct:"Actions",
   empty:"No files yet",
   setT:"Admin settings", secAuth:"Authentication", secRate:"Rate limits (per minute)",
+  secS3:"S3 Service & Telegram", s3Endpoint:"S3 Endpoint", tgAppEndpoint:"Telegram Mini App",
   secCrypto:"Security & Encryption", encLab:"Zero-Knowledge Encryption (AES-256-GCM)", encSub:"Encrypt chunks before storing on Telegram",
   download:"Download",
   secLimits:"Limits", secCache:"Download cache",
