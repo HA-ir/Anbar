@@ -264,6 +264,85 @@ def _cmd_get(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_s3(args: argparse.Namespace) -> int:
+    """S3 CLI subcommands (put, get, ls, rm)."""
+    action = args.s3_action
+    bucket = args.bucket
+    key = getattr(args, "key", None)
+    base = args.base_url.rstrip("/")
+    admin_key = args.key or args.admin_key
+
+    headers = {}
+    if admin_key:
+        headers["Authorization"] = f"Bearer {admin_key}"
+
+    if action == "ls":
+        url = f"{base}/s3/{bucket}"
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                xml_data = resp.read().decode()
+                import xml.etree.ElementTree as ET
+
+                root = ET.fromstring(xml_data)
+                print(f"Bucket: {bucket}")
+                for c in root.findall(".//Contents"):
+                    k = c.findtext("Key") or ""
+                    sz = c.findtext("Size") or "0"
+                    mod = c.findtext("LastModified") or ""
+                    print(f"  {sz:>10} B  {mod}  {k}")
+            return 0
+        except Exception as e:
+            print(f"error: s3 ls failed: {e}", file=sys.stderr)
+            return 1
+
+    elif action == "put":
+        file_path = args.file
+        if not os.path.isfile(file_path):
+            print(f"error: no such file: {file_path}", file=sys.stderr)
+            return 1
+        url = f"{base}/s3/{bucket}/{key}"
+        with open(file_path, "rb") as f:
+            data = f.read()
+        req = urllib.request.Request(url, data=data, method="PUT", headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                etag = resp.headers.get("ETag", "")
+                print(f"Uploaded {file_path} -> s3://{bucket}/{key} (ETag: {etag})")
+            return 0
+        except Exception as e:
+            print(f"error: s3 put failed: {e}", file=sys.stderr)
+            return 1
+
+    elif action == "get":
+        out_path = args.out or os.path.basename(key)
+        url = f"{base}/s3/{bucket}/{key}"
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp, open(out_path, "wb") as f:
+                while chunk := resp.read(64 * 1024):
+                    f.write(chunk)
+            print(f"Downloaded s3://{bucket}/{key} -> {out_path}")
+            return 0
+        except Exception as e:
+            print(f"error: s3 get failed: {e}", file=sys.stderr)
+            return 1
+
+    elif action == "rm":
+        url = f"{base}/s3/{bucket}/{key}"
+        req = urllib.request.Request(url, method="DELETE", headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                if resp.status in (200, 204):
+                    print(f"Deleted s3://{bucket}/{key}")
+            return 0
+        except Exception as e:
+            print(f"error: s3 rm failed: {e}", file=sys.stderr)
+            return 1
+
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="anbarctl", description=__doc__)
     parser.add_argument(
@@ -360,6 +439,35 @@ def _build_parser() -> argparse.ArgumentParser:
     p_inst.add_argument("--port", type=int, default=8000)
     p_inst.add_argument("--loopback", action="store_true", help="bind 127.0.0.1 instead of 0.0.0.0")
     p_inst.set_defaults(func=_cmd_install)
+
+    # S3 CLI commands (anbarctl s3 ls/put/get/rm)
+    p_s3 = sub.add_parser("s3", help="S3 compatibility operations")
+    s3_sub = p_s3.add_subparsers(dest="s3_action", required=True)
+
+    p_s3_ls = s3_sub.add_parser("ls", help="list bucket objects")
+    p_s3_ls.add_argument("bucket", help="bucket name (e.g. mybucket or default)")
+    p_s3_ls.add_argument("--key", default=os.environ.get("ANBAR_API_KEY"), help="API key")
+    p_s3_ls.set_defaults(func=_cmd_s3)
+
+    p_s3_put = s3_sub.add_parser("put", help="upload object to S3")
+    p_s3_put.add_argument("bucket", help="bucket name")
+    p_s3_put.add_argument("key", help="object key/path")
+    p_s3_put.add_argument("file", help="local file path")
+    p_s3_put.add_argument("--key", default=os.environ.get("ANBAR_API_KEY"), help="API key")
+    p_s3_put.set_defaults(func=_cmd_s3)
+
+    p_s3_get = s3_sub.add_parser("get", help="download object from S3")
+    p_s3_get.add_argument("bucket", help="bucket name")
+    p_s3_get.add_argument("key", help="object key/path")
+    p_s3_get.add_argument("--out", "-o", help="destination file path")
+    p_s3_get.add_argument("--key", default=os.environ.get("ANBAR_API_KEY"), help="API key")
+    p_s3_get.set_defaults(func=_cmd_s3)
+
+    p_s3_rm = s3_sub.add_parser("rm", help="delete object from S3")
+    p_s3_rm.add_argument("bucket", help="bucket name")
+    p_s3_rm.add_argument("key", help="object key/path")
+    p_s3_rm.add_argument("--key", default=os.environ.get("ANBAR_API_KEY"), help="API key")
+    p_s3_rm.set_defaults(func=_cmd_s3)
 
     return parser
 
