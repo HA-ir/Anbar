@@ -39,6 +39,7 @@ def _env_defaults(s) -> dict[str, int]:
         "mtproto_export_conns": getattr(s, "mtproto_export_conns", 0),
         "hybrid_enabled": 1 if getattr(s, "hybrid_enabled", False) else 0,
         "hybrid_bot_timeout_ms": int(getattr(s, "hybrid_bot_timeout_s", 1.5) * 1000),
+        "encryption_enabled": 0,
     }
 
 

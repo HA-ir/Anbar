@@ -532,6 +532,13 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
       </div>
     </div>
     <div class="sec">
+      <h3 data-i18n="secCrypto">امنیت و رمزنگاری</h3>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="encLab">رمزنگاری سرتاسری (AES-256-GCM)</span><small data-i18n="encSub">رمزنگاری چانک‌ها قبل از ارسال به تلگرام (Zero-Knowledge)</small></div>
+        <div class="sw" id="swEnc" role="switch"><i></i></div>
+      </div>
+    </div>
+    <div class="sec">
       <h3 data-i18n="secRate">محدودیت سرعت (در دقیقه)</h3>
       <div class="set-row">
         <div class="lab"><span data-i18n="rDl">دانلود</span><small data-i18n="rDlS">به ازای هر IP + فایل · ۰ = بدون محدودیت</small></div>
@@ -710,7 +717,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <div class="fm-name" id="fmName"></div>
     <div class="fm-meta" id="fmMeta"></div>
     <div class="fm-actions">
-      <button class="btn btn-primary" style="width:auto" id="fmDl" data-i18n="thAct">…</button>
+      <button class="btn btn-primary" style="width:auto" id="fmDl" data-i18n="download">دانلود</button>
       <button class="btn btn-ghost" style="width:auto" id="fmShare" data-i18n="linkT">…</button>
       <button class="btn btn-ghost" style="width:auto" id="fmRename" data-i18n="renameT">…</button>
     </div>
@@ -733,6 +740,8 @@ const I18N={
   thName:"نام فایل", thSize:"حجم", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
   empty:"هنوز فایلی آپلود نکرده‌ای",
   setT:"تنظیمات ادمین", secAuth:"احراز هویت", secRate:"محدودیت سرعت (در دقیقه)",
+ secCrypto:"امنیت و رمزنگاری", encLab:"رمزنگاری سرتاسری (AES-256-GCM)", encSub:"رمزنگاری چانک‌ها قبل از ارسال به تلگرام (Zero-Knowledge)",
+ download:"دانلود",
   secLimits:"سقف‌ها", secCache:"کش دانلود",
   authLab:"احراز هویت API", authSub:"با غیرفعال‌سازی، دانلود بدون کلید آزاد است",
   rDl:"دانلود", rDlS:"به ازای هر IP + فایل · ۰ = بدون محدودیت",
@@ -789,6 +798,8 @@ const I18N={
   thName:"File name", thSize:"Size", thDate:"Date", thDl:"Downloads", thAct:"Actions",
   empty:"No files yet",
   setT:"Admin settings", secAuth:"Authentication", secRate:"Rate limits (per minute)",
+  secCrypto:"Security & Encryption", encLab:"Zero-Knowledge Encryption (AES-256-GCM)", encSub:"Encrypt chunks before storing on Telegram",
+  download:"Download",
   secLimits:"Limits", secCache:"Download cache",
   authLab:"API authentication", authSub:"When off, downloads are open without a key",
   rDl:"Downloads", rDlS:"per IP + file · 0 = unlimited",
@@ -903,7 +914,7 @@ function humanSize(b){
   if(b==null)return"—";
   const u=["B","KB","MB","GB"];let i=0;
   while(b>=1024&&i<3){b/=1024;i++}
-  return(b>=100?b.toFixed(0):b.toFixed(1))+" "+u[i];
+  return '<span style="direction:ltr;unicode-bidi:embed;display:inline-block">'+(b>=100?b.toFixed(0):b.toFixed(1))+" "+u[i]+'</span>';
 }
 function humanDate(ts){
   if(!ts)return"—";
@@ -1170,7 +1181,7 @@ function renderGallery(list){
     else inner='<div class="gicon">'+esc((extOf(o.filename)||"bin").toUpperCase().slice(0,4))+'</div>';
     cell.innerHTML='<div class="gthumb">'+inner+'</div>'
       +'<div class="gname" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</div>'
-      +'<div class="gsub">'+humanSize(o.size)+' · '+(o.downloaded??0)+'⬇</div>'
+      +'<div class="gsub">'+humanSize(o.size)+' . '+(o.downloaded??0)+'⬇</div>'
       +'<input type="checkbox" class="selbox" data-id="'+o.id+'">'
       +'<div class="gacts">'
       +'<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>'
@@ -1839,8 +1850,10 @@ async function loadSettings(){
     const r=await api("/api/v1/admin/settings");
     curSettings=r.settings;
     const s=r.settings;
-    const v=k=>(s[k]&&s[k].value)??"";
-    $("#s_rate_download").value=v("rate_download");
+    const v=k=>(s[k]&&s[k].value)??null;
+    const swE=$("#swEnc");
+    if(swE)swE.classList.toggle("on",!!v("encryption_enabled"));
+    $("#s_rate_download").value=v("rate_download")??"";
     $("#s_rate_upload").value=v("rate_upload");
     $("#s_rate_login").value=v("rate_login");
     $("#s_max_upload_mb").value=v("max_upload_mb");
@@ -1854,6 +1867,17 @@ $("#swAuth").onclick=async()=>{
     const r=await api("/api/v1/admin/auth/toggle",{method:"POST"});
     authOn=r.auth_enabled;
     sw.classList.toggle("on",!!authOn);
+  }catch(e){toast(e.message,"err");}
+  finally{sw.style.opacity="";}
+};
+$("#swEnc").onclick=async()=>{
+  const sw=$("#swEnc");sw.style.opacity=".5";
+  try{
+    const nextOn=!sw.classList.contains("on");
+    const r=await api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify({encryption_enabled:nextOn?1:0})});
+    curSettings=r.settings;
+    sw.classList.toggle("on",nextOn);
+    toast(t("saved"));
   }catch(e){toast(e.message,"err");}
   finally{sw.style.opacity="";}
 };

@@ -31,6 +31,8 @@ SPEC = {
     "hybrid_enabled": (0, 1),
     # hybrid bot fallback timeout in milliseconds (e.g. 1500 = 1.5s)
     "hybrid_bot_timeout_ms": (200, 30_000),
+    # zero-knowledge encryption: 0 = disabled (plain chunks), 1 = enabled (AES-256-GCM)
+    "encryption_enabled": (0, 1),
 }
 
 
