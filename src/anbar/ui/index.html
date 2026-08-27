@@ -1535,10 +1535,10 @@ async function openFileModal(o){
   }
   $("#fmName").textContent=o.filename||o.id;
   $("#fmMeta").innerHTML=
-    '<span>'+humanSize(o.size)+'</span><span>·</span>'
+    '<span class="num">'+humanSize(o.size)+'</span><span>·</span>'
     +'<span data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</span><span>·</span>'
-    +'<span>'+(o.chunks??0)+' chunk</span><span>·</span>'
-    +'<span>↓ '+(o.downloaded??0)+'</span>';
+    +'<span class="num">'+(o.chunks||1)+' chunk</span><span>·</span>'
+    +'<span class="num">↓ '+(o.downloaded??0)+'</span>';
   $("#fileModal").classList.add("on");
 }
 $("#fmClose").onclick=()=>{$("#fileModal").classList.remove("on");$("#fmPreview").innerHTML="";};

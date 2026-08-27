@@ -101,11 +101,23 @@ class Database:
         where = "WHERE deleted_at IS NOT NULL" if trash else "WHERE deleted_at IS NULL"
         order = "deleted_at DESC" if trash else "created_at DESC"
         rows = self._conn.execute(
-            f"SELECT id, filename, size, backend, created_at, downloaded, deleted_at "
+            f"SELECT id, filename, size, backend, created_at, downloaded, deleted_at, manifest "
             f"FROM objects {where} ORDER BY {order} LIMIT ? OFFSET ?",
             (limit, offset),
         ).fetchall()
-        out = [{**dict(r), "chunks": 0} for r in rows]
+        out = []
+        for r in rows:
+            d = dict(r)
+            chunk_count = 1
+            if d.get("manifest"):
+                try:
+                    m = json.loads(d["manifest"])
+                    chunk_count = len(m.get("chunks", [])) or 1
+                except Exception:
+                    chunk_count = 1
+            d["chunks"] = chunk_count
+            d.pop("manifest", None)
+            out.append(d)
         return out
 
     def list_objects_full(self, limit: int = 500, trash: bool = False) -> list[dict[str, Any]]:
