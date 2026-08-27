@@ -163,7 +163,10 @@ def decrypt_gcm(encrypted_data: bytes, key: bytes) -> bytes:
         out = ctypes.create_string_buffer(len(ciphertext) + 16)
         out_len = ctypes.c_int(0)
 
-        if _libcrypto.EVP_DecryptUpdate(ctx, out, ctypes.byref(out_len), ciphertext, len(ciphertext)) != 1:
+        res_upd = _libcrypto.EVP_DecryptUpdate(
+            ctx, out, ctypes.byref(out_len), ciphertext, len(ciphertext)
+        )
+        if res_upd != 1:
             raise RuntimeError("EVP_DecryptUpdate failed")
 
         tag_buf = ctypes.create_string_buffer(tag, len(tag))
@@ -174,7 +177,9 @@ def decrypt_gcm(encrypted_data: bytes, key: bytes) -> bytes:
         final_ptr = ctypes.cast(ctypes.byref(out, out_len.value), ctypes.c_char_p)
         res = _libcrypto.EVP_DecryptFinal_ex(ctx, final_ptr, ctypes.byref(dummy_len))
         if res <= 0:
-            raise ValueError("Decryption failed: authentication tag mismatch or corrupted ciphertext")
+            raise ValueError(
+                "Decryption failed: authentication tag mismatch or corrupted ciphertext"
+            )
 
         return out.raw[: out_len.value]
     finally:

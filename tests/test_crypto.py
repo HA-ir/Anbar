@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import io
-from anbar.crypto import derive_key_256, encrypt_gcm, decrypt_gcm
+from anbar.crypto import decrypt_gcm, derive_key_256, encrypt_gcm
 
 ADMIN = {"Authorization": "Bearer test-admin-key"}
 
@@ -32,6 +31,6 @@ def test_crypto_tamper_fails():
 
     try:
         decrypt_gcm(bytes(encrypted), key)
-        assert False, "Decryption should have failed on tampered ciphertext"
+        raise AssertionError("Decryption should have failed on tampered ciphertext")
     except ValueError:
         pass  # Expected tag authentication failure

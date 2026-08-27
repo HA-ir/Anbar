@@ -7,7 +7,12 @@ import io
 ADMIN = {"Authorization": "Bearer test-admin-key"}
 
 
-def _upload(client, filename="photo.png", data=b"\x89PNG\r\n\x1a\nfakeimage", content_type="image/png"):
+def _upload(
+    client,
+    filename="photo.png",
+    data=b"\x89PNG\r\n\x1a\nfakeimage",
+    content_type="image/png",
+):
     r = client.post(
         "/api/v1/upload",
         headers=ADMIN,

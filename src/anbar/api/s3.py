@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from email.utils import formatdate
+
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 
@@ -58,7 +59,8 @@ async def list_objects_v2(bucket: str, request: Request):
     for r in matching:
         full_row = db.get_object(r["id"]) or r
         contents = ET.SubElement(root, "Contents")
-        key_name = r["filename"][len(prefix) :] if r["filename"].startswith(prefix) else r["filename"]
+        is_pfx = r["filename"].startswith(prefix)
+        key_name = r["filename"][len(prefix) :] if is_pfx else r["filename"]
         ET.SubElement(contents, "Key").text = key_name
         ET.SubElement(contents, "Size").text = str(r["size"])
         ET.SubElement(contents, "ETag").text = f'"{full_row.get("sha256") or ""}"'
@@ -223,7 +225,8 @@ async def delete_object(bucket: str, key: str, request: Request):
         manifest = Manifest.from_json(row["manifest"])
         for c in manifest.chunks:
             try:
-                await backend.delete(ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=backend.name))
+                ref = ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=backend.name)
+                await backend.delete(ref)
             except Exception:
                 pass
         db.delete_object(obj_id)

@@ -322,7 +322,9 @@ async def download(request: Request, obj_id: str):
         or ct == "application/pdf"
     )
     req_view = request.query_params.get("view") in ("1", "true")
-    req_dl = request.query_params.get("dl") in ("1", "true") or request.query_params.get("download") in ("1", "true")
+    req_dl = request.query_params.get("dl") in ("1", "true") or request.query_params.get(
+        "download"
+    ) in ("1", "true")
 
     if req_dl:
         disposition = "attachment"

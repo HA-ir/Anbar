@@ -1,9 +1,9 @@
 """v0.11: Comprehensive End-to-End (E2E) integration tests for the 6 new capabilities.
 Simulates real full client workflows without mocks:
-1. S3 Complete Lifecycle (PutObject -> Head -> Get Range -> ETag 304 -> List -> Delete -> Verify Gone)
+1. S3 Lifecycle (PutObject -> Head -> Get Range -> ETag 304 -> List -> Delete)
 2. ETag & Smart Content-Disposition in direct /f/ download routes
 3. Telegram Mini App initData Auth -> Web Session generation -> Authenticated CRUD
-4. AES-256-GCM Zero-Knowledge stream encryption & decryption roundtrip with file uploads
+4. AES-256-GCM Zero-Knowledge stream encryption & decryption roundtrip
 5. Forum Topic configuration integrity in Bot backend
 """
 
@@ -13,10 +13,11 @@ import hashlib
 import hmac
 import io
 import time
+
 import pytest
 
 from anbar.auth import verify_telegram_init_data
-from anbar.crypto import derive_key_256, encrypt_gcm, decrypt_gcm
+from anbar.crypto import decrypt_gcm, derive_key_256, encrypt_gcm
 
 ADMIN = {"Authorization": "Bearer test-admin-key"}
 
@@ -124,7 +125,10 @@ def test_e2e_telegram_miniapp_flow(client):
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(params.items()))
     secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
     valid_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    valid_init_data = f"auth_date={params['auth_date']}&query_id={params['query_id']}&user={params['user']}&hash={valid_hash}"
+    valid_init_data = (
+        f"auth_date={params['auth_date']}&query_id={params['query_id']}"
+        f"&user={params['user']}&hash={valid_hash}"
+    )
 
     # Verify pass
     assert verify_telegram_init_data(valid_init_data, bot_token) is True
