@@ -244,6 +244,15 @@ upload+download wall times are separate measurements):
 | `mtproto` | 16 MB | **729 s — 14.04 MB/s** | 1965 s — 5.21 MB/s | n/a | OK |
 | `bot` (single) | 16 MB | 1985 s — 5.16 MB/s (43× flood-wait) | ~31.5 MB/s (stream truncates without retry) | n/a | n/a |
 
+**Hybrid mode speed ladder (dual-bot pool @ 16 MB chunks):**
+
+| Size | Upload (MTProto) | Download (Dual-Bot CDN) | Total Wall Time | SHA-256 |
+|------|-------------------|--------------------------|-----------------|---------|
+| 10 MB | 1.07 s — 9.33 MB/s | 1.24 s — 8.05 MB/s | 2.31 s | OK |
+| 100 MB | 8.44 s — 11.85 MB/s | 8.38 s — 11.93 MB/s | 16.82 s | OK |
+| 500 MB | 39.93 s — 12.52 MB/s | 59.16 s — 8.45 MB/s | 99.09 s | OK |
+| **10 GB** | **806.2 s — 12.70 MB/s** | **1204.9 s — 8.50 MB/s** | **2011.1 s (~33.5m)** | **OK** |
+
 Take-away: **hybrid mode** combines the fast flood-free upload of MTProto (~12.7–14.0 MB/s) with real-time `BotHarvester` document harvesting (100% of chunks tagged with Bot API `file_id`s) and resilient multi-bot token pool CDN streaming. Adding a 2nd bot token instantly boosted 10 GB sustained download throughput from **4.54 MB/s to 8.50 MB/s** (cutting download time from 37.6m down to **20.1m**). The entire mechanism is dynamically toggleable via `POST /api/v1/admin/settings` with `{"hybrid_enabled": 1}`.
 
 ### Multi-Bot Token Pool (`ANBAR_BOT_TOKENS`)
