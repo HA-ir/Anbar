@@ -96,13 +96,14 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
     async def healthz():
         return {"status": "ok", "service": "anbar", "version": __version__}
 
-    from .api import admin, download, upload, web  # noqa: PLC0415
+    from .api import admin, download, s3, upload, web  # noqa: PLC0415
 
     app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
     from .api import ingest  # local import: optional URL-ingest feature
 
     app.include_router(ingest.router, prefix="/api/v1", tags=["ingest"])
     app.include_router(download.router, prefix="/f", tags=["download"])
+    app.include_router(s3.router, tags=["s3"])
     app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
     app.include_router(web.router, tags=["web ui"])
     return app
@@ -128,6 +129,7 @@ def _default_backend(settings) -> StorageBackend:
             send_gap_s=settings.flood_send_gap_s,
             flood_budget_s=settings.flood_budget_s,
             send_timeout_s=settings.send_timeout_s,
+            channel_thread_id=settings.channel_thread_id,
         )
     if settings.backend.value == "mtproto":
         if not settings.api_id or not settings.api_hash:

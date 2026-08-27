@@ -50,6 +50,41 @@ def hash_key(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
+def verify_telegram_init_data(init_data: str, bot_token: str, max_age_s: int = 86400) -> bool:
+    """
+    Validate Telegram WebApp initData per Telegram standard:
+    1. Parse initData query string.
+    2. Extract 'hash' and check 'auth_date'.
+    3. secret_key = HMAC-SHA256(b"WebAppData", bot_token)
+    4. data_check_string = key=value sorted alphabetically joined by newline.
+    5. Compare calculated hash with given hash in constant time.
+    """
+    import urllib.parse
+
+    try:
+        parsed = urllib.parse.parse_qsl(init_data, keep_blank_values=True)
+        params = dict(parsed)
+        given_hash = params.pop("hash", None)
+        if not given_hash:
+            return False
+
+        auth_date = int(params.get("auth_date", "0"))
+        if not auth_date or (time.time() - auth_date) > max_age_s:
+            return False
+
+        # Sort alphabetically and join with \n
+        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(params.items()))
+
+        # Secret key: HMAC-SHA256(b"WebAppData", bot_token)
+        secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+
+        # Calculated hash
+        calc_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(calc_hash, given_hash)
+    except Exception:
+        return False
+
+
 def effective_auth_enabled(db: Database, default: bool) -> bool:
     """kv override wins (runtime toggle), else the settings default."""
     v = db.kv_get(KV_AUTH)

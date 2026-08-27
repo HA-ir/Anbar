@@ -76,9 +76,11 @@ class BotBackend(StorageBackend):
         send_gap_s: float | None = None,
         flood_budget_s: float | None = None,
         send_timeout_s: float | None = None,
+        channel_thread_id: int | None = None,
     ) -> None:
         self.bot_token = bot_token
         self._channel = channel_id
+        self._thread_id = channel_thread_id
         self.send_gap_s = send_gap_s if send_gap_s is not None else self.send_gap_s
         self.flood_budget_s = flood_budget_s if flood_budget_s is not None else self.flood_budget_s
         self.send_timeout_s = send_timeout_s if send_timeout_s is not None else self.send_timeout_s
@@ -218,6 +220,8 @@ class BotBackend(StorageBackend):
                     "sendAudio": "audio/mpeg",
                 }.get(method, "application/octet-stream")
                 fields: dict = {"chat_id": self._channel}
+                if self._thread_id is not None:
+                    fields["message_thread_id"] = str(self._thread_id)
                 if method == "sendVideo":
                     fields["supports_streaming"] = "true"
                 return await self._call_multipart(

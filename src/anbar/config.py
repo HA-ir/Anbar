@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     bot_token: SecretStr | None = None
     bot_tokens_raw: str | None = Field(default=None, alias="ANBAR_BOT_TOKENS")
     channel_id: str = ""  # private channel the bot administers (backend=bot)
+    channel_thread_id: int | None = None  # Forum topic message_thread_id (v0.11)
     api_id: int | None = None
     api_hash: str = ""
     session_file: Path = Path("secrets/session.session")

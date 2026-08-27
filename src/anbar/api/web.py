@@ -110,6 +110,13 @@ async def icon():
     )
 
 
+@router.get("/tg-app", response_class=HTMLResponse, include_in_schema=False)
+async def telegram_miniapp(request: Request):
+    """Serve Telegram Mini App interface."""
+    p = _ui_dir() / "miniapp.html"
+    return HTMLResponse(p.read_text(encoding="utf-8") if p.exists() else "<h1>Anbar Mini App</h1>")
+
+
 def _ui_dir() -> Path:
     return Path(__file__).parent.parent / "ui"
 

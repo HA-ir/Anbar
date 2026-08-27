@@ -23,7 +23,7 @@ import re
 import time
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from .. import runtime
 from ..auth import (
@@ -304,10 +304,32 @@ async def download(request: Request, obj_id: str):
         length = total
         segments = manifest.map_range(0, total)
 
-    # v0.10.2: ?view=1 → serve inline (browser plays/edits instead of saving)
-    disposition = "attachment"
-    if request.query_params.get("view") in ("1", "true"):
+    # ETag / Conditional request support (HTTP 304)
+    etag = f'"{row["sha256"]}"' if row["sha256"] else None
+    if etag:
+        if_none_match = request.headers.get("if-none-match")
+        if if_none_match:
+            # Handle weak ETag prefix or comma-separated list
+            tags = [t.strip() for t in if_none_match.split(",")]
+            if "*" in tags or etag in tags or f"W/{etag}" in tags:
+                headers = {"ETag": etag, "Accept-Ranges": "bytes"}
+                return Response(status_code=304, headers=headers)
+
+    # v0.10.2 / v0.11: ?view=1 or media content-type defaults to inline unless ?dl=1 / ?download=1
+    ct = (row["content_type"] or "").lower()
+    is_media = (
+        ct.startswith(("image/", "video/", "audio/", "text/"))
+        or ct == "application/pdf"
+    )
+    req_view = request.query_params.get("view") in ("1", "true")
+    req_dl = request.query_params.get("dl") in ("1", "true") or request.query_params.get("download") in ("1", "true")
+
+    if req_dl:
+        disposition = "attachment"
+    elif req_view or is_media:
         disposition = "inline"
+    else:
+        disposition = "attachment"
 
     headers = {
         "Content-Length": str(length),
@@ -315,6 +337,8 @@ async def download(request: Request, obj_id: str):
         "Content-Disposition": f'{disposition}; filename="{row["filename"]}"',
         "Accept-Ranges": "bytes",
     }
+    if etag:
+        headers["ETag"] = etag
     if start is not None:
         headers["Content-Range"] = f"bytes {start}-{end}/{total}"
     status = 206 if start is not None else 200
