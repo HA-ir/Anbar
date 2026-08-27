@@ -166,11 +166,6 @@ async def get_object(bucket: str, key: str, request: Request):
     if not row:
         return _xml_error("NoSuchKey", "The specified key does not exist.", f"/{bucket}/{key}", 404)
 
-    etag = f'"{row["sha256"]}"'
-    if_none_match = request.headers.get("if-none-match")
-    if if_none_match and (if_none_match == etag or if_none_match == "*"):
-        return Response(status_code=304, headers={"ETag": etag, "Accept-Ranges": "bytes"})
-
     manifest = Manifest.from_json(row["manifest"])
     total = manifest.total_size
     backend = request.app.state.backend
@@ -189,6 +184,11 @@ async def get_object(bucket: str, key: str, request: Request):
         length = total
         segments = manifest.map_range(0, total)
         status_code = 200
+
+    etag = f'"{row["sha256"]}"'
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and start is None and (if_none_match == etag or if_none_match == "*"):
+        return Response(status_code=304, headers={"ETag": etag, "Accept-Ranges": "bytes"})
 
     async def stream_body():
         for idx, off, n in segments:

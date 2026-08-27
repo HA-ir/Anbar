@@ -10,7 +10,7 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # non-root
-RUN groupadd -r anbar && useradd -r -g anbar -d /app anbar
+RUN groupadd -g 1000 anbar && useradd -u 1000 -g 1000 -d /app anbar
 
 COPY --chown=anbar:anbar pyproject.toml README.md ./
 COPY --chown=anbar:anbar src ./src
