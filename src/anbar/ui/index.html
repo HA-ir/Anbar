@@ -236,7 +236,7 @@ tbody tr.selected .fname .fn{color:var(--brand)}
 .tag{font-size:10.5px;font-weight:700;padding:2.5px 8px;border-radius:6px;letter-spacing:.03em}
 .tag.bot{background:var(--brand-soft);color:var(--brand)}
 .tag.mtproto{background:var(--ok-soft);color:var(--ok)}
-.num{font-variant-numeric:tabular-nums;color:var(--tx2);font-size:12.5px}
+.num{font-variant-numeric:tabular-nums;color:var(--tx2);font-size:12.5px;direction:ltr;text-align:left;unicode-bidi:isolate}
 /* ============ settings drawer ============ */
 .scrim{position:fixed;inset:0;background:rgba(8,12,20,.45);opacity:0;pointer-events:none;transition:.25s;z-index:90}
 .scrim.on{opacity:1;pointer-events:auto}
@@ -926,7 +926,7 @@ function humanSize(b){
   if(b==null)return"—";
   const u=["B","KB","MB","GB"];let i=0;
   while(b>=1024&&i<3){b/=1024;i++}
-  return '<span style="direction:ltr;unicode-bidi:embed;display:inline-block">'+(b>=100?b.toFixed(0):b.toFixed(1))+" "+u[i]+'</span>';
+  return (b>=100?b.toFixed(0):b.toFixed(1))+" "+u[i];
 }
 function humanDate(ts){
   if(!ts)return"—";
@@ -1008,7 +1008,7 @@ $("#outBtn").onclick=async()=>{
 /* ================= files ================= */
 let files=[];
 function updateLimTag(){
-  $("#limTag").textContent=t("limit")+humanSize(maxUploadBytes);
+  $("#limTag").innerHTML=esc(t("limit"))+'<span style="direction:ltr;display:inline-block;unicode-bidi:isolate">'+humanSize(maxUploadBytes)+'</span>';
 }
 let fQuery="",fSortMode=localStorage.getItem("anbar-sort")||"new",fType="";
 function visibleFiles(){
