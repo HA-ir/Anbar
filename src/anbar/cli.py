@@ -264,6 +264,32 @@ def _cmd_get(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_crypto(args: argparse.Namespace) -> int:
+    """Toggle or check zero-knowledge AES-256-GCM chunk encryption."""
+    if args.state:
+        val = 1 if args.state == "on" else 0
+        status, body = _http(
+            "POST",
+            f"{args.base_url}/api/v1/admin/settings",
+            args.admin_key,
+            {"encryption_enabled": val},
+        )
+        if status != 200:
+            print(f"error: settings update failed: HTTP {status} {body}", file=sys.stderr)
+            return 1
+        print(f"encryption: {args.state}")
+        return 0
+    else:
+        status, body = _http("GET", f"{args.base_url}/api/v1/admin/status", args.admin_key)
+        if status != 200:
+            print(f"error: status check failed: HTTP {status} {body}", file=sys.stderr)
+            return 1
+        st = body.get("settings", {})
+        enc_on = bool(st.get("encryption_enabled", 0))
+        print(f"encryption is {'on' if enc_on else 'off'}")
+        return 0
+
+
 def _cmd_s3(args: argparse.Namespace) -> int:
     """S3 CLI subcommands (put, get, ls, rm)."""
     action = args.s3_action
@@ -363,6 +389,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_auth = sub.add_parser("auth", help="turn auth on or off (runtime, no restart)")
     p_auth.add_argument("state", choices=["on", "off"])
     p_auth.set_defaults(func=_cmd_auth)
+
+    p_crypto = sub.add_parser("crypto", help="toggle/check AES-256-GCM encryption")
+    p_crypto.add_argument("state", nargs="?", choices=["on", "off"], help="turn on or off")
+    p_crypto.set_defaults(func=_cmd_crypto)
 
     p_link = sub.add_parser("link", help="mint a signed download link")
     p_link.add_argument("object_id")
