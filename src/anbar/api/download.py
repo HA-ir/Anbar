@@ -304,16 +304,13 @@ async def download(request: Request, obj_id: str):
         length = total
         segments = manifest.map_range(0, total)
 
-    # ETag / Conditional request support (HTTP 304)
     etag = f'"{row["sha256"]}"' if row["sha256"] else None
-    if etag:
+    if etag and start is None:
         if_none_match = request.headers.get("if-none-match")
         if if_none_match:
-            # Handle weak ETag prefix or comma-separated list
             tags = [t.strip() for t in if_none_match.split(",")]
             if "*" in tags or etag in tags or f"W/{etag}" in tags:
-                headers = {"ETag": etag, "Accept-Ranges": "bytes"}
-                return Response(status_code=304, headers=headers)
+                return Response(status_code=304, headers={"ETag": etag, "Accept-Ranges": "bytes"})
 
     # v0.10.2 / v0.11: ?view=1 or media content-type defaults to inline unless ?dl=1 / ?download=1
     ct = (row["content_type"] or "").lower()
