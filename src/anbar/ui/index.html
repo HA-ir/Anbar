@@ -461,6 +461,9 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
         <option value="other" data-i18n="ftOther">سایر</option>
       </select>
       <button class="btn btn-ghost" id="selAllBtn" style="width:auto" data-i18n="selAll">همه</button>
+      <button class="btn btn-ghost" id="newFolderBtn" style="width:auto;padding:8px 11px" title="پوشه جدید">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+      </button>
       <button class="btn btn-ghost" id="viewBtn" style="width:auto;padding:8px 11px" title="gallery">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       </button>
@@ -497,6 +500,15 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
         <option value="dl" data-i18n="sDl">پردانلودترین</option>
         <option value="name" data-i18n="sName">نام</option>
       </select>
+    </div>
+
+    <!-- Breadcrumb Bar for Folders -->
+    <div id="breadcrumbBar" style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:6px 2px 10px;color:var(--tx2);overflow-x:auto;white-space:nowrap">
+      <span id="bcRoot" style="cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--brand)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>خانه</span>
+      </span>
+      <div id="bcTrail" style="display:flex;align-items:center;gap:6px"></div>
     </div>
 
     <div class="tbl-wrap" id="tblWrap">
@@ -1014,31 +1026,130 @@ let files=[];
 function updateLimTag(){
   $("#limTag").innerHTML=esc(t("limit"))+'<span style="direction:ltr;display:inline-block;unicode-bidi:isolate">'+humanSize(maxUploadBytes)+'</span>';
 }
-let fQuery="",fSortMode=localStorage.getItem("anbar-sort")||"new",fType="";
-function visibleFiles(){
-  let list=files;
-  if(fQuery){
-    const q=fQuery.toLowerCase();
-    list=list.filter(o=>(o.filename||o.id||"").toLowerCase().includes(q));
+let curFolderPrefix = "";
+
+function updateBreadcrumb() {
+  const trail = $("#bcTrail");
+  trail.innerHTML = "";
+  if (!curFolderPrefix) return;
+  const parts = curFolderPrefix.split("/").filter(Boolean);
+  let accumulated = "";
+  parts.forEach((p, idx) => {
+    accumulated += p + "/";
+    const span = document.createElement("span");
+    span.style.cssText = "display:flex;align-items:center;gap:6px";
+    span.innerHTML = '<span style="color:var(--tx3)">/</span><span class="bc-link" style="cursor:pointer;color:' + (idx === parts.length - 1 ? 'var(--tx)' : 'var(--brand)') + '">' + esc(p) + '</span>';
+    const acc = accumulated;
+    span.querySelector(".bc-link").onclick = () => {
+      curFolderPrefix = acc;
+      updateBreadcrumb();
+      renderRows();
+    };
+    trail.appendChild(span);
+  });
+}
+$("#newFolderBtn").onclick = async () => {
+  const name = prompt("نام پوشه جدید را وارد کنید:");
+  if (!name) return;
+  const cleanName = name.replace(/[\/\\?%*:|"<>]/g, "").trim();
+  if (!cleanName) return;
+  const fullPath = (curFolderPrefix || "") + cleanName;
+  try {
+    await api("/api/v1/admin/folders/create", {
+      method: "POST",
+      body: JSON.stringify({ path: fullPath })
+    });
+    toast("پوشه ایجاد شد");
+    refresh();
+  } catch(e) {
+    toast(e.message, "err");
   }
-  if(fType){
-    list=list.filter(o=>{
-      const k=mediaKind(o);
-      if(fType==="other")return !k||k==="pdf";
-      return k===fType;
+};
+
+function visibleFiles() {
+  let list = files;
+  if (fQuery) {
+    const q = fQuery.toLowerCase();
+    list = list.filter(o => (o.filename || o.id || "").toLowerCase().includes(q));
+    return list;
+  }
+  
+  // Folder tree aggregation
+  const map = new Map();
+  list.forEach(o => {
+    let fn = o.filename || o.id || "";
+    if (curFolderPrefix) {
+      if (!fn.startsWith(curFolderPrefix)) return;
+      fn = fn.slice(curFolderPrefix.length);
+    }
+    if (!fn) return; // exact match of the folder marker itself
+    const slashIdx = fn.indexOf("/");
+    if (slashIdx !== -1) {
+      const folderName = fn.slice(0, slashIdx);
+      const folderFull = (curFolderPrefix || "") + folderName + "/";
+      if (!map.has("DIR:" + folderName)) {
+        map.set("DIR:" + folderName, {
+          isFolder: true,
+          id: "folder_" + folderName,
+          filename: folderName,
+          fullPrefix: folderFull,
+          size: 0,
+          created_at: o.created_at,
+          downloaded: 0,
+          itemCount: 1,
+        });
+      } else {
+        const d = map.get("DIR:" + folderName);
+        d.size += (o.size || 0);
+        d.itemCount++;
+      }
+    } else {
+      if (fn.endsWith("/")) {
+        // empty folder marker object
+        const folderName = fn.slice(0, -1);
+        if (!map.has("DIR:" + folderName)) {
+          map.set("DIR:" + folderName, {
+            isFolder: true,
+            id: o.id,
+            filename: folderName,
+            fullPrefix: (curFolderPrefix || "") + folderName + "/",
+            size: 0,
+            created_at: o.created_at,
+            downloaded: 0,
+            itemCount: 0,
+          });
+        }
+      } else {
+        map.set("FILE:" + o.id, { ...o, displayName: fn });
+      }
+    }
+  });
+
+  let res = Array.from(map.values());
+  if (fType) {
+    res = res.filter(o => {
+      if (o.isFolder) return true;
+      const k = mediaKind(o);
+      if (fType === "other") return !k || k === "pdf";
+      return k === fType;
     });
   }
-  const by={
-    new:(a,b)=>(b.created_at||0)-(a.created_at||0),
-    old:(a,b)=>(a.created_at||0)-(b.created_at||0),
-    big:(a,b)=>(b.size||0)-(a.size||0),
-    small:(a,b)=>(a.size||0)-(b.size||0),
-    dl:(a,b)=>(b.downloaded||0)-(a.downloaded||0),
-    name:(a,b)=>(a.filename||"").localeCompare(b.filename||""),
+  const by = {
+    new: (a, b) => (b.isFolder ? 1 : 0) - (a.isFolder ? 1 : 0) || (b.created_at || 0) - (a.created_at || 0),
+    old: (a, b) => (b.isFolder ? 1 : 0) - (a.isFolder ? 1 : 0) || (a.created_at || 0) - (b.created_at || 0),
+    big: (a, b) => (b.isFolder ? 1 : 0) - (a.isFolder ? 1 : 0) || (b.size || 0) - (a.size || 0),
+    small: (a, b) => (b.isFolder ? 1 : 0) - (a.isFolder ? 1 : 0) || (a.size || 0) - (b.size || 0),
+    dl: (a, b) => (b.isFolder ? 1 : 0) - (a.isFolder ? 1 : 0) || (b.downloaded || 0) - (a.downloaded || 0),
+    name: (a, b) => (b.isFolder ? 1 : 0) - (a.isFolder ? 1 : 0) || (a.filename || "").localeCompare(b.filename || ""),
   }[fSortMode];
-  return by?[...list].sort(by):list;
+  return by ? [...res].sort(by) : res;
 }
-$("#fSearch").oninput=e=>{
+  $("#bcRoot").onclick = () => {
+    curFolderPrefix = "";
+    updateBreadcrumb();
+    renderRows();
+  };
+  $("#fSearch").oninput=e=>{
   fQuery=e.target.value.trim();
   $("#fClear").style.display=fQuery?"flex":"none";
   renderRows();
@@ -1113,18 +1224,75 @@ function renderRows(){
   if(selBar)updateSelBar();
   list.forEach(o=>{
     const tr=document.createElement("tr");
+    const isDir = o.isFolder;
+    const nameToShow = isDir ? o.filename : (o.displayName || o.filename || o.id);
+    const iconSvg = isDir
+      ? '<svg viewBox="0 0 24 24" style="stroke:var(--brand)"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
+      : '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
+    
     tr.innerHTML=
-      '<td data-th="'+t("thName")+'"><div class="fname"><input type="checkbox" class="selbox" data-id="'+o.id+'" style="margin-inline-end:8px;vertical-align:-2px">'
-      +'<span class="fic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>'
-      +'<span class="fn" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</span></div></td>'
-      +'<td class="num" data-th="'+t("thSize")+'">'+humanSize(o.size)+'</td>'
+      '<td data-th="'+t("thName")+'"><div class="fname">'
+      +(isDir ? '' : '<input type="checkbox" class="selbox" data-id="'+o.id+'" style="margin-inline-end:8px;vertical-align:-2px">')
+      +'<span class="fic" style="'+(isDir ? 'background:rgba(47,107,255,.15)' : '')+'">'+iconSvg+'</span>'
+      +'<span class="fn" style="cursor:'+(isDir ? 'pointer;color:var(--brand);font-weight:700' : 'default')+'" title="'+esc(nameToShow)+'">'+esc(nameToShow)+(isDir ? '/' : '')+'</span></div></td>'
+      +'<td class="num" data-th="'+t("thSize")+'">'+(isDir ? (o.itemCount + ' item') : humanSize(o.size))+'</td>'
       +'<td class="num" data-th="'+t("thDate")+'" data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</td>'
-      +'<td class="num" data-th="'+t("thDl")+'">'+(o.downloaded??0)+'</td>'
+      +'<td class="num" data-th="'+t("thDl")+'">'+(isDir ? '—' : (o.downloaded??0))+'</td>'
       +'<td data-th="'+t("thAct")+'"><div class="acts">'
-      +'<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
-      +'<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></button>'
-      +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>'
+      +(isDir
+        ? '<button class="act" data-a="fold-rename" title="تغییر نام / جابجایی"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+          +'<button class="act" data-a="fold-copy" title="کپی پوشه"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+          +'<button class="act del" data-a="fold-del" title="حذف پوشه"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
+        : '<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
+          +'<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>'
+          +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>')
       +'</div></td>';
+
+    if (isDir) {
+      tr.querySelector(".fn").onclick = () => {
+        curFolderPrefix = o.fullPrefix;
+        updateBreadcrumb();
+        renderRows();
+      };
+      tr.querySelector('[data-a="fold-rename"]').onclick = async (e) => {
+        e.stopPropagation();
+        const p = prompt("مسیر یا نام جدید پوشه را وارد کنید:", o.fullPrefix.replace(/\/$/, ""));
+        if (!p || p === o.filename) return;
+        try {
+          await api("/api/v1/admin/folders/rename", {
+            method: "POST",
+            body: JSON.stringify({ old_path: o.fullPrefix, new_path: p })
+          });
+          toast("پوشه با موفقیت تغییر نام یافت");
+          refresh();
+        } catch(err) { toast(err.message, "err"); }
+      };
+      tr.querySelector('[data-a="fold-copy"]').onclick = async (e) => {
+        e.stopPropagation();
+        const p = prompt("مسیر پوشه مقصد برای کپی را وارد کنید:", o.filename + "_copy");
+        if (!p) return;
+        try {
+          await api("/api/v1/admin/folders/copy", {
+            method: "POST",
+            body: JSON.stringify({ src_path: o.fullPrefix, dst_path: p })
+          });
+          toast("پوشه با موفقیت کپی شد");
+          refresh();
+        } catch(err) { toast(err.message, "err"); }
+      };
+      tr.querySelector('[data-a="fold-del"]').onclick = async (e) => {
+        e.stopPropagation();
+        if (!confirm("آیا از حذف پوشه " + o.filename + " و فایل‌های داخل آن اطمینان دارید؟")) return;
+        try {
+          await api("/api/v1/admin/folders/delete", {
+            method: "POST",
+            body: JSON.stringify({ path: o.fullPrefix })
+          });
+          toast("پوشه به سطل زباله منتقل شد");
+          refresh();
+        } catch(err) { toast(err.message, "err"); }
+      };
+    }
     tr.querySelector('[data-a=dl]').onclick=()=>{
       toast(t("dlStart"));
       const a=document.createElement("a");
@@ -1775,8 +1943,13 @@ dirInput.onchange=()=>{
 function enqueue(list){
   for(const f of list){
     if(f.size>maxUploadBytes){toast(f.name+" — "+t("sizeOver"),"err");continue;}
+    let finalName = f.name;
+    if(curFolderPrefix && !finalName.includes("/")){
+      finalName = curFolderPrefix + finalName;
+    }
+    const targetFile = finalName !== f.name ? new File([f], finalName, {type: f.type, lastModified: f.lastModified}) : f;
     const id="q"+Math.random().toString(36).slice(2,8);
-    queue.push({id,file:f,prog:0,state:"wait"});
+    queue.push({id,file:targetFile,prog:0,state:"wait"});
   }
   renderQueue();pump();
 }

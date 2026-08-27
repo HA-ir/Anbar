@@ -156,6 +156,89 @@ class Database:
         self._conn.commit()
         return cur.rowcount > 0
 
+    def list_objects_by_prefix(
+        self, prefix: str, *, include_trashed: bool = False
+    ) -> list[dict[str, Any]]:
+        """List all objects starting with a prefix (for folder operations)."""
+        where = (
+            "WHERE filename LIKE ? AND deleted_at IS NULL"
+            if not include_trashed
+            else "WHERE filename LIKE ?"
+        )
+        rows = self._conn.execute(
+            f"SELECT * FROM objects {where} ORDER BY created_at DESC",
+            (f"{prefix}%",),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def rename_folder(self, old_prefix: str, new_prefix: str) -> int:
+        """Rename/move all files under old_prefix to new_prefix."""
+        old_prefix = old_prefix.rstrip("/") + "/"
+        new_prefix = new_prefix.rstrip("/") + "/"
+        rows = self._conn.execute(
+            "SELECT id, filename FROM objects WHERE filename LIKE ? AND deleted_at IS NULL",
+            (f"{old_prefix}%",),
+        ).fetchall()
+        count = 0
+        for r in rows:
+            old_name = r["filename"]
+            suffix = old_name[len(old_prefix):]
+            new_name = new_prefix + suffix
+            self._conn.execute("UPDATE objects SET filename = ? WHERE id = ?", (new_name, r["id"]))
+            count += 1
+        self._conn.commit()
+        return count
+
+    def copy_folder(self, src_prefix: str, dst_prefix: str) -> int:
+        """Duplicate metadata of all files under src_prefix to dst_prefix."""
+        import uuid
+        src_prefix = src_prefix.rstrip("/") + "/"
+        dst_prefix = dst_prefix.rstrip("/") + "/"
+        rows = self._conn.execute(
+            "SELECT * FROM objects WHERE filename LIKE ? AND deleted_at IS NULL",
+            (f"{src_prefix}%",),
+        ).fetchall()
+        count = 0
+        now = int(time.time())
+        for r in rows:
+            d = dict(r)
+            suffix = d["filename"][len(src_prefix):]
+            new_name = dst_prefix + suffix
+            new_id = uuid.uuid4().hex[:12]
+            self._conn.execute(
+                """INSERT INTO objects
+                   (id, file_id, backend, filename, size, content_type, sha256,
+                    manifest, uploader_key, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    new_id,
+                    d["file_id"],
+                    d["backend"],
+                    new_name,
+                    d["size"],
+                    d.get("content_type"),
+                    d.get("sha256"),
+                    d.get("manifest"),
+                    d.get("uploader_key"),
+                    now,
+                ),
+            )
+            count += 1
+        self._conn.commit()
+        return count
+
+    def soft_delete_folder(self, prefix: str) -> int:
+        """Soft-delete all files under a prefix."""
+        prefix = prefix.rstrip("/") + "/"
+        now = int(time.time())
+        cur = self._conn.execute(
+            "UPDATE objects SET deleted_at = ? "
+            "WHERE (filename LIKE ? OR filename = ?) AND deleted_at IS NULL",
+            (now, f"{prefix}%", prefix.rstrip("/")),
+        )
+        self._conn.commit()
+        return cur.rowcount
+
     # -- trash (v0.10): soft delete → restore / hard purge -----------------
     def soft_delete(self, obj_id: str) -> bool:
         cur = self._conn.execute(

@@ -535,6 +535,79 @@ async def trash_restore(request: Request, obj_id: str):
     return {"restored": obj_id}
 
 
+@router.post("/admin/folders/create")
+async def folder_create(request: Request):
+    """Create an empty folder marker object (compatible with S3 virtual directory)."""
+    require_admin(request)
+    body = await request.json()
+    folder_path = body.get("path", "").strip("/")
+    if not folder_path:
+        raise HTTPException(400, "folder path is required")
+    folder_name = f"{folder_path}/"
+    db = request.app.state.db
+    # Check if folder or files inside already exist
+    existing = db.list_objects_by_prefix(folder_name)
+    if existing:
+        return {"status": "exists", "folder": folder_name}
+
+    import uuid
+    dummy_manifest = json.dumps({"version": 1, "total_size": 0, "chunks": []})
+    obj_id = uuid.uuid4().hex[:12]
+    now = int(time.time())
+    db.insert_object({
+        "id": obj_id,
+        "file_id": f"folder_{obj_id}",
+        "backend": "virtual",
+        "filename": folder_name,
+        "size": 0,
+        "content_type": "application/x-directory",
+        "manifest": dummy_manifest,
+        "created_at": now,
+    })
+    return {"status": "created", "folder": folder_name, "id": obj_id}
+
+
+@router.post("/admin/folders/rename")
+async def folder_rename(request: Request):
+    """Rename or move a folder prefix."""
+    require_admin(request)
+    body = await request.json()
+    old_path = body.get("old_path", "").strip("/")
+    new_path = body.get("new_path", "").strip("/")
+    if not old_path or not new_path:
+        raise HTTPException(400, "both old_path and new_path are required")
+    db = request.app.state.db
+    moved_count = db.rename_folder(old_path, new_path)
+    return {"status": "renamed", "moved_count": moved_count, "new_path": new_path}
+
+
+@router.post("/admin/folders/copy")
+async def folder_copy(request: Request):
+    """Duplicate all files from src_path to dst_path."""
+    require_admin(request)
+    body = await request.json()
+    src_path = body.get("src_path", "").strip("/")
+    dst_path = body.get("dst_path", "").strip("/")
+    if not src_path or not dst_path:
+        raise HTTPException(400, "both src_path and dst_path are required")
+    db = request.app.state.db
+    copied_count = db.copy_folder(src_path, dst_path)
+    return {"status": "copied", "copied_count": copied_count, "dst_path": dst_path}
+
+
+@router.post("/admin/folders/delete")
+async def folder_delete(request: Request):
+    """Soft-delete all files inside a folder."""
+    require_admin(request)
+    body = await request.json()
+    folder_path = body.get("path", "").strip("/")
+    if not folder_path:
+        raise HTTPException(400, "folder path is required")
+    db = request.app.state.db
+    deleted_count = db.soft_delete_folder(folder_path)
+    return {"status": "deleted", "deleted_count": deleted_count, "folder": folder_path}
+
+
 @router.delete("/admin/trash/{obj_id}")
 async def trash_purge_one(request: Request, obj_id: str):
     """Permanently destroy one trashed object (blobs + metadata) now."""
@@ -547,3 +620,4 @@ async def trash_purge_one(request: Request, obj_id: str):
         raise HTTPException(404, "object not found")
     removed = await _purge_object_blobs(request.app.state.backend, db, row)
     return {"purged": obj_id, "blobs_removed": removed}
+
