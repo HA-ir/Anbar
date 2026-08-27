@@ -312,8 +312,16 @@ async def download(request: Request, obj_id: str):
             if "*" in tags or etag in tags or f"W/{etag}" in tags:
                 return Response(status_code=304, headers={"ETag": etag, "Accept-Ranges": "bytes"})
 
-    # v0.10.2 / v0.11: ?view=1 or media content-type defaults to inline unless ?dl=1 / ?download=1
-    ct = (row["content_type"] or "").lower()
+    import mimetypes
+
+    # Fallback to file extension guessing if content_type is generic octet-stream or missing
+    resolved_ct = row["content_type"] or ""
+    if not resolved_ct or resolved_ct == "application/octet-stream":
+        guessed, _ = mimetypes.guess_type(row["filename"] or "")
+        if guessed:
+            resolved_ct = guessed
+
+    ct = (resolved_ct or "").lower()
     is_media = (
         ct.startswith(("image/", "video/", "audio/", "text/"))
         or ct == "application/pdf"
@@ -332,7 +340,7 @@ async def download(request: Request, obj_id: str):
 
     headers = {
         "Content-Length": str(length),
-        "Content-Type": row["content_type"] or "application/octet-stream",
+        "Content-Type": resolved_ct or "application/octet-stream",
         "Content-Disposition": f'{disposition}; filename="{row["filename"]}"',
         "Accept-Ranges": "bytes",
     }
