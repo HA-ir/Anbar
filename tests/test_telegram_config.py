@@ -49,6 +49,25 @@ def test_telegram_config_update(client: TestClient, tmp_path, monkeypatch):
     assert env_dict["ANBAR_CHUNK_SIZE_MB"] == "20"
 
 
+def test_telegram_config_hybrid(client: TestClient, tmp_path, monkeypatch):
+    _authed(client)
+    fake_env = tmp_path / ".env"
+    fake_env.write_text("ANBAR_BACKEND=bot\n", encoding="utf-8")
+
+    from anbar.api import admin
+
+    monkeypatch.setattr(admin, "_get_env_file_path", lambda: fake_env)
+
+    payload = {"backend": "hybrid"}
+    r = client.post("/api/v1/admin/telegram-config", json=payload, headers=ADMIN)
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
+
+    env_dict = admin._read_env_dict(fake_env)
+    assert env_dict["ANBAR_BACKEND"] == "mtproto"
+    assert env_dict["ANBAR_HYBRID_ENABLED"] == "true"
+
+
 def test_telegram_config_validation(client: TestClient):
     _authed(client)
     r = client.post(

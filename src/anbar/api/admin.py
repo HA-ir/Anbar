@@ -392,9 +392,16 @@ async def telegram_config_get(request: Request):
     )
     mtproto_peer = env_vars.get("ANBAR_MTPROTO_PEER", s.mtproto_peer)
     chunk_size_mb = int(env_vars.get("ANBAR_CHUNK_SIZE_MB", s.chunk_size_mb))
+    db = request.app.state.db
+    hybrid_runtime = bool(
+        runtime.get_int(db, "hybrid_enabled", 1 if s.hybrid_enabled else 0)
+    )
+    hybrid_env = env_vars.get("ANBAR_HYBRID_ENABLED", "").lower() in ("true", "1", "yes")
+    hybrid_enabled = hybrid_runtime or hybrid_env
 
     return {
         "backend": backend,
+        "hybrid_enabled": hybrid_enabled,
         "bot_tokens_raw": bot_tokens_raw,
         "bot_tokens_count": len(tokens_list),
         "bot_tokens_masked": masked_tokens,
@@ -426,9 +433,22 @@ async def telegram_config_update(request: Request):
 
     if "backend" in body:
         b = str(body["backend"]).strip().lower()
-        if b not in ("bot", "mtproto", "fake"):
-            raise HTTPException(422, "invalid backend (must be bot or mtproto)")
-        updates["ANBAR_BACKEND"] = b
+        if b == "hybrid":
+            updates["ANBAR_BACKEND"] = "mtproto"
+            updates["ANBAR_HYBRID_ENABLED"] = "true"
+            runtime.set_int(request.app.state.db, "hybrid_enabled", 1)
+        elif b in ("bot", "mtproto", "fake"):
+            updates["ANBAR_BACKEND"] = b
+            if b == "bot":
+                updates["ANBAR_HYBRID_ENABLED"] = "false"
+                runtime.set_int(request.app.state.db, "hybrid_enabled", 0)
+        else:
+            raise HTTPException(422, "invalid backend (must be hybrid, bot, or mtproto)")
+
+    if "hybrid_enabled" in body:
+        h_on = bool(body["hybrid_enabled"])
+        updates["ANBAR_HYBRID_ENABLED"] = "true" if h_on else "false"
+        runtime.set_int(request.app.state.db, "hybrid_enabled", 1 if h_on else 0)
 
     if "bot_tokens" in body:
         tokens_val = str(body["bot_tokens"]).strip()

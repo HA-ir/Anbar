@@ -685,10 +685,11 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <div class="sec">
       <h3 data-i18n="secTgConfig">پیکربندی تلگرام و متغیرها (.env)</h3>
       <div class="set-row">
-        <div class="lab"><span data-i18n="tgBackendLab">نوع بک‌اند ذخیره‌سازی</span><small data-i18n="tgBackendSub">MTProto (کلاینت تلگرام) یا Bot API</small></div>
+        <div class="lab"><span data-i18n="tgBackendLab">نوع بک‌اند ذخیره‌سازی</span><small data-i18n="tgBackendSub">استراتژی هیبریدی (توصیه‌شده)، MTProto یا Bot</small></div>
         <select id="s_tg_backend" style="padding:7px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
-          <option value="mtproto">MTProto (Direct Client)</option>
-          <option value="bot">Bot API (Bots Pool)</option>
+          <option value="hybrid" data-i18n="tgBackendHybrid">🚀 Hybrid (MTProto Upload + Bot CDN Fast Download)</option>
+          <option value="mtproto" data-i18n="tgBackendMtproto">MTProto (Direct Client)</option>
+          <option value="bot" data-i18n="tgBackendBot">Bot API (Bots Pool)</option>
         </select>
       </div>
       <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
@@ -910,7 +911,10 @@ const I18N={
   thName:"نام فایل", thSize:"حجم", thItems:"تعداد فایل‌ها", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
   secTgConfig:"پیکربندی تلگرام و متغیرها (.env)",
   tgBackendLab:"نوع بک‌اند ذخیره‌سازی",
-  tgBackendSub:"MTProto (کلاینت تلگرام) یا Bot API",
+  tgBackendSub:"استراتژی هیبریدی (توصیه‌شده)، MTProto یا Bot API",
+  tgBackendHybrid:"🚀 هیبریدی Hybrid (آپلود MTProto + دانلود فوق‌سریع Bot CDN)",
+  tgBackendMtproto:"MTProto (کلاینت مستقیم تلگرام)",
+  tgBackendBot:"Bot API (مخزن بات‌های تلگرام)",
   tgTokensLab:"توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)",
   tgTokensSub:"چند توکن را با کاما جدا کنید (برای چرخش و افزایش سرعت).",
   tgChannelLab:"شناسه کانال (ANBAR_CHANNEL_ID)",
@@ -993,8 +997,11 @@ const I18N={
   files:"Files", refresh:"Refresh",
   thName:"File name", thSize:"Size", thItems:"Items", thDate:"Date", thDl:"Downloads", thAct:"Actions",
   secTgConfig:"Telegram & MTProto Config (.env)",
-  tgBackendLab:"Storage Backend",
-  tgBackendSub:"MTProto (Telegram Client) or Bot API",
+  tgBackendLab:"Storage Backend Strategy",
+  tgBackendSub:"Hybrid (recommended), MTProto or Bot API",
+  tgBackendHybrid:"🚀 Hybrid (MTProto Upload + Fast Bot CDN Download)",
+  tgBackendMtproto:"MTProto (Direct Telegram Client)",
+  tgBackendBot:"Bot API (Bots Pool)",
   tgTokensLab:"Bot API Tokens (ANBAR_BOT_TOKENS)",
   tgTokensSub:"Separate multiple tokens with commas for rotation.",
   tgChannelLab:"Channel ID (ANBAR_CHANNEL_ID)",
@@ -2668,7 +2675,13 @@ function syncHashToggleBtn(){
 async function loadTelegramConfig(){
   try{
     const r=await api("/api/v1/admin/telegram-config");
-    if($("#s_tg_backend"))$("#s_tg_backend").value=r.backend||"mtproto";
+    if($("#s_tg_backend")){
+      if(r.backend==="mtproto" && r.hybrid_enabled){
+        $("#s_tg_backend").value="hybrid";
+      }else{
+        $("#s_tg_backend").value=r.backend||"hybrid";
+      }
+    }
     if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").value=r.bot_tokens_raw||"";
     if($("#tgTokensCount"))$("#tgTokensCount").textContent=r.bot_tokens_count?("("+r.bot_tokens_count+" active)"):"";
     if($("#s_tg_channel_id"))$("#s_tg_channel_id").value=r.channel_id||"";
