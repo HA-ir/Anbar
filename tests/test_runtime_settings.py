@@ -18,7 +18,7 @@ def test_settings_get_defaults(client):
     assert s["rate_download"]["default"] == 1000  # conftest env default
     assert s["rate_download"]["value"] == 1000
     assert s["rate_download"]["overridden"] is False
-    assert s["max_upload_mb"]["default"] == 2000
+    assert s["max_upload_mb"]["default"] == 10240
     assert s["cache_mb"]["default"] == 512
 
 

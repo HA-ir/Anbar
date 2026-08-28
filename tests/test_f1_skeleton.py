@@ -71,7 +71,7 @@ class TestConfig:
         assert s.auth_enabled is True
         assert s.backend.value == "bot"
         assert s.chunking.value == "auto"
-        assert s.max_upload_bytes() == 2000 * 1024 * 1024
+        assert s.max_upload_bytes() == 10240 * 1024 * 1024
 
     def test_port_bounds(self):
         from pydantic import ValidationError
