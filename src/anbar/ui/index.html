@@ -503,12 +503,12 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
         <option value="pdf" data-i18n="ftPdf">PDF</option>
         <option value="other" data-i18n="ftOther">سایر</option>
       </select>
-      <button class="btn btn-ghost" id="selectModeBtn" style="width:auto;padding:8px 12px;display:flex;align-items:center;gap:5px" title="انتخاب">
+      <button class="btn btn-ghost" id="selectModeBtn" style="width:auto;padding:8px 12px;display:flex;align-items:center;gap:5px" data-i18n-title="select" title="انتخاب">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px"><polyline points="20 6 9 17 4 12"/></svg>
         <span data-i18n="select">انتخاب</span>
       </button>
       <button class="btn btn-ghost" id="selAllBtn" style="width:auto;display:none" data-i18n="selAll">همه</button>
-      <button class="btn btn-ghost" id="newFolderBtn" style="width:auto;padding:8px 11px" title="پوشه جدید">
+      <button class="btn btn-ghost" id="newFolderBtn" style="width:auto;padding:8px 11px" data-i18n-title="newFolder" title="پوشه جدید">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
       </button>
       <button class="btn btn-ghost" id="viewBtn" style="width:auto;padding:8px 11px" title="gallery">
@@ -624,7 +624,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgAppEndpoint">مینی‌اپ تلگرام</span><small style="direction:ltr;text-align:left;font-family:ui-monospace,monospace">/tg-app</small></div>
-        <a href="/tg-app" target="_blank" class="btn btn-ghost" style="width:auto;padding:6px 12px;font-size:12px">باز کردن ↗</a>
+        <a href="/tg-app" target="_blank" class="btn btn-ghost" style="width:auto;padding:6px 12px;font-size:12px" data-i18n="openTgApp">باز کردن ↗</a>
       </div>
     </div>
     <div class="sec">
@@ -723,7 +723,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgPeerLab">MTProto Peer (ANBAR_MTPROTO_PEER)</span></div>
-        <input type="text" id="s_tg_peer" placeholder="me یا -100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        <input type="text" id="s_tg_peer" data-i18n-ph="tgPeerPh" placeholder="me یا -100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgChunkLab">حجم هر چانک (MB)</span><small data-i18n="tgChunkSub">حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto</small></div>
@@ -912,6 +912,14 @@ const I18N={
   files:"فایل‌ها", refresh:"به‌روزرسانی",
   thName:"نام فایل", thSize:"حجم", thItems:"تعداد فایل‌ها", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
   secTgConfig:"پیکربندی تلگرام و متغیرها (.env)",
+  openTgApp:"باز کردن ↗",
+  newFolder:"پوشه جدید",
+  newFolderPrompt:"نام پوشه جدید را وارد کنید:",
+  folderCreated:"پوشه ایجاد شد",
+  shareFilesOnly:"اشتراک گروهی فقط برای فایل‌هاست",
+  zipFilesOnly:"دانلود ZIP فقط برای فایل‌هاست",
+  tgPeerPh:"me یا -100...",
+  tgApiHashPh:"Telegram API Hash...",
   tgBackendLab:"نوع بک‌اند ذخیره‌سازی",
   tgBackendSub:"استراتژی هیبریدی (توصیه‌شده)، MTProto یا Bot API",
   tgBackendHybrid:"🚀 هیبریدی (آپلود MTProto + دانلود Bot CDN)",
@@ -999,6 +1007,14 @@ const I18N={
   files:"Files", refresh:"Refresh",
   thName:"File name", thSize:"Size", thItems:"Items", thDate:"Date", thDl:"Downloads", thAct:"Actions",
   secTgConfig:"Telegram & MTProto Config (.env)",
+  openTgApp:"Open ↗",
+  newFolder:"New folder",
+  newFolderPrompt:"Enter new folder name:",
+  folderCreated:"Folder created",
+  shareFilesOnly:"Bulk share is only for files",
+  zipFilesOnly:"ZIP download is only for files",
+  tgPeerPh:"me or -100...",
+  tgApiHashPh:"Telegram API Hash...",
   tgBackendLab:"Storage Backend Strategy",
   tgBackendSub:"Hybrid (recommended), MTProto or Bot API",
   tgBackendHybrid:"🚀 Hybrid (MTProto + Bot CDN)",
@@ -1092,6 +1108,7 @@ function applyI18n(){
   document.documentElement.dir=lang==="fa"?"rtl":"ltr";
   document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));
   document.querySelectorAll("[data-i18n-ph]").forEach(el=>el.placeholder=t(el.dataset.i18nPh));
+  document.querySelectorAll("[data-i18n-title]").forEach(el=>el.title=t(el.dataset.i18nTitle));
   $("#langFa").classList.toggle("on",lang==="fa");
   $("#langEn").classList.toggle("on",lang==="en");
   updateLimTag();
@@ -1273,7 +1290,7 @@ function updateBreadcrumb() {
   });
 }
 $("#newFolderBtn").onclick = async () => {
-  const name = prompt("نام پوشه جدید را وارد کنید:");
+  const name = prompt(t("newFolderPrompt"));
   if (!name) return;
   const cleanName = name.replace(/[\/\\?%*:|"<>]/g, "").trim();
   if (!cleanName) return;
@@ -1283,7 +1300,7 @@ $("#newFolderBtn").onclick = async () => {
       method: "POST",
       body: JSON.stringify({ path: fullPath })
     });
-    toast("پوشه ایجاد شد");
+    toast(t("folderCreated"));
     refresh();
   } catch(e) {
     toast(e.message, "err");
@@ -1841,14 +1858,14 @@ $("#selMoveBtn").onclick=()=>{
    then show every URL in the link modal (copy-all friendly) */
 $("#selShareBtn").onclick=()=>{
   if(!selSet.size)return;
-  if([...selSet].some(id=>String(id).startsWith("folder:"))){toast("اشتراک گروهی فقط برای فایل‌هاست","err");return;}
+  if([...selSet].some(id=>String(id).startsWith("folder:"))){toast(t("shareFilesOnly"),"err");return;}
   openShareOpts(null); // reuse the options form; shareTarget=null marks bulk
 };
 /* bulk ZIP: stream the selection as one archive */
 $("#selZipBtn").onclick=async()=>{
   if(!selSet.size)return;
   const ids=[...selSet].filter(id=>!String(id).startsWith("folder:"));
-  if(!ids.length){toast("ZIP فقط برای فایل‌هاست","err");return;}
+  if(!ids.length){toast(t("zipFilesOnly"),"err");return;}
   toast(t("zipStart"));
   try{
     const r=await fetch("/f/zip",{method:"POST",
