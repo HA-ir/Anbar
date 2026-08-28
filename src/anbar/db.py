@@ -285,6 +285,45 @@ class Database:
         self._conn.commit()
         return cur.rowcount > 0
 
+    def move_objects_to_prefix(self, ids: list[str], new_prefix: str) -> dict[str, Any]:
+        """Move objects into a folder (prefix). Only the path portion of the
+        filename changes; the basename is preserved. Collisions are skipped,
+        not overwritten. Returns {"moved": int, "skipped": [{id, reason}]}.
+        """
+        if not ids:
+            return {"moved": 0, "skipped": []}
+        prefix = (new_prefix or "").strip("/")
+        prefix = prefix + "/" if prefix else ""
+        ph = ",".join("?" for _ in ids)
+        rows = self._conn.execute(
+            f"SELECT id, filename FROM objects WHERE id IN ({ph}) AND deleted_at IS NULL",
+            tuple(ids),
+        ).fetchall()
+        moved = 0
+        skipped: list[dict[str, Any]] = []
+        for r in rows:
+            obj_id = r["id"]
+            old_name = r["filename"]
+            base = old_name.rsplit("/", 1)[-1]
+            if not base:
+                skipped.append({"id": obj_id, "reason": "no-basename"})
+                continue
+            new_name = prefix + base
+            if new_name == old_name:
+                moved += 1  # already at the destination
+                continue
+            clash = self._conn.execute(
+                "SELECT 1 FROM objects WHERE filename = ? AND id != ? AND deleted_at IS NULL",
+                (new_name, obj_id),
+            ).fetchone()
+            if clash:
+                skipped.append({"id": obj_id, "reason": "exists", "name": new_name})
+                continue
+            self._conn.execute("UPDATE objects SET filename = ? WHERE id = ?", (new_name, obj_id))
+            moved += 1
+        self._conn.commit()
+        return {"moved": moved, "skipped": skipped}
+
     def bump_downloads(self, obj_id: str) -> None:
         self._conn.execute("UPDATE objects SET downloaded = downloaded + 1 WHERE id = ?", (obj_id,))
         self._conn.commit()

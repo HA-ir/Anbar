@@ -576,6 +576,9 @@ async def folder_rename(request: Request):
     new_path = body.get("new_path", "").strip("/")
     if not old_path or not new_path:
         raise HTTPException(400, "both old_path and new_path are required")
+    # moving a folder into itself (or one of its own subfolders) is illegal
+    if new_path == old_path or new_path.startswith(old_path + "/"):
+        raise HTTPException(400, "cannot move a folder into itself")
     db = request.app.state.db
     moved_count = db.rename_folder(old_path, new_path)
     return {"status": "renamed", "moved_count": moved_count, "new_path": new_path}
@@ -606,6 +609,33 @@ async def folder_delete(request: Request):
     db = request.app.state.db
     deleted_count = db.soft_delete_folder(folder_path)
     return {"status": "deleted", "deleted_count": deleted_count, "folder": folder_path}
+
+
+@router.post("/admin/objects/move")
+async def objects_move(request: Request):
+    """Move real objects into a folder (prefix). Basename preserved; existing
+    names are never overwritten — collisions are reported as skipped.
+    Folder *markers* are moved with /admin/folders/rename instead."""
+    require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "expected JSON {ids, dest}") from None
+    ids = body.get("ids") or []
+    dest = (body.get("dest") or "").strip()
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(400, "ids must be a non-empty list")
+    dest = dest.strip("/")
+    if "/" not in dest and any(ch in dest for ch in '?%*|"<>\\'):
+        raise HTTPException(400, "invalid destination path")
+    db = request.app.state.db
+    res = db.move_objects_to_prefix([str(i) for i in ids], dest)
+    return {
+        "status": "moved",
+        "moved": res["moved"],
+        "skipped": res["skipped"],
+        "dest": dest + "/" if dest else "",
+    }
 
 
 @router.delete("/admin/trash/{obj_id}")

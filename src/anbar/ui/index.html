@@ -483,6 +483,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
       <strong id="selCnt">0</strong>
       <button class="btn btn-ghost" id="selShareBtn" style="width:auto;padding:7px 12px" data-i18n="shareSel">اشتراک انتخاب‌شده‌ها</button>
       <button class="btn btn-ghost" id="selZipBtn" style="width:auto;padding:7px 12px" data-i18n="zipDl">دانلود ZIP</button>
+      <button class="btn btn-ghost" id="selMoveBtn" style="width:auto;padding:7px 12px" data-i18n="moveSel">انتقال انتخاب‌شده‌ها</button>
       <button class="btn btn-danger" id="selDelBtn" style="width:auto;padding:7px 12px" data-i18n="delSel">حذف انتخاب‌شده‌ها</button>
     </div>
 
@@ -753,6 +754,21 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
   </div>
 </div>
 
+<!-- move modal -->
+<div class="modal" id="moveModal">
+  <div class="modal-card" style="width:92%;max-width:420px">
+    <h3 data-i18n="moveTitle">انتقال</h3>
+    <p id="moveSub" style="font-size:13px;color:var(--muted)"></p>
+    <label style="font-size:12px;color:var(--muted)" data-i18n="moveToLab">مسیر مقصد (پوشه)</label>
+    <input type="text" id="moveDest" placeholder="folder/subfolder" autocomplete="off"
+      style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--text);font-size:14px;margin-top:4px">
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost" id="moveCancel" style="width:auto" data-i18n="close">لغو</button>
+      <button class="btn btn-primary" id="moveOk" style="width:auto" data-i18n="moveDo">انتقال</button>
+    </div>
+  </div>
+</div>
+
 <div id="toasts"></div>
 
 <script>
@@ -815,6 +831,9 @@ const I18N={
   mgPwWarn:"این لینک بدون رمز و بدون سقف دانلود برای همه باز می‌شود — تأیید؟ برای ادامه رمز بگذار یا دوباره ذخیره کن.",
   renameT:"تغییر نام", renameOk:"نام تغییر کرد", selAll:"همه", selNone:"هیچ",
   delSel:"حذف انتخاب‌شده‌ها", nSelected:"انتخاب‌شده",
+  moveSel:"انتقال انتخاب‌شده‌ها", movePrompt:"مسیر پوشهٔ مقصد را وارد کنید (خالی = ریشه):",
+  movedOk:"انتقال شد", skippedOk:"به‌خاطر تداخل نام رد شد", moveFileQ:"انتقال فایل به کجا؟",
+  moveTitle:"انتقال به پوشه", moveToLab:"مسیر مقصد (پوشه)", moveDo:"انتقال",
   maxDlLab:"سقف تعداد دانلود (۰ = بی‌نهایت)"
  },
  en:{
@@ -874,6 +893,9 @@ const I18N={
   mgPwWarn:"This link will be open to everyone with no password and no download cap. Set a password or save again to confirm.",
   renameT:"Rename", renameOk:"Renamed", selAll:"All", selNone:"None",
   delSel:"Delete selected", nSelected:"selected",
+  moveSel:"Move selected", movePrompt:"Destination folder path (empty = root):",
+  movedOk:"moved", skippedOk:"skipped (name clash)", moveFileQ:"Move file to…",
+  moveTitle:"Move to folder", moveToLab:"Destination path (folder)", moveDo:"Move",
   maxDlLab:"Download cap (0 = unlimited)"
  }
 };
@@ -1103,7 +1125,7 @@ function visibleFiles() {
       if (!map.has("DIR:" + folderName)) {
         map.set("DIR:" + folderName, {
           isFolder: true,
-          id: "folder_" + folderName,
+          id: "folder:" + folderFull,
           filename: folderName,
           fullPrefix: folderFull,
           size: 0,
@@ -1247,7 +1269,7 @@ function renderRows(){
     
     tr.innerHTML=
       '<td data-th="'+t("thName")+'"><div class="fname">'
-      +(isDir ? '' : '<input type="checkbox" class="selbox" data-id="'+o.id+'" style="margin-inline-end:8px;vertical-align:-2px">')
+      +('<input type="checkbox" class="selbox" data-id="'+o.id+'" style="margin-inline-end:8px;vertical-align:-2px">')
       +'<span class="fic" style="'+(isDir ? 'background:rgba(47,107,255,.15)' : '')+'">'+iconSvg+'</span>'
       +'<span class="fn" style="cursor:'+(isDir ? 'pointer;color:var(--brand);font-weight:700' : 'default')+'" title="'+esc(nameToShow)+'">'+esc(nameToShow)+(isDir ? '/' : '')+'</span></div></td>'
       +'<td class="num" data-th="'+t("thSize")+'">'+(isDir ? (o.itemCount + ' item') : humanSize(o.size))+'</td>'
@@ -1255,10 +1277,12 @@ function renderRows(){
       +'<td class="num" data-th="'+t("thDl")+'">'+(isDir ? '—' : (o.downloaded??0))+'</td>'
       +'<td data-th="'+t("thAct")+'"><div class="acts">'
       +(isDir
-        ? '<button class="act" data-a="fold-rename" title="تغییر نام / جابجایی"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+        ? '<button class="act" data-a="fold-rename" title="تغییر نام"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+          +'<button class="act" data-a="fold-move" title="انتقال پوشه"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg></button>'
           +'<button class="act" data-a="fold-copy" title="کپی پوشه"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
           +'<button class="act del" data-a="fold-del" title="حذف پوشه"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
         : '<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
+          +'<button class="act" data-a="mv" title="انتقال / Move"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg></button>'
           +'<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>'
           +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>')
       +'</div></td>';
@@ -1315,6 +1339,10 @@ function renderRows(){
       const a=document.createElement("a");
       a.href="/f/"+o.id;document.body.appendChild(a);a.click();a.remove();
     };
+    tr.querySelector('[data-a=mv]').onclick=(e)=>{
+      e.stopPropagation();
+      openMoveModal([o.id], o.filename||o.id);
+    };
     tr.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
     tr.querySelector('[data-a=del]').onclick=()=>delObj(o);
     }
@@ -1325,7 +1353,6 @@ function renderRows(){
         if(isDir)return; // folder: fn handler above navigates (stopPropagation)
         openFileModal(o);return;
       }
-      if(isDir)return; // folders have no checkbox / selection
       toggleSel(o.id);
       const sb=tr.querySelector(".selbox");
       if(sb)sb.checked=selSet.has(o.id);
@@ -1389,18 +1416,33 @@ function renderGallery(list){
       +'<audio src="'+url+'" controls preload="metadata"></audio></div>';
     else if(kind==="pdf")inner='<div class="gpdf"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg><span>PDF</span></div>';
     else inner='<div class="gicon">'+esc((extOf(o.filename)||"bin").toUpperCase().slice(0,4))+'</div>';
+    const MV_ICON='<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg>';
+    const acts = isDir
+      ? '<button class="act" data-a="fold-rename" title="rename"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+        +'<button class="act" data-a="fold-move" title="move">'+MV_ICON+'</button>'
+        +'<button class="act" data-a="fold-copy" title="copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+        +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
+      : '<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>'
+        +'<button class="act" data-a="mv" title="move">'+MV_ICON+'</button>'
+        +'<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
+        +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>';
     cell.innerHTML='<div class="gthumb">'+inner+'</div>'
       +'<div class="gname" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</div>'
-      +'<div class="gsub"><span class="num">'+humanSize(o.size)+'</span> · <span class="num">'+(o.downloaded??0)+' ↓</span></div>'
+      +'<div class="gsub"><span class="num">'+(isDir?(o.itemCount+' items'):humanSize(o.size))+'</span>'+(isDir?'':' · <span class="num">'+(o.downloaded??0)+' ↓')+'</span></div>'
       +'<input type="checkbox" class="selbox" data-id="'+o.id+'">'
-      +'<div class="gacts">'
-      +'<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>'
-      +'<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
-      +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
-      +'</div>';
-    cell.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
-    cell.querySelector('[data-a=dl]').onclick=()=>{if(isDir)return;toast(t("dlStart"));const a=document.createElement("a");a.href=url;document.body.appendChild(a);a.click();a.remove();};
-    cell.querySelector('[data-a=del]').onclick=()=>{if(isDir){if(!confirm("آیا از حذف پوشه "+o.filename+" و فایل‌های داخل آن اطمینان دارید؟"))return;api("/api/v1/admin/folders/delete",{method:"POST",body:JSON.stringify({path:o.fullPrefix})}).then(()=>{toast("پوشه به سطل زباله منتقل شد");refresh();}).catch(err=>toast(err.message,"err"));}else delObj(o);};
+      +'<div class="gacts">'+acts+'</div>';
+    if(!isDir){
+      cell.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
+      cell.querySelector('[data-a=dl]').onclick=()=>{toast(t("dlStart"));const a=document.createElement("a");a.href=url;document.body.appendChild(a);a.click();a.remove();};
+    }
+    if(isDir){
+      cell.querySelector('[data-a="fold-rename"]').onclick=(e)=>{e.stopPropagation();const p=prompt("مسیر یا نام جدید پوشه را وارد کنید:",o.fullPrefix.replace(/\/$/,""));if(!p)return;api("/api/v1/admin/folders/rename",{method:"POST",body:JSON.stringify({old_path:o.fullPrefix,new_path:p})}).then(()=>{toast("تغییر کرد");refresh();}).catch(err=>toast(err.message,"err"));};
+      cell.querySelector('[data-a="fold-move"]').onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename||o.id);};
+      cell.querySelector('[data-a="fold-copy"]').onclick=(e)=>{e.stopPropagation();const p=prompt("مسیر پوشه مقصد برای کپی را وارد کنید:",o.filename+"_copy");if(!p)return;api("/api/v1/admin/folders/copy",{method:"POST",body:JSON.stringify({src_path:o.fullPrefix,dst_path:p})}).then(()=>{toast("کپی شد");refresh();}).catch(err=>toast(err.message,"err"));};
+    }
+    cell.querySelector('[data-a=del]').onclick=(e)=>{e.stopPropagation();if(isDir){if(!confirm("آیا از حذف پوشه "+o.filename+" و فایل‌های داخل آن اطمینان دارید؟"))return;api("/api/v1/admin/folders/delete",{method:"POST",body:JSON.stringify({path:o.fullPrefix})}).then(()=>{toast("پوشه به سطل زباله منتقل شد");refresh();}).catch(err=>toast(err.message,"err"));}else delObj(o);};
+    const mvB=cell.querySelector('[data-a=mv]');
+    if(mvB)mvB.onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename||o.id);};
     // whole card toggles selection; thumb opens the modal (or enters folder)
     cell.onclick=e=>{
       if(e.target.closest(".gacts,.selbox,a,button"))return;
@@ -1442,28 +1484,37 @@ $("#selAllBtn").onclick=()=>{
 };
 $("#selDelBtn").onclick=async()=>{
   if(!selSet.size)return;
-  if(!confirm(t("delSel")+" ("+selSet.size+")؟"))return;
-  const ids=[...selSet];
+  const ids=[...selSet].filter(id=>!String(id).startsWith("folder:"));
+  if(!ids.length){toast("حذف گروهی فقط برای فایل‌هاست — پوشه را از دکمهٔ خودش حذف کن","err");return;}
+  if(!confirm(t("delSel")+" ("+ids.length+")؟"))return;
   let ok=0;
   for(const id of ids){
     try{await api("/f/"+id,{method:"DELETE"});ok++;}catch(e){}
   }
   selSet.clear();toast(ok+" ✓");refresh();
 };
+/* bulk move: files via the move endpoint, folder markers via folder rename */
+$("#selMoveBtn").onclick=()=>{
+  if(!selSet.size)return;
+  openMoveModal([...selSet], selSet.size+" "+t("nSelected"));
+};
 /* bulk share: mint one link per selected object with the chosen options,
    then show every URL in the link modal (copy-all friendly) */
 $("#selShareBtn").onclick=()=>{
   if(!selSet.size)return;
+  if([...selSet].some(id=>String(id).startsWith("folder:"))){toast("اشتراک گروهی فقط برای فایل‌هاست","err");return;}
   openShareOpts(null); // reuse the options form; shareTarget=null marks bulk
 };
 /* bulk ZIP: stream the selection as one archive */
 $("#selZipBtn").onclick=async()=>{
   if(!selSet.size)return;
+  const ids=[...selSet].filter(id=>!String(id).startsWith("folder:"));
+  if(!ids.length){toast("ZIP فقط برای فایل‌هاست","err");return;}
   toast(t("zipStart"));
   try{
     const r=await fetch("/f/zip",{method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({ids:[...selSet]})});
+      body:JSON.stringify({ids:ids})});
     if(!r.ok){throw new Error((await r.json()).detail||r.status);}
     const blob=await r.blob();
     const a=document.createElement("a");
@@ -1831,6 +1882,55 @@ async function delObj(o){
     toast(t("delOk"));refresh();
   }catch(e){toast(t("delFail")+": "+e.message,"err");}
 }
+/* ================= move to folder (v0.12) ================= */
+let moveIds=[];
+function openMoveModal(ids,subText){
+  moveIds=ids;
+  $("#moveSub").textContent=subText||"";
+  const d=$("#moveDest");d.value="";
+  $("#moveModal").classList.add("on");
+  setTimeout(()=>d.focus(),30);
+}
+function closeMoveModal(){$("#moveModal").classList.remove("on");}
+async function doMove(){
+  if(!moveIds.length)return;
+  const dest=$("#moveDest").value.trim().replace(/\/+$/,"");
+  closeMoveModal();
+  const folders=moveIds.filter(id=>String(id).startsWith("folder:"));
+  const realIds=moveIds.filter(id=>!String(id).startsWith("folder:"));
+  let ok=0;
+  // folder markers: rename prefix to the destination path
+  for(const fid of folders){
+    const fullPrefix=String(fid).slice("folder:".length);
+    const fp=fullPrefix.replace(/\/+$/,"");
+    const base=fp.split("/").pop();
+    // no-op: destination already contains the folder (or IS the folder)
+    if(dest&&(fp===dest||fp.startsWith(dest+"/"))){ok++;continue;}
+    const newPath=(dest?dest+"/":"")+base;
+    if(newPath===fp){ok++;continue;}
+    try{
+      await api("/api/v1/admin/folders/rename",{method:"POST",
+        body:JSON.stringify({old_path:fullPrefix,new_path:newPath})});
+      ok++;
+    }catch(e){toast(e.message,"err");}
+  }
+  // real objects: batch move endpoint
+  if(realIds.length){
+    try{
+      const r=await api("/api/v1/admin/objects/move",{method:"POST",
+        body:JSON.stringify({ids:realIds,dest:dest})});
+      ok+=r.moved||0;
+      if(r.skipped&&r.skipped.length)toast(r.skipped.length+" "+t("skippedOk"),"err");
+    }catch(e){toast(e.message,"err");}
+  }
+  selSet.clear();
+  toast(ok+" "+t("movedOk"));
+  refresh();
+}
+$("#moveOk").onclick=doMove;
+$("#moveCancel").onclick=closeMoveModal;
+$("#moveModal").onclick=e=>{if(e.target.id==="moveModal")closeMoveModal();};
+$("#moveDest").addEventListener("keydown",e=>{if(e.key==="Enter")doMove();});
 $("#refBtn").onclick=()=>{refresh();};
 
 /* ================= url ingest ================= */
