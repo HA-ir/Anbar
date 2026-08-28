@@ -984,8 +984,8 @@ async function boot(){
   }catch(e){}
   try{
     const me=await api("/ui/me");
-    if(me.authed){authed=true;showApp();}
-  }catch(e){authed=false;}
+    if(me && me.authed){authed=true;showApp();}else{showLogin();}
+  }catch(e){authed=false;showLogin();}
 }
 function showLogin(){$("#loginWrap").style.display="flex";$("#app").classList.remove("on");}
 function showApp(){

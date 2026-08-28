@@ -166,13 +166,11 @@ def whoami(request) -> str:
         else (str(settings.api_key) if settings.api_key else None)
     )
     if key and (
-        (admin_key and constant_time_equal(key, admin_key))
-        or key == "test-admin-key"
+        admin_key and constant_time_equal(key, admin_key)
     ):
         return "admin"
     if key and (
         (api_key and constant_time_equal(key, api_key))
-        or key == "test-key"
         or _match_dynamic_key(key, request.app.state.db)
     ):
         return "uploader"
