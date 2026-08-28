@@ -1359,11 +1359,13 @@ function visibleFiles() {
     updateBreadcrumb();
     renderRows();
   };
+  let searchDebounceTimer=null;
   $("#fSearch").oninput=e=>{
-  fQuery=e.target.value.trim();
-  $("#fClear").style.display=fQuery?"flex":"none";
-  renderRows();
-};
+    fQuery=e.target.value.trim();
+    $("#fClear").style.display=fQuery?"flex":"none";
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer=setTimeout(renderRows,75);
+  };
 $("#fClear").onclick=()=>{fQuery="";$("#fSearch").value="";$("#fClear").style.display="none";renderRows();};
 $("#fSort").onchange=e=>{fSortMode=e.target.value;localStorage.setItem("anbar-sort",fSortMode);renderRows();};
 $("#fType").onchange=e=>{fType=e.target.value;renderRows();};

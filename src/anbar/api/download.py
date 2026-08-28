@@ -458,9 +458,13 @@ async def download(request: Request, obj_id: str):
 
     async def stream():
         # one chunk in flight per request — never the whole object
+        # Stream in 128KB slices with memoryview for zero-copy socket backpressure
+        SLICE = 128 * 1024
         for idx, off, n in segments:
             chunk = await _fetch_chunk_bytes(manifest.chunks[idx])
-            yield chunk[off : off + n]
+            mv = memoryview(chunk)[off : off + n]
+            for i in range(0, len(mv), SLICE):
+                yield bytes(mv[i : i + SLICE])
 
     return StreamingResponse(stream(), status_code=status, headers=headers)
 

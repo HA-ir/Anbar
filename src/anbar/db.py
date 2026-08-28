@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS objects (
   deleted_at    INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_objects_created ON objects(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_objects_deleted ON objects(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_objects_filename ON objects(filename);
 CREATE TABLE IF NOT EXISTS kv (
   k TEXT PRIMARY KEY,
   v TEXT NOT NULL
@@ -43,6 +45,9 @@ def _connect(path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA mmap_size=268435456")
+    conn.execute("PRAGMA cache_size=-64000")
+    conn.execute("PRAGMA temp_store=MEMORY")
     return conn
 
 
