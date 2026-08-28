@@ -181,11 +181,31 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .btn-danger:hover{background:var(--err);color:#fff}
 /* gallery view */
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:14px}
-.gcell{position:relative;background:var(--bg3);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.gcell{position:relative;background:var(--bg3);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .gcell:hover{border-color:var(--line2)}
 .gthumb{height:110px;background:var(--bg2);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
 .gthumb img,.gthumb video{width:100%;height:100%;object-fit:cover}
 .gicon{font-size:22px;font-weight:700;color:var(--tx3);letter-spacing:.05em}
+/* select mode toggle & checkboxes */
+body:not(.select-mode) .selbox{display:none !important}
+body.select-mode .selbox{display:block !important}
+.gcell .selbox{position:absolute;top:8px;inset-inline-start:8px;z-index:3;width:18px;height:18px;cursor:pointer}
+tbody tr .selbox{cursor:pointer}
+#selectModeBtn.view-on{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 0 0 3px var(--brand-soft)}
+/* date cell RTL styling */
+.date-cell{font-size:12.5px;color:var(--tx2);white-space:nowrap;direction:rtl;text-align:right;unicode-bidi:embed}
+html[dir="ltr"] .date-cell{direction:ltr;text-align:left}
+/* filterbar & selects */
+#fType,#fSort{height:36px;line-height:36px;padding:0 12px;border:1.5px solid var(--line2);border-radius:10px;background-color:var(--bg2);color:var(--tx);font-size:13px;font-family:inherit;outline:none;cursor:pointer;text-align:center;text-align-last:center;-webkit-text-align-last:center;-moz-text-align-last:center;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+#fType option,#fSort option{text-align:center;padding:5px 8px;background:var(--bg2);color:var(--tx)}
+/* selBar responsive */
+#selBar{display:none;flex-wrap:wrap;align-items:center;gap:8px;margin:-8px 0 14px;padding:10px 14px;background:var(--brand-soft);border:1px solid var(--line2);border-radius:12px;font-size:13px;max-width:100%;box-sizing:border-box}
+#selBar .btn{flex:0 1 auto;white-space:nowrap;padding:7px 12px}
+@media(max-width:640px){
+  #selBar{gap:6px;padding:8px 10px}
+  #selBar .btn{flex:1 1 calc(50% - 6px);text-align:center;justify-content:center;font-size:12px;padding:7px 6px}
+  #selBar strong{width:100%;text-align:center;margin-bottom:2px}
+}
 /* gallery: real audio player + PDF card */
 .gaudio{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;padding:10px}
 .gaudio svg{width:30px;height:30px;fill:none;stroke:var(--brand);stroke-width:1.7;stroke-linecap:round;flex:none;margin-top:4px}
@@ -196,8 +216,6 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .gplay{position:absolute;inset:auto auto 6px 6px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:8px}
 .gname{font-size:12px;padding:8px 10px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gsub{font-size:11px;color:var(--tx3);padding:0 10px 10px;display:flex;align-items:center;gap:4px;direction:ltr;justify-content:flex-end}
-.gcell .selbox{position:absolute;top:8px;inset-inline-start:8px;z-index:2;display:none}
-.gcell:hover .selbox,.gcell .selbox:checked{display:block}
 .gacts{position:absolute;top:6px;inset-inline-end:6px;display:none;gap:4px;z-index:2}
 .gcell:hover .gacts{display:flex}
 .gacts .act{background:var(--bg2)}
@@ -436,7 +454,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
         <span class="url-ic"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>
         <input type="url" id="urlInput" data-i18n-ph="urlPh" placeholder="https://example.com/file.zip …" autocomplete="off" spellcheck="false">
         <button class="btn btn-ghost" id="pasteBtn" type="button" style="width:auto;padding:11px 14px;flex:none" title="Paste" data-i18n-title="pasteT">
-          <svg viewBox="0 0 24 24" style="width:15px;height:15px;vertical-align:-2px"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
         </button>
         <button class="btn btn-primary" id="urlBtn" type="submit" style="width:auto" data-i18n="urlBtn">دریافت</button>
       </form>
@@ -452,7 +470,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <!-- files -->
     <div class="toolbar">
       <h2><span data-i18n="files">فایل‌ها</span><span class="count" id="cnt">0</span></h2>
-      <select id="fType" aria-label="type filter" style="width:auto;padding:8px 10px;border:1.5px solid var(--line2);border-radius:9px;background:var(--bg2);color:var(--tx);font-family:inherit;font-size:13px">
+      <select id="fType" aria-label="type filter" style="width:auto;min-width:110px">
         <option value="" data-i18n="ftAll">همه انواع</option>
         <option value="image" data-i18n="ftImage">عکس</option>
         <option value="video" data-i18n="ftVideo">ویدیو</option>
@@ -460,7 +478,11 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
         <option value="pdf" data-i18n="ftPdf">PDF</option>
         <option value="other" data-i18n="ftOther">سایر</option>
       </select>
-      <button class="btn btn-ghost" id="selAllBtn" style="width:auto" data-i18n="selAll">همه</button>
+      <button class="btn btn-ghost" id="selectModeBtn" style="width:auto;padding:8px 12px;display:flex;align-items:center;gap:5px" title="انتخاب">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px"><polyline points="20 6 9 17 4 12"/></svg>
+        <span data-i18n="select">انتخاب</span>
+      </button>
+      <button class="btn btn-ghost" id="selAllBtn" style="width:auto;display:none" data-i18n="selAll">همه</button>
       <button class="btn btn-ghost" id="newFolderBtn" style="width:auto;padding:8px 11px" title="پوشه جدید">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
       </button>
@@ -479,12 +501,13 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
         <span data-i18n="refresh">به‌روزرسانی</span>
       </button>
     </div>
-    <div id="selBar" style="display:none;align-items:center;gap:10px;margin:-8px 0 14px;padding:8px 14px;background:var(--brand-soft);border:1px solid var(--line2);border-radius:10px;font-size:13px">
+    <div id="selBar">
       <strong id="selCnt">0</strong>
-      <button class="btn btn-ghost" id="selShareBtn" style="width:auto;padding:7px 12px" data-i18n="shareSel">اشتراک انتخاب‌شده‌ها</button>
-      <button class="btn btn-ghost" id="selZipBtn" style="width:auto;padding:7px 12px" data-i18n="zipDl">دانلود ZIP</button>
-      <button class="btn btn-ghost" id="selMoveBtn" style="width:auto;padding:7px 12px" data-i18n="moveSel">انتقال انتخاب‌شده‌ها</button>
-      <button class="btn btn-danger" id="selDelBtn" style="width:auto;padding:7px 12px" data-i18n="delSel">حذف انتخاب‌شده‌ها</button>
+      <button class="btn btn-ghost" id="selShareBtn" data-i18n="shareSel">اشتراک انتخاب‌شده‌ها</button>
+      <button class="btn btn-ghost" id="selZipBtn" data-i18n="zipDl">دانلود ZIP</button>
+      <button class="btn btn-ghost" id="selMoveBtn" data-i18n="moveSel">انتقال انتخاب‌شده‌ها</button>
+      <button class="btn btn-danger" id="selDelBtn" data-i18n="delSel">حذف انتخاب‌شده‌ها</button>
+      <button class="btn btn-ghost" id="selCancelBtn" data-i18n="close">لغو</button>
     </div>
 
     <div class="filterbar">
@@ -507,7 +530,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <div id="breadcrumbBar" style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:6px 2px 10px;color:var(--tx2);overflow-x:auto;white-space:nowrap">
       <span id="bcRoot" style="cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--brand)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        <span>خانه</span>
+        <span data-i18n="home">خانه</span>
       </span>
       <div id="bcTrail" style="display:flex;align-items:center;gap:6px"></div>
     </div>
@@ -541,6 +564,23 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     </button>
   </div>
   <div class="drawer-body">
+    <div class="sec">
+      <h3 data-i18n="secUI">تنظیمات ظاهر و رابط کاربری</h3>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="defView">نمای پیش‌فرض</span></div>
+        <select id="s_def_view" style="padding:7px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px">
+          <option value="gallery" data-i18n="vGallery">گالری</option>
+          <option value="table" data-i18n="vTable">جدول</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="themeLab">پوسته</span></div>
+        <select id="s_theme_select" style="padding:7px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px">
+          <option value="dark" data-i18n="thDark">تاریک</option>
+          <option value="light" data-i18n="thLight">روشن</option>
+        </select>
+      </div>
+    </div>
     <div class="sec">
       <h3 data-i18n="secAuth">احراز هویت</h3>
       <div class="set-row">
@@ -834,6 +874,9 @@ const I18N={
   moveSel:"انتقال انتخاب‌شده‌ها", movePrompt:"مسیر پوشهٔ مقصد را وارد کنید (خالی = ریشه):",
   movedOk:"انتقال شد", skippedOk:"به‌خاطر تداخل نام رد شد", moveFileQ:"انتقال فایل به کجا؟",
   moveTitle:"انتقال به پوشه", moveToLab:"مسیر مقصد (پوشه)", moveDo:"انتقال",
+  home:"خانه", select:"انتخاب", selectCancel:"لغو انتخاب",
+  secUI:"تنظیمات ظاهر و رابط کاربری", defView:"نمای پیش‌فرض", vGallery:"گالری", vTable:"جدول",
+  themeLab:"پوسته", thDark:"تاریک", thLight:"روشن",
   maxDlLab:"سقف تعداد دانلود (۰ = بی‌نهایت)"
  },
  en:{
@@ -896,6 +939,9 @@ const I18N={
   moveSel:"Move selected", movePrompt:"Destination folder path (empty = root):",
   movedOk:"moved", skippedOk:"skipped (name clash)", moveFileQ:"Move file to…",
   moveTitle:"Move to folder", moveToLab:"Destination path (folder)", moveDo:"Move",
+  home:"Home", select:"Select", selectCancel:"Done",
+  secUI:"UI & Preferences", defView:"Default view", vGallery:"Gallery", vTable:"Table",
+  themeLab:"Theme", thDark:"Dark", thLight:"Light",
   maxDlLab:"Download cap (0 = unlimited)"
  }
 };
@@ -970,8 +1016,15 @@ function humanDate(ts){
   if(!ts)return"—";
   const d=new Date(ts*1000);
   if(lang==="fa"){
-    const f=new Intl.DateTimeFormat("fa-IR",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"});
-    return f.format(d);
+    const parts=new Intl.DateTimeFormat("fa-IR",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(d);
+    let day="", month="", hour="", minute="";
+    for(const p of parts){
+      if(p.type==="day")day=p.value;
+      else if(p.type==="month")month=p.value;
+      else if(p.type==="hour")hour=p.value;
+      else if(p.type==="minute")minute=p.value;
+    }
+    return `${day} ${month} ساعت ${hour}:${minute}`;
   }
   const f=new Intl.DateTimeFormat("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
   return f.format(d);
@@ -1273,7 +1326,7 @@ function renderRows(){
       +'<span class="fic" style="'+(isDir ? 'background:rgba(47,107,255,.15)' : '')+'">'+iconSvg+'</span>'
       +'<span class="fn" style="cursor:'+(isDir ? 'pointer;color:var(--brand);font-weight:700' : 'default')+'" title="'+esc(nameToShow)+'">'+esc(nameToShow)+(isDir ? '/' : '')+'</span></div></td>'
       +'<td class="num" data-th="'+t("thSize")+'">'+(isDir ? (o.itemCount + ' item') : humanSize(o.size))+'</td>'
-      +'<td class="num" data-th="'+t("thDate")+'" data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</td>'
+      +'<td class="date-cell" data-th="'+t("thDate")+'" data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</td>'
       +'<td class="num" data-th="'+t("thDl")+'">'+(isDir ? '—' : (o.downloaded??0))+'</td>'
       +'<td data-th="'+t("thAct")+'"><div class="acts">'
       +(isDir
@@ -1346,11 +1399,22 @@ function renderRows(){
     tr.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
     tr.querySelector('[data-a=del]').onclick=()=>delObj(o);
     }
-    // click anywhere on the row toggles selection; the name still opens
+    // click anywhere on the row toggles selection (in selectMode) or opens/navigates
     tr.onclick=e=>{
       if(e.target.closest(".selbox,.acts,a,button"))return;
       if(e.target.closest(".fn")){
         if(isDir)return; // folder: fn handler above navigates (stopPropagation)
+        if(selectMode){
+          toggleSel(o.id);
+          const sb=tr.querySelector(".selbox");
+          if(sb)sb.checked=selSet.has(o.id);
+          tr.classList.toggle("selected",selSet.has(o.id));
+          return;
+        }
+        openFileModal(o);return;
+      }
+      if(!selectMode){
+        if(isDir){curFolderPrefix=o.fullPrefix;updateBreadcrumb();renderRows();return;}
         openFileModal(o);return;
       }
       toggleSel(o.id);
@@ -1370,9 +1434,10 @@ function renderRows(){
     tb.appendChild(tr);
   });
 }
-/* multi-select (v0.9) */
+/* multi-select & select mode (v0.13) */
 const selSet=new Set();
-let viewMode=localStorage.getItem("anbar-view")||"table";
+let selectMode=false;
+let viewMode=localStorage.getItem("anbar-view")||"gallery";
 function syncViewBtn(){
   const b=$("#viewBtn");
   if(!b)return;
@@ -1387,8 +1452,32 @@ $("#viewBtn").onclick=()=>{
   renderRows();
 };
 syncViewBtn();
-/* selection UX: click the row/card to toggle selection (no hunting for
-   a tiny checkbox). Name click still opens the file modal. */
+function setSelectMode(on){
+  selectMode=!!on;
+  document.body.classList.toggle("select-mode",selectMode);
+  const btn=$("#selectModeBtn");
+  if(btn){
+    btn.classList.toggle("view-on",selectMode);
+    const s=btn.querySelector("span");
+    if(s){
+      s.dataset.i18n = selectMode ? "selectCancel" : "select";
+      s.textContent = t(s.dataset.i18n);
+    }
+  }
+  const allBtn=$("#selAllBtn");
+  if(allBtn)allBtn.style.display=selectMode?"inline-block":"none";
+  if(!selectMode){
+    selSet.clear();
+    updateSelBar();
+    renderRows();
+  }
+}
+$("#selectModeBtn").onclick=()=>{
+  setSelectMode(!selectMode);
+  if(selectMode)renderRows();
+};
+$("#selCancelBtn").onclick=()=>setSelectMode(false);
+/* selection UX */
 function toggleSel(id){
   if(selSet.has(id))selSet.delete(id);else selSet.add(id);
   updateSelBar();
@@ -1443,17 +1532,28 @@ function renderGallery(list){
     cell.querySelector('[data-a=del]').onclick=(e)=>{e.stopPropagation();if(isDir){if(!confirm("آیا از حذف پوشه "+o.filename+" و فایل‌های داخل آن اطمینان دارید؟"))return;api("/api/v1/admin/folders/delete",{method:"POST",body:JSON.stringify({path:o.fullPrefix})}).then(()=>{toast("پوشه به سطل زباله منتقل شد");refresh();}).catch(err=>toast(err.message,"err"));}else delObj(o);};
     const mvB=cell.querySelector('[data-a=mv]');
     if(mvB)mvB.onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename||o.id);};
-    // whole card toggles selection; thumb opens the modal (or enters folder)
+    // whole card click: toggle sel in selectMode, otherwise open/navigate
     cell.onclick=e=>{
       if(e.target.closest(".gacts,.selbox,a,button"))return;
-      if(isDir){curFolderPrefix=o.fullPrefix;updateBreadcrumb();renderRows();return;}
+      if(!selectMode){
+        if(isDir){curFolderPrefix=o.fullPrefix;updateBreadcrumb();renderRows();return;}
+        openFileModal(o);return;
+      }
       toggleSel(o.id);
       cell.classList.toggle("selected",selSet.has(o.id));
-      cell.querySelector(".selbox").checked=selSet.has(o.id);
+      const sb=cell.querySelector(".selbox");
+      if(sb)sb.checked=selSet.has(o.id);
     };
     cell.querySelector(".gthumb").addEventListener("click",e=>{
       if(e.target.closest(".selbox,.gacts,audio"))return;
       e.stopPropagation();
+      if(selectMode){
+        toggleSel(o.id);
+        cell.classList.toggle("selected",selSet.has(o.id));
+        const sb=cell.querySelector(".selbox");
+        if(sb)sb.checked=selSet.has(o.id);
+        return;
+      }
       if(isDir){curFolderPrefix=o.fullPrefix;updateBreadcrumb();renderRows();return;}
       openFileModal(o);
     });
@@ -1477,10 +1577,12 @@ function updateSelBar(){
   if(n)$("#selCnt").textContent=n+" "+t("nSelected");
 }
 $("#selAllBtn").onclick=()=>{
+  if(!selectMode)setSelectMode(true);
   const list=visibleFiles();
   if(selSet.size>=list.length){selSet.clear();}
   else list.forEach(o=>selSet.add(o.id));
   renderRows();
+  updateSelBar();
 };
 $("#selDelBtn").onclick=async()=>{
   if(!selSet.size)return;
@@ -2172,6 +2274,8 @@ function openDrawer(){
 function closeDrawer(){drawer.classList.remove("on");scrim.classList.remove("on");}
 let curSettings=null,authOn=null;
 async function loadSettings(){
+  const dv=$("#s_def_view");if(dv)dv.value=viewMode;
+  const th=$("#s_theme_select");if(th)th.value=theme;
   try{
     const st=await api("/api/v1/admin/status");
     authOn=st.auth_enabled;
@@ -2214,6 +2318,17 @@ $("#swEnc").onclick=async()=>{
   finally{sw.style.opacity="";}
 };
 $("#saveBtn").onclick=async()=>{
+  const dv=$("#s_def_view");
+  if(dv&&dv.value!==viewMode){
+    viewMode=dv.value;
+    localStorage.setItem("anbar-view",viewMode);
+    syncViewBtn();
+    renderRows();
+  }
+  const th=$("#s_theme_select");
+  if(th&&th.value!==theme){
+    setTheme(th.value);
+  }
   const body={
     rate_download:+$("#s_rate_download").value,
     rate_upload:+$("#s_rate_upload").value,
