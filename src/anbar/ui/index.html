@@ -254,7 +254,9 @@ tbody tr.selected .fname .fn{color:var(--brand)}
 .tag{font-size:10.5px;font-weight:700;padding:2.5px 8px;border-radius:6px;letter-spacing:.03em}
 .tag.bot{background:var(--brand-soft);color:var(--brand)}
 .tag.mtproto{background:var(--ok-soft);color:var(--ok)}
-.num{font-variant-numeric:tabular-nums;color:var(--tx2);font-size:12.5px;direction:ltr;text-align:left;unicode-bidi:isolate}
+.num{font-variant-numeric:tabular-nums;color:var(--tx2);font-size:12.5px;unicode-bidi:embed}
+/* date cell */
+.date-cell{font-size:12.5px;color:var(--tx2);white-space:nowrap;unicode-bidi:embed}
 /* ============ settings drawer ============ */
 .scrim{position:fixed;inset:0;background:rgba(8,12,20,.45);opacity:0;pointer-events:none;transition:.25s;z-index:90}
 .scrim.on{opacity:1;pointer-events:auto}
@@ -363,7 +365,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
   td .fname{flex:1;min-width:0}
   td:first-child::before{display:none}  /* file row is self-describing */
   td .acts{justify-content:flex-end}
-  .num{font-size:13px;color:var(--tx)}
+  .num,.date-cell{font-size:13px;color:var(--tx)}
   .modal-card{padding:20px 16px;max-width:calc(100vw - 16px)}
   .modal{padding:8px}
   .drawer{width:100%}
@@ -821,7 +823,7 @@ const I18N={
   keyPh:"کلید ادمین (ANBAR_ADMIN_KEY)", login:"ورود", badKey:"کلید نادرست است",
   dropT:"فایل‌ها را اینجا رها کن یا کلیک کن", dropS:"چند فایلی · بدون ذخیره روی دیسک سرور — مستقیم در تلگرام",
   files:"فایل‌ها", refresh:"به‌روزرسانی",
-  thName:"نام فایل", thSize:"حجم", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
+  thName:"نام فایل", thSize:"حجم", thItems:"تعداد فایل‌ها", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
   empty:"هنوز فایلی آپلود نکرده‌ای",
   setT:"تنظیمات ادمین", secAuth:"احراز هویت", secRate:"محدودیت سرعت (در دقیقه)",
  secS3:"سرویس S3 و تلگرام", s3Endpoint:"اندپوینت S3", tgAppEndpoint:"مینی‌اپ تلگرام",
@@ -889,7 +891,7 @@ const I18N={
   keyPh:"Admin key (ANBAR_ADMIN_KEY)", login:"Sign in", badKey:"Invalid key",
   dropT:"Drop files here or click to browse", dropS:"Multiple files · never stored on server disk — straight to Telegram",
   files:"Files", refresh:"Refresh",
-  thName:"File name", thSize:"Size", thDate:"Date", thDl:"Downloads", thAct:"Actions",
+  thName:"File name", thSize:"Size", thItems:"Items", thDate:"Date", thDl:"Downloads", thAct:"Actions",
   empty:"No files yet",
   setT:"Admin settings", secAuth:"Authentication", secRate:"Rate limits (per minute)",
   secS3:"S3 Service & Telegram", s3Endpoint:"S3 Endpoint", tgAppEndpoint:"Telegram Mini App",
@@ -1332,7 +1334,7 @@ function renderRows(){
       +('<input type="checkbox" class="selbox" data-id="'+o.id+'" style="margin-inline-end:8px;vertical-align:-2px">')
       +'<span class="fic" style="'+(isDir ? 'background:rgba(47,107,255,.15);cursor:pointer' : '')+'">'+iconSvg+'</span>'
       +'<span class="fn" style="cursor:'+(isDir ? 'pointer;color:var(--brand);font-weight:700' : 'default')+'" title="'+esc(nameToShow)+'">'+esc(nameToShow)+(isDir ? '/' : '')+'</span></div></td>'
-      +'<td class="num" data-th="'+t("thSize")+'">'+(isDir ? (o.itemCount + ' ' + t("nItems")) : humanSize(o.size))+'</td>'
+      +'<td class="num" data-th="'+(isDir ? t("thItems") : t("thSize"))+'">'+(isDir ? (o.itemCount + ' ' + t("nItems")) : humanSize(o.size))+'</td>'
       +'<td class="date-cell" data-th="'+t("thDate")+'" data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</td>'
       +'<td class="num" data-th="'+t("thDl")+'">'+(isDir ? '—' : (o.downloaded??0))+'</td>'
       +'<td data-th="'+t("thAct")+'"><div class="acts">'
