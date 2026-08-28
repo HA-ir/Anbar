@@ -956,10 +956,12 @@ function humanDate(ts){
 }
 
 /* ================= api ================= */
+let _apiKey=localStorage.getItem("anbar-key")||"";
 async function api(path,opt={}){
-  const r=await fetch(path,{credentials:"same-origin",
-    headers:opt.body&&!(opt.body instanceof FormData)?{"Content-Type":"application/json"}:{},
-    ...opt});
+  const hdrs={};
+  if(opt.body&&!(opt.body instanceof FormData))hdrs["Content-Type"]="application/json";
+  if(_apiKey)hdrs["Authorization"]="Bearer "+_apiKey;
+  const r=await fetch(path,{credentials:"same-origin",headers:hdrs,...opt});
   if(!r.ok){
     let msg=r.status;
     try{msg=(await r.json()).detail||msg}catch(e){}
@@ -982,10 +984,15 @@ async function boot(){
       history.replaceState(null,"",location.pathname);
     }
   }catch(e){}
-  try{
-    const me=await api("/ui/me");
-    if(me && me.authed){authed=true;showApp();}else{showLogin();}
-  }catch(e){authed=false;showLogin();}
+  if(_apiKey){
+    try{
+      const me=await api("/ui/me");
+      if(me&&me.authed){authed=true;showApp();return;}
+    }catch(e){}
+    // key stored but invalid — clear it
+    _apiKey="";localStorage.removeItem("anbar-key");
+  }
+  showLogin();
 }
 function showLogin(){$("#loginWrap").style.display="flex";$("#app").classList.remove("on");}
 function showApp(){
@@ -1009,6 +1016,8 @@ $("#loginForm").onsubmit=async ev=>{
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({key:$("#keyInput").value.trim()})});
     if(!r.ok)throw 0;
+    _apiKey=$("#keyInput").value.trim();
+    localStorage.setItem("anbar-key",_apiKey);
     authed=true;$("#keyInput").value="";$("#loginErr").textContent="";showApp();
   }catch(e){$("#loginErr").textContent=t("badKey");}
   finally{btn.disabled=false;}
@@ -1018,6 +1027,7 @@ $("#eyeBtn").onclick=()=>{
 };
 $("#outBtn").onclick=async()=>{
   try{await api("/ui/logout",{method:"POST"})}catch(e){}
+  _apiKey="";localStorage.removeItem("anbar-key");
   authed=false;showLogin();toast(t("logoutOk"));
 };
 
@@ -1176,7 +1186,7 @@ async function refresh(){
       try{
         const r=await api("/api/v1/admin/objects");
         files=r.objects||[];
-      }catch(e){files=[];}
+      }catch(e){files=[];console.error('[anbar] /api/v1/admin/objects failed:',e.message);if(e.message==='401'||e.message.includes('authentication')){authed=false;showLogin();toast(t('badKey'),'err');}}
     })()]);
     renderRows();
     refreshTrashBadge();
