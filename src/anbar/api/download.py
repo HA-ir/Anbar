@@ -600,9 +600,14 @@ async def rename(request: Request, obj_id: str):
     name = ((body or {}).get("filename") or "").strip()
     if not name or len(name) > 200 or "/" in name or "\\" in name:
         raise HTTPException(400, "invalid filename")
-    if not db.rename_object(obj_id, name):
+    old_filename = row["filename"] or ""
+    prefix = ""
+    if "/" in old_filename:
+        prefix = old_filename.rsplit("/", 1)[0] + "/"
+    target_filename = prefix + name
+    if not db.rename_object(obj_id, target_filename):
         raise HTTPException(404, "object not found")
-    return {"renamed": True, "id": obj_id, "filename": name}
+    return {"renamed": True, "id": obj_id, "filename": target_filename}
 
 
 def _key_matches(request: Request, uploader_key: str) -> bool:

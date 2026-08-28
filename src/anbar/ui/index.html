@@ -796,14 +796,16 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 
 <!-- move modal -->
 <div class="modal" id="moveModal">
-  <div class="modal-card" style="width:92%;max-width:420px">
-    <h3 data-i18n="moveTitle">انتقال</h3>
-    <p id="moveSub" style="font-size:13px;color:var(--muted)"></p>
-    <label style="font-size:12px;color:var(--muted)" data-i18n="moveToLab">مسیر مقصد (پوشه)</label>
+  <div class="modal-card" style="width:92%;max-width:440px">
+    <h3 data-i18n="moveTitle">انتقال به پوشه</h3>
+    <p id="moveSub" style="font-size:13px;color:var(--tx2);margin-bottom:12px"></p>
+    <label style="font-size:12px;font-weight:600;color:var(--tx2)" data-i18n="quickPick">انتخاب سریع پوشهٔ مقصد:</label>
+    <div id="moveChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px;max-height:120px;overflow-y:auto"></div>
+    <label style="font-size:12px;font-weight:600;color:var(--tx2)" data-i18n="moveToLab">مسیر مقصد (پوشه)</label>
     <input type="text" id="moveDest" placeholder="folder/subfolder" autocomplete="off"
-      style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--text);font-size:14px;margin-top:4px">
-    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-ghost" id="moveCancel" style="width:auto" data-i18n="close">لغو</button>
+      style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);color:var(--tx);font-size:13.5px;margin-top:5px;font-family:ui-monospace,monospace;direction:ltr">
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost" id="moveCancel" style="width:auto" data-i18n="close">بستن</button>
       <button class="btn btn-primary" id="moveOk" style="width:auto" data-i18n="moveDo">انتقال</button>
     </div>
   </div>
@@ -874,6 +876,9 @@ const I18N={
   moveSel:"انتقال انتخاب‌شده‌ها", movePrompt:"مسیر پوشهٔ مقصد را وارد کنید (خالی = ریشه):",
   movedOk:"انتقال شد", skippedOk:"به‌خاطر تداخل نام رد شد", moveFileQ:"انتقال فایل به کجا؟",
   moveTitle:"انتقال به پوشه", moveToLab:"مسیر مقصد (پوشه)", moveDo:"انتقال",
+  quickPick:"انتخاب سریع پوشهٔ مقصد:", rootFolder:"🏠 خانه (ریشه)", emptyFolder:"📂 این پوشه خالی است",
+  nItems:"مورد", renameFile:"تغییر نام فایل", foldRenameT:"تغییر نام پوشه", foldMoveT:"انتقال پوشه",
+  foldCopyT:"کپی پوشه", foldDelT:"حذف پوشه",
   home:"خانه", select:"انتخاب", selectCancel:"لغو انتخاب",
   secUI:"تنظیمات ظاهر و رابط کاربری", defView:"نمای پیش‌فرض", vGallery:"گالری", vTable:"جدول",
   themeLab:"پوسته", thDark:"تاریک", thLight:"روشن",
@@ -939,6 +944,9 @@ const I18N={
   moveSel:"Move selected", movePrompt:"Destination folder path (empty = root):",
   movedOk:"moved", skippedOk:"skipped (name clash)", moveFileQ:"Move file to…",
   moveTitle:"Move to folder", moveToLab:"Destination path (folder)", moveDo:"Move",
+  quickPick:"Quick pick destination:", rootFolder:"🏠 Root (Home)", emptyFolder:"📂 This folder is empty",
+  nItems:"items", renameFile:"Rename file", foldRenameT:"Rename folder", foldMoveT:"Move folder",
+  foldCopyT:"Copy folder", foldDelT:"Delete folder",
   home:"Home", select:"Select", selectCancel:"Done",
   secUI:"UI & Preferences", defView:"Default view", vGallery:"Gallery", vTable:"Table",
   themeLab:"Theme", thDark:"Dark", thLight:"Light",
@@ -959,13 +967,7 @@ function applyI18n(){
   $("#langFa").classList.toggle("on",lang==="fa");
   $("#langEn").classList.toggle("on",lang==="en");
   updateLimTag();
-  // NOTE: renderRows() intentionally NOT called here — it rebuilds the DOM
-  // and made the whole page flicker on every language switch (v0.8.5 fix).
-  // Date cells carry data-ts; update their text in place instead:
-  document.querySelectorAll("[data-ts]").forEach(el=>{
-    el.textContent=humanDate(parseFloat(el.dataset.ts));
-  });
-  // static table headers re-render through data-i18n above.
+  renderRows();
   renderThemeIcon();
 }
 let langSwitching=false;
@@ -1295,23 +1297,28 @@ function cacheInfo(st){
 function renderRows(){
   const tb=$("#rows");
   const list=visibleFiles();
+  const selBar=$("#selBar");
   $("#cnt").textContent=files.length;
   $("#empty").style.display=files.length?"none":"block";
-  if(viewMode==="gallery"){renderGallery(list);updateSelBar();return;}
   const wrap=$("#tblWrap");
   wrap.querySelectorAll(".gallery").forEach(g=>g.remove());
   const nm0=$("#noMatch");
   if(files.length&&!list.length){
     let nm=nm0;
     if(!nm){const d=document.createElement("div");d.id="noMatch";d.className="empty";
-      d.innerHTML='<p>'+esc(t("noMatch"))+'</p>';tb.parentNode.parentNode.appendChild(d);nm=d;}
-    if(curFolderPrefix)nm.innerHTML='<p>'+esc("📂 این پوشه خالی است")+'</p>';
-    nm.style.display="block";tb.innerHTML="";return;
+      wrap.appendChild(d);nm=d;}
+    nm.innerHTML='<p>'+esc(curFolderPrefix ? t("emptyFolder") : t("noMatch"))+'</p>';
+    nm.style.display="block";
+    tb.innerHTML="";
+    if(selBar)updateSelBar();
+    return;
   }
   if(nm0)nm0.style.display="none";
+  if(viewMode==="gallery"){renderGallery(list);updateSelBar();return;}
   tb.innerHTML="";
-  const selBar=$("#selBar");
   if(selBar)updateSelBar();
+  const MV_ICON='<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg>';
+  const RN_ICON='<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
   list.forEach(o=>{
     const tr=document.createElement("tr");
     const isDir = o.isFolder;
@@ -1323,87 +1330,104 @@ function renderRows(){
     tr.innerHTML=
       '<td data-th="'+t("thName")+'"><div class="fname">'
       +('<input type="checkbox" class="selbox" data-id="'+o.id+'" style="margin-inline-end:8px;vertical-align:-2px">')
-      +'<span class="fic" style="'+(isDir ? 'background:rgba(47,107,255,.15)' : '')+'">'+iconSvg+'</span>'
+      +'<span class="fic" style="'+(isDir ? 'background:rgba(47,107,255,.15);cursor:pointer' : '')+'">'+iconSvg+'</span>'
       +'<span class="fn" style="cursor:'+(isDir ? 'pointer;color:var(--brand);font-weight:700' : 'default')+'" title="'+esc(nameToShow)+'">'+esc(nameToShow)+(isDir ? '/' : '')+'</span></div></td>'
-      +'<td class="num" data-th="'+t("thSize")+'">'+(isDir ? (o.itemCount + ' item') : humanSize(o.size))+'</td>'
+      +'<td class="num" data-th="'+t("thSize")+'">'+(isDir ? (o.itemCount + ' ' + t("nItems")) : humanSize(o.size))+'</td>'
       +'<td class="date-cell" data-th="'+t("thDate")+'" data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</td>'
       +'<td class="num" data-th="'+t("thDl")+'">'+(isDir ? '—' : (o.downloaded??0))+'</td>'
       +'<td data-th="'+t("thAct")+'"><div class="acts">'
       +(isDir
-        ? '<button class="act" data-a="fold-rename" title="تغییر نام"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
-          +'<button class="act" data-a="fold-move" title="انتقال پوشه"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg></button>'
-          +'<button class="act" data-a="fold-copy" title="کپی پوشه"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
-          +'<button class="act del" data-a="fold-del" title="حذف پوشه"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
-        : '<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
-          +'<button class="act" data-a="mv" title="انتقال / Move"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg></button>'
-          +'<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>'
-          +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>')
+        ? '<button class="act" data-a="fold-rename" title="'+esc(t("foldRenameT"))+'">'+RN_ICON+'</button>'
+          +'<button class="act" data-a="fold-move" title="'+esc(t("foldMoveT"))+'">'+MV_ICON+'</button>'
+          +'<button class="act" data-a="fold-copy" title="'+esc(t("foldCopyT"))+'"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+          +'<button class="act del" data-a="fold-del" title="'+esc(t("foldDelT"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
+        : '<button class="act" data-a="dl" title="'+esc(t("download"))+'"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
+          +'<button class="act" data-a="rn" title="'+esc(t("renameT"))+'">'+RN_ICON+'</button>'
+          +'<button class="act" data-a="mv" title="'+esc(t("moveTitle"))+'">'+MV_ICON+'</button>'
+          +'<button class="act" data-a="ln" title="'+esc(t("linkT"))+'"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>'
+          +'<button class="act del" data-a="del" title="'+esc(t("delQ"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>')
       +'</div></td>';
 
     if (isDir) {
-      tr.querySelector(".fn").onclick = (e) => {
+      const enter = (e) => {
         e.stopPropagation();
         curFolderPrefix = o.fullPrefix;
         updateBreadcrumb();
         renderRows();
       };
+      tr.querySelector(".fn").onclick = enter;
+      const fic = tr.querySelector(".fic");
+      if(fic) fic.onclick = enter;
       tr.querySelector('[data-a="fold-rename"]').onclick = async (e) => {
         e.stopPropagation();
-        const p = prompt("مسیر یا نام جدید پوشه را وارد کنید:", o.fullPrefix.replace(/\/$/, ""));
+        const p = prompt(t("foldRenameT"), o.fullPrefix.replace(/\/$/, ""));
         if (!p || p === o.filename) return;
         try {
           await api("/api/v1/admin/folders/rename", {
             method: "POST",
             body: JSON.stringify({ old_path: o.fullPrefix, new_path: p })
           });
-          toast("پوشه با موفقیت تغییر نام یافت");
+          toast(t("saved"));
           refresh();
         } catch(err) { toast(err.message, "err"); }
       };
+      tr.querySelector('[data-a="fold-move"]').onclick = (e) => {
+        e.stopPropagation();
+        openMoveModal([o.id], o.filename);
+      };
       tr.querySelector('[data-a="fold-copy"]').onclick = async (e) => {
         e.stopPropagation();
-        const p = prompt("مسیر پوشه مقصد برای کپی را وارد کنید:", o.filename + "_copy");
+        const p = prompt(t("foldCopyT"), o.filename + "_copy");
         if (!p) return;
         try {
           await api("/api/v1/admin/folders/copy", {
             method: "POST",
             body: JSON.stringify({ src_path: o.fullPrefix, dst_path: p })
           });
-          toast("پوشه با موفقیت کپی شد");
+          toast(t("saved"));
           refresh();
         } catch(err) { toast(err.message, "err"); }
       };
       tr.querySelector('[data-a="fold-del"]').onclick = async (e) => {
         e.stopPropagation();
-        if (!confirm("آیا از حذف پوشه " + o.filename + " و فایل‌های داخل آن اطمینان دارید؟")) return;
+        if (!confirm(t("foldDelT") + " — " + o.filename + "؟")) return;
         try {
           await api("/api/v1/admin/folders/delete", {
             method: "POST",
             body: JSON.stringify({ path: o.fullPrefix })
           });
-          toast("پوشه به سطل زباله منتقل شد");
+          toast(t("delOk"));
           refresh();
         } catch(err) { toast(err.message, "err"); }
       };
     }
     if(!isDir){
-    tr.querySelector('[data-a=dl]').onclick=()=>{
-      toast(t("dlStart"));
-      const a=document.createElement("a");
-      a.href="/f/"+o.id;document.body.appendChild(a);a.click();a.remove();
-    };
-    tr.querySelector('[data-a=mv]').onclick=(e)=>{
-      e.stopPropagation();
-      openMoveModal([o.id], o.filename||o.id);
-    };
-    tr.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
-    tr.querySelector('[data-a=del]').onclick=()=>delObj(o);
+      tr.querySelector('[data-a=dl]').onclick=()=>{
+        toast(t("dlStart"));
+        const a=document.createElement("a");
+        a.href="/f/"+o.id;document.body.appendChild(a);a.click();a.remove();
+      };
+      tr.querySelector('[data-a=rn]').onclick=(e)=>{
+        e.stopPropagation();
+        renameObj(o);
+      };
+      tr.querySelector('[data-a=mv]').onclick=(e)=>{
+        e.stopPropagation();
+        openMoveModal([o.id], o.filename||o.id);
+      };
+      tr.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
+      tr.querySelector('[data-a=del]').onclick=()=>delObj(o);
     }
     // click anywhere on the row toggles selection (in selectMode) or opens/navigates
     tr.onclick=e=>{
       if(e.target.closest(".selbox,.acts,a,button"))return;
-      if(e.target.closest(".fn")){
-        if(isDir)return; // folder: fn handler above navigates (stopPropagation)
+      if(e.target.closest(".fn,.fic")){
+        if(isDir){
+          curFolderPrefix = o.fullPrefix;
+          updateBreadcrumb();
+          renderRows();
+          return;
+        }
         if(selectMode){
           toggleSel(o.id);
           const sb=tr.querySelector(".selbox");
@@ -1491,6 +1515,8 @@ function renderGallery(list){
   if(!list.length)return;
   const g=document.createElement("div");
   g.className="gallery";
+  const MV_ICON='<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg>';
+  const RN_ICON='<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
   list.forEach(o=>{
     const isDir=!!o.isFolder;
     const kind=isDir?null:mediaKind(o);
@@ -1505,36 +1531,48 @@ function renderGallery(list){
       +'<audio src="'+url+'" controls preload="metadata"></audio></div>';
     else if(kind==="pdf")inner='<div class="gpdf"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg><span>PDF</span></div>';
     else inner='<div class="gicon">'+esc((extOf(o.filename)||"bin").toUpperCase().slice(0,4))+'</div>';
-    const MV_ICON='<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg>';
     const acts = isDir
-      ? '<button class="act" data-a="fold-rename" title="rename"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
-        +'<button class="act" data-a="fold-move" title="move">'+MV_ICON+'</button>'
-        +'<button class="act" data-a="fold-copy" title="copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
-        +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
-      : '<button class="act" data-a="ln" title="share"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>'
-        +'<button class="act" data-a="mv" title="move">'+MV_ICON+'</button>'
-        +'<button class="act" data-a="dl" title="download"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
-        +'<button class="act del" data-a="del" title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>';
+      ? '<button class="act" data-a="fold-rename" title="'+esc(t("foldRenameT"))+'">'+RN_ICON+'</button>'
+        +'<button class="act" data-a="fold-move" title="'+esc(t("foldMoveT"))+'">'+MV_ICON+'</button>'
+        +'<button class="act" data-a="fold-copy" title="'+esc(t("foldCopyT"))+'"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+        +'<button class="act del" data-a="del" title="'+esc(t("foldDelT"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
+      : '<button class="act" data-a="dl" title="'+esc(t("download"))+'"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
+        +'<button class="act" data-a="rn" title="'+esc(t("renameT"))+'">'+RN_ICON+'</button>'
+        +'<button class="act" data-a="mv" title="'+esc(t("moveTitle"))+'">'+MV_ICON+'</button>'
+        +'<button class="act" data-a="ln" title="'+esc(t("linkT"))+'"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>'
+        +'<button class="act del" data-a="del" title="'+esc(t("delQ"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>';
     cell.innerHTML='<div class="gthumb">'+inner+'</div>'
       +'<div class="gname" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</div>'
-      +'<div class="gsub"><span class="num">'+(isDir?(o.itemCount+' items'):humanSize(o.size))+'</span>'+(isDir?'':' · <span class="num">'+(o.downloaded??0)+' ↓')+'</span></div>'
+      +'<div class="gsub"><span class="num">'+(isDir?(o.itemCount+' '+t("nItems")):humanSize(o.size))+'</span>'+(isDir?'':' · <span class="num">'+(o.downloaded??0)+' ↓')+'</span></div>'
       +'<input type="checkbox" class="selbox" data-id="'+o.id+'">'
       +'<div class="gacts">'+acts+'</div>';
     if(!isDir){
-      cell.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
       cell.querySelector('[data-a=dl]').onclick=()=>{toast(t("dlStart"));const a=document.createElement("a");a.href=url;document.body.appendChild(a);a.click();a.remove();};
+      cell.querySelector('[data-a=rn]').onclick=(e)=>{e.stopPropagation();renameObj(o);};
+      cell.querySelector('[data-a=mv]').onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename||o.id);};
+      cell.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
+      cell.querySelector('[data-a=del]').onclick=()=>delObj(o);
     }
     if(isDir){
-      cell.querySelector('[data-a="fold-rename"]').onclick=(e)=>{e.stopPropagation();const p=prompt("مسیر یا نام جدید پوشه را وارد کنید:",o.fullPrefix.replace(/\/$/,""));if(!p)return;api("/api/v1/admin/folders/rename",{method:"POST",body:JSON.stringify({old_path:o.fullPrefix,new_path:p})}).then(()=>{toast("تغییر کرد");refresh();}).catch(err=>toast(err.message,"err"));};
-      cell.querySelector('[data-a="fold-move"]').onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename||o.id);};
-      cell.querySelector('[data-a="fold-copy"]').onclick=(e)=>{e.stopPropagation();const p=prompt("مسیر پوشه مقصد برای کپی را وارد کنید:",o.filename+"_copy");if(!p)return;api("/api/v1/admin/folders/copy",{method:"POST",body:JSON.stringify({src_path:o.fullPrefix,dst_path:p})}).then(()=>{toast("کپی شد");refresh();}).catch(err=>toast(err.message,"err"));};
+      cell.querySelector('[data-a="fold-rename"]').onclick=(e)=>{e.stopPropagation();const p=prompt(t("foldRenameT"),o.fullPrefix.replace(/\/$/,""));if(!p)return;api("/api/v1/admin/folders/rename",{method:"POST",body:JSON.stringify({old_path:o.fullPrefix,new_path:p})}).then(()=>{toast(t("saved"));refresh();}).catch(err=>toast(err.message,"err"));};
+      cell.querySelector('[data-a="fold-move"]').onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename);};
+      cell.querySelector('[data-a="fold-copy"]').onclick=(e)=>{e.stopPropagation();const p=prompt(t("foldCopyT"),o.filename+"_copy");if(!p)return;api("/api/v1/admin/folders/copy",{method:"POST",body:JSON.stringify({src_path:o.fullPrefix,dst_path:p})}).then(()=>{toast(t("saved"));refresh();}).catch(err=>toast(err.message,"err"));};
+      cell.querySelector('[data-a=del]').onclick=(e)=>{e.stopPropagation();if(!confirm(t("foldDelT")+" — "+o.filename+"؟"))return;api("/api/v1/admin/folders/delete",{method:"POST",body:JSON.stringify({path:o.fullPrefix})}).then(()=>{toast(t("delOk"));refresh();}).catch(err=>toast(err.message,"err"));};
     }
-    cell.querySelector('[data-a=del]').onclick=(e)=>{e.stopPropagation();if(isDir){if(!confirm("آیا از حذف پوشه "+o.filename+" و فایل‌های داخل آن اطمینان دارید؟"))return;api("/api/v1/admin/folders/delete",{method:"POST",body:JSON.stringify({path:o.fullPrefix})}).then(()=>{toast("پوشه به سطل زباله منتقل شد");refresh();}).catch(err=>toast(err.message,"err"));}else delObj(o);};
-    const mvB=cell.querySelector('[data-a=mv]');
-    if(mvB)mvB.onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename||o.id);};
+    const enter = (e) => {
+      e.stopPropagation();
+      curFolderPrefix=o.fullPrefix;
+      updateBreadcrumb();
+      renderRows();
+    };
+    if(isDir){
+      const fn = cell.querySelector(".gname");
+      if(fn) fn.onclick = enter;
+    }
     // whole card click: toggle sel in selectMode, otherwise open/navigate
     cell.onclick=e=>{
       if(e.target.closest(".gacts,.selbox,a,button"))return;
+      if(isDir && e.target.closest(".gname")){return;}
       if(!selectMode){
         if(isDir){curFolderPrefix=o.fullPrefix;updateBreadcrumb();renderRows();return;}
         openFileModal(o);return;
@@ -1547,6 +1585,12 @@ function renderGallery(list){
     cell.querySelector(".gthumb").addEventListener("click",e=>{
       if(e.target.closest(".selbox,.gacts,audio"))return;
       e.stopPropagation();
+      if(isDir){
+        curFolderPrefix=o.fullPrefix;
+        updateBreadcrumb();
+        renderRows();
+        return;
+      }
       if(selectMode){
         toggleSel(o.id);
         cell.classList.toggle("selected",selSet.has(o.id));
@@ -1554,7 +1598,6 @@ function renderGallery(list){
         if(sb)sb.checked=selSet.has(o.id);
         return;
       }
-      if(isDir){curFolderPrefix=o.fullPrefix;updateBreadcrumb();renderRows();return;}
       openFileModal(o);
     });
     cell.querySelector(".gthumb").style.cursor="pointer";
@@ -1825,12 +1868,13 @@ $("#trashEmptyBtn").onclick=async()=>{
 };
 
 async function renameObj(o){
-  const name=prompt(t("renameT"),o.filename||"");
+  const currentBase=o.displayName||(o.filename?o.filename.split("/").pop():o.id);
+  const name=prompt(t("renameFile")||t("renameT"),currentBase);
   if(name===null)return;
-  const nn=name.trim();
-  if(!nn||nn===o.filename)return;
+  const clean=name.trim().replace(/[\\/?%*:|"<>]/g,"");
+  if(!clean||clean===currentBase)return;
   try{
-    await api("/f/"+o.id,{method:"PATCH",body:JSON.stringify({filename:nn})});
+    await api("/f/"+o.id,{method:"PATCH",body:JSON.stringify({filename:clean})});
     toast(t("renameOk"));refresh();
   }catch(e){toast(e.message,"err");}
 }
@@ -1989,7 +2033,43 @@ let moveIds=[];
 function openMoveModal(ids,subText){
   moveIds=ids;
   $("#moveSub").textContent=subText||"";
-  const d=$("#moveDest");d.value="";
+  const d=$("#moveDest");
+  d.value="";
+  const chips=$("#moveChips");
+  if(chips){
+    chips.innerHTML="";
+    const rootBtn=document.createElement("button");
+    rootBtn.type="button";
+    rootBtn.className="btn btn-ghost";
+    rootBtn.style.cssText="padding:4px 10px;font-size:12px;border-radius:20px;background:var(--bg2)";
+    rootBtn.textContent=t("rootFolder");
+    rootBtn.onclick=()=>{d.value="";d.focus();};
+    chips.appendChild(rootBtn);
+    const fldSet=new Set();
+    files.forEach(o=>{
+      const fn=o.filename||"";
+      const slash=fn.indexOf("/");
+      if(slash!==-1){
+        const parts=fn.split("/").filter(Boolean);
+        let acc="";
+        for(let i=0;i<parts.length-(fn.endsWith("/")?0:1);i++){
+          acc+=parts[i]+"/";
+          fldSet.add(acc.replace(/\/+$/,""));
+        }
+      }else if(fn.endsWith("/")){
+        fldSet.add(fn.replace(/\/+$/,""));
+      }
+    });
+    Array.from(fldSet).sort().forEach(fld=>{
+      const btn=document.createElement("button");
+      btn.type="button";
+      btn.className="btn btn-ghost";
+      btn.style.cssText="padding:4px 10px;font-size:12px;border-radius:20px;background:var(--bg2)";
+      btn.textContent="📁 "+fld;
+      btn.onclick=()=>{d.value=fld;d.focus();};
+      chips.appendChild(btn);
+    });
+  }
   $("#moveModal").classList.add("on");
   setTimeout(()=>d.focus(),30);
 }
