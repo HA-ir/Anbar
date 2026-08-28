@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -309,6 +310,166 @@ async def links_list(request: Request, limit: int = 200):
     from ..links import list_links
 
     return {"links": list_links(request.app.state.db, limit=limit)}
+
+
+# ── Telegram & MTProto Env Config (v0.14.1) ──────────────────────────────────
+def _mask_secret(val: str | None, visible: int = 4) -> str:
+    if not val:
+        return ""
+    val = val.strip()
+    if len(val) <= visible * 2:
+        return "****"
+    return val[:visible] + "•" * (len(val) - visible * 2) + val[-visible:]
+
+
+def _get_env_file_path() -> Path:
+    prod_env = Path("/opt/anbar/.env")
+    if prod_env.exists():
+        return prod_env
+    local_env = Path(".env")
+    return local_env
+
+
+def _read_env_dict(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    res = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        res[k.strip()] = v.strip().strip("'\"")
+    return res
+
+
+def _write_env_dict(path: Path, updates: dict[str, str]) -> None:
+    if not path.exists():
+        lines = []
+    else:
+        lines = path.read_text(encoding="utf-8").splitlines()
+
+    seen = set()
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            k = stripped.split("=", 1)[0].strip()
+            if k in updates:
+                new_lines.append(f"{k}={updates[k]}")
+                seen.add(k)
+                continue
+        new_lines.append(line)
+
+    for k, v in updates.items():
+        if k not in seen and v is not None:
+            new_lines.append(f"{k}={v}")
+
+    path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+
+@router.get("/admin/telegram-config")
+async def telegram_config_get(request: Request):
+    """Retrieve current Telegram & MTProto configuration for admin UI."""
+    require_admin(request)
+    s = request.app.state.settings
+    env_path = _get_env_file_path()
+    env_vars = _read_env_dict(env_path)
+
+    backend = env_vars.get("ANBAR_BACKEND", s.backend.value)
+    bot_tokens_raw = env_vars.get("ANBAR_BOT_TOKENS") or s.bot_tokens_raw or (
+        s.bot_token.get_secret_value() if s.bot_token else ""
+    )
+    tokens_list = [t.strip() for t in (bot_tokens_raw or "").split(",") if t.strip()]
+    masked_tokens = [_mask_secret(t, 6) for t in tokens_list]
+
+    api_hash_raw = env_vars.get("ANBAR_API_HASH") or s.api_hash
+    api_id_raw = env_vars.get("ANBAR_API_ID") or (str(s.api_id) if s.api_id else "")
+    channel_id = env_vars.get("ANBAR_CHANNEL_ID", s.channel_id)
+    channel_thread_id = env_vars.get(
+        "ANBAR_CHANNEL_THREAD_ID",
+        str(s.channel_thread_id) if s.channel_thread_id else "",
+    )
+    mtproto_peer = env_vars.get("ANBAR_MTPROTO_PEER", s.mtproto_peer)
+    chunk_size_mb = int(env_vars.get("ANBAR_CHUNK_SIZE_MB", s.chunk_size_mb))
+
+    return {
+        "backend": backend,
+        "bot_tokens_raw": bot_tokens_raw,
+        "bot_tokens_count": len(tokens_list),
+        "bot_tokens_masked": masked_tokens,
+        "channel_id": channel_id,
+        "channel_thread_id": channel_thread_id,
+        "api_id": api_id_raw,
+        "api_hash_masked": _mask_secret(api_hash_raw, 4),
+        "api_hash_set": bool(api_hash_raw),
+        "mtproto_peer": mtproto_peer,
+        "chunk_size_mb": chunk_size_mb,
+    }
+
+
+@router.post("/admin/telegram-config")
+async def telegram_config_update(request: Request):
+    """Update Telegram and MTProto credentials and write safely to persistent .env."""
+    require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "expected JSON body") from None
+
+    if not isinstance(body, dict):
+        raise HTTPException(400, "expected JSON object")
+
+    env_path = _get_env_file_path()
+    updates = {}
+
+    if "backend" in body:
+        b = str(body["backend"]).strip().lower()
+        if b not in ("bot", "mtproto", "fake"):
+            raise HTTPException(422, "invalid backend (must be bot or mtproto)")
+        updates["ANBAR_BACKEND"] = b
+
+    if "bot_tokens" in body:
+        tokens_val = str(body["bot_tokens"]).strip()
+        updates["ANBAR_BOT_TOKENS"] = tokens_val
+        first_token = tokens_val.split(",")[0].strip() if tokens_val else ""
+        if first_token:
+            updates["ANBAR_BOT_TOKEN"] = first_token
+
+    if "channel_id" in body:
+        cid = str(body["channel_id"]).strip()
+        updates["ANBAR_CHANNEL_ID"] = cid
+
+    if "channel_thread_id" in body:
+        tid = str(body["channel_thread_id"]).strip()
+        updates["ANBAR_CHANNEL_THREAD_ID"] = tid
+
+    if "api_id" in body:
+        aid = str(body["api_id"]).strip()
+        if aid and not aid.isdigit():
+            raise HTTPException(422, "api_id must be a numeric integer")
+        updates["ANBAR_API_ID"] = aid
+
+    if "api_hash" in body:
+        ahash = str(body["api_hash"]).strip()
+        if ahash and "•" not in ahash and "*" not in ahash:
+            updates["ANBAR_API_HASH"] = ahash
+
+    if "mtproto_peer" in body:
+        peer = str(body["mtproto_peer"]).strip()
+        updates["ANBAR_MTPROTO_PEER"] = peer
+
+    if "chunk_size_mb" in body:
+        try:
+            cs = int(body["chunk_size_mb"])
+            if cs < 1 or cs > 49:
+                raise HTTPException(422, "chunk_size_mb must be between 1 and 49")
+            updates["ANBAR_CHUNK_SIZE_MB"] = str(cs)
+        except ValueError:
+            raise HTTPException(422, "chunk_size_mb must be integer") from None
+
+    _write_env_dict(env_path, updates)
+    return {"status": "ok", "updated_keys": list(updates.keys())}
 
 
 @router.post("/admin/links/{obj_id}/revoke/{exp}")

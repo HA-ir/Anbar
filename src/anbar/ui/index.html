@@ -678,6 +678,53 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
         <div class="lab"><small data-i18n="cacheMasterOff" style="color:var(--warn)">غیرفعال — برای فعال‌سازی ANBAR_CACHE_ENABLED=true در .env و ری‌استارت لازم است</small></div>
       </div>
     </div>
+
+    <!-- Telegram & MTProto Configuration (v0.14.1) -->
+    <div class="sec">
+      <h3 data-i18n="secTgConfig">پیکربندی تلگرام و متغیرها (.env)</h3>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="tgBackendLab">نوع بک‌اند ذخیره‌سازی</span><small data-i18n="tgBackendSub">MTProto (کلاینت تلگرام) یا Bot API</small></div>
+        <select id="s_tg_backend" style="padding:7px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
+          <option value="mtproto">MTProto (Direct Client)</option>
+          <option value="bot">Bot API (Bots Pool)</option>
+        </select>
+      </div>
+      <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
+          <span data-i18n="tgTokensLab">توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)</span>
+          <small id="tgTokensCount" style="color:var(--brand);font-weight:600"></small>
+        </div>
+        <textarea id="s_tg_bot_tokens" rows="2" placeholder="123456:ABC..., 987654:XYZ..." style="width:100%;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:ui-monospace,monospace;font-size:12px;direction:ltr;resize:vertical" spellcheck="false"></textarea>
+        <small data-i18n="tgTokensSub" style="color:var(--tx3);font-size:11.5px">چند توکن را با کاما جدا کنید (برای چرخش و افزایش سرعت).</small>
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="tgChannelLab">شناسه کانال (ANBAR_CHANNEL_ID)</span></div>
+        <input type="text" id="s_tg_channel_id" placeholder="-100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="tgThreadLab">شناسه تاپیک / ترد (اختیاری)</span></div>
+        <input type="text" id="s_tg_thread_id" placeholder="123..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="tgApiIdLab">Telegram API ID (ANBAR_API_ID)</span></div>
+        <input type="text" id="s_tg_api_id" placeholder="27755251" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+      </div>
+      <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
+          <span data-i18n="tgApiHashLab">Telegram API Hash (ANBAR_API_HASH)</span>
+          <button type="button" class="btn btn-ghost" id="s_tg_hash_toggle" style="width:auto;padding:2px 8px;font-size:11px">👁 نمایش / پنهان</button>
+        </div>
+        <input type="password" id="s_tg_api_hash" placeholder="••••••••••••••••••••••••••••••••" style="width:100%;direction:ltr;font-family:ui-monospace,monospace;font-size:12px">
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="tgPeerLab">MTProto Peer (ANBAR_MTPROTO_PEER)</span></div>
+        <input type="text" id="s_tg_peer" placeholder="me یا -100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+      </div>
+      <div class="set-row">
+        <div class="lab"><span data-i18n="tgChunkLab">حجم هر چانک (MB)</span><small data-i18n="tgChunkSub">حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto</small></div>
+        <input type="number" min="1" max="49" id="s_tg_chunk_size" style="direction:ltr;width:80px">
+      </div>
+    </div>
   </div>
   <div class="drawer-foot">
     <button class="btn btn-primary" style="width:auto" id="saveBtn" data-i18n="save">ذخیره</button>
@@ -861,6 +908,18 @@ const I18N={
   dropT:"فایل‌ها را اینجا رها کن یا کلیک کن", dropS:"چند فایلی · بدون ذخیره روی دیسک سرور — مستقیم در تلگرام",
   files:"فایل‌ها", refresh:"به‌روزرسانی",
   thName:"نام فایل", thSize:"حجم", thItems:"تعداد فایل‌ها", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
+  secTgConfig:"پیکربندی تلگرام و متغیرها (.env)",
+  tgBackendLab:"نوع بک‌اند ذخیره‌سازی",
+  tgBackendSub:"MTProto (کلاینت تلگرام) یا Bot API",
+  tgTokensLab:"توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)",
+  tgTokensSub:"چند توکن را با کاما جدا کنید (برای چرخش و افزایش سرعت).",
+  tgChannelLab:"شناسه کانال (ANBAR_CHANNEL_ID)",
+  tgThreadLab:"شناسه تاپیک / ترد (اختیاری)",
+  tgApiIdLab:"Telegram API ID (ANBAR_API_ID)",
+  tgApiHashLab:"Telegram API Hash (ANBAR_API_HASH)",
+  tgPeerLab:"MTProto Peer (ANBAR_MTPROTO_PEER)",
+  tgChunkLab:"حجم هر چانک (MB)",
+  tgChunkSub:"حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto",
   upload:"آپلود / دریافت",
   empty:"هنوز فایلی آپلود نکرده‌ای",
   setT:"تنظیمات ادمین", secAuth:"احراز هویت", secRate:"محدودیت سرعت (در دقیقه)",
@@ -930,6 +989,18 @@ const I18N={
   dropT:"Drop files here or click to browse", dropS:"Multiple files · never stored on server disk — straight to Telegram",
   files:"Files", refresh:"Refresh",
   thName:"File name", thSize:"Size", thItems:"Items", thDate:"Date", thDl:"Downloads", thAct:"Actions",
+  secTgConfig:"Telegram & MTProto Config (.env)",
+  tgBackendLab:"Storage Backend",
+  tgBackendSub:"MTProto (Telegram Client) or Bot API",
+  tgTokensLab:"Bot API Tokens (ANBAR_BOT_TOKENS)",
+  tgTokensSub:"Separate multiple tokens with commas for rotation.",
+  tgChannelLab:"Channel ID (ANBAR_CHANNEL_ID)",
+  tgThreadLab:"Topic / Thread ID (optional)",
+  tgApiIdLab:"Telegram API ID (ANBAR_API_ID)",
+  tgApiHashLab:"Telegram API Hash (ANBAR_API_HASH)",
+  tgPeerLab:"MTProto Peer (ANBAR_MTPROTO_PEER)",
+  tgChunkLab:"Chunk Size (MB)",
+  tgChunkSub:"Max 19 for Bot, max 49 for MTProto",
   upload:"Upload / Ingest",
   empty:"No files yet",
   setT:"Admin settings", secAuth:"Authentication", secRate:"Rate limits (per minute)",
@@ -2568,8 +2639,30 @@ async function loadSettings(){
     $("#s_max_upload_mb").value=v("max_upload_mb");
     $("#s_session_ttl_h").value=Math.round(v("web_session_ttl")/3600);
     $("#s_cache_mb").value=v("cache_mb");
+    await loadTelegramConfig();
   }catch(e){toast(e.message,"err");}
 }
+async function loadTelegramConfig(){
+  try{
+    const r=await api("/api/v1/admin/telegram-config");
+    if($("#s_tg_backend"))$("#s_tg_backend").value=r.backend||"mtproto";
+    if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").value=r.bot_tokens_raw||"";
+    if($("#tgTokensCount"))$("#tgTokensCount").textContent=r.bot_tokens_count?("("+r.bot_tokens_count+" active)"):"";
+    if($("#s_tg_channel_id"))$("#s_tg_channel_id").value=r.channel_id||"";
+    if($("#s_tg_thread_id"))$("#s_tg_thread_id").value=r.channel_thread_id||"";
+    if($("#s_tg_api_id"))$("#s_tg_api_id").value=r.api_id||"";
+    if($("#s_tg_api_hash")){
+      $("#s_tg_api_hash").value="";
+      $("#s_tg_api_hash").placeholder=r.api_hash_set?r.api_hash_masked:"Telegram API Hash...";
+    }
+    if($("#s_tg_peer"))$("#s_tg_peer").value=r.mtproto_peer||"";
+    if($("#s_tg_chunk_size"))$("#s_tg_chunk_size").value=r.chunk_size_mb||16;
+  }catch(e){}
+}
+$("#s_tg_hash_toggle").onclick=()=>{
+  const inp=$("#s_tg_api_hash");
+  if(inp)inp.type=inp.type==="password"?"text":"password";
+};
 $("#swAuth").onclick=async()=>{
   const sw=$("#swAuth");sw.style.opacity=".5";
   try{
@@ -2610,11 +2703,24 @@ $("#saveBtn").onclick=async()=>{
     web_session_ttl:Math.round(+$("#s_session_ttl_h").value*3600),
     cache_mb:+$("#s_cache_mb").value
   };
+  const tgBody={
+    backend:$("#s_tg_backend")?.value,
+    bot_tokens:$("#s_tg_bot_tokens")?.value,
+    channel_id:$("#s_tg_channel_id")?.value,
+    channel_thread_id:$("#s_tg_thread_id")?.value,
+    api_id:$("#s_tg_api_id")?.value,
+    mtproto_peer:$("#s_tg_peer")?.value,
+    chunk_size_mb:+$("#s_tg_chunk_size")?.value||16
+  };
+  const enteredHash=$("#s_tg_api_hash")?.value?.trim();
+  if(enteredHash)tgBody.api_hash=enteredHash;
   try{
-    const r=await api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify(body)});
-    curSettings=r.settings;
+    const [r1, r2]=await Promise.all([
+      api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify(body)}),
+      api("/api/v1/admin/telegram-config",{method:"POST",body:JSON.stringify(tgBody)})
+    ]);
+    curSettings=r1.settings;
     toast(t("saved"));
-    // session ttl change affects new logins only
     refresh();
   }catch(e){toast(e.message,"err");}
 };
