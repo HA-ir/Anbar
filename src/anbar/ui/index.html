@@ -920,6 +920,7 @@ const I18N={
   tgPeerLab:"MTProto Peer (ANBAR_MTPROTO_PEER)",
   tgChunkLab:"حجم هر چانک (MB)",
   tgChunkSub:"حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto",
+  showHash:"👁 نمایش", hideHash:"🙈 پنهان",
   upload:"آپلود / دریافت",
   empty:"هنوز فایلی آپلود نکرده‌ای",
   setT:"تنظیمات ادمین", secAuth:"احراز هویت", secRate:"محدودیت سرعت (در دقیقه)",
@@ -1001,6 +1002,7 @@ const I18N={
   tgPeerLab:"MTProto Peer (ANBAR_MTPROTO_PEER)",
   tgChunkLab:"Chunk Size (MB)",
   tgChunkSub:"Max 19 for Bot, max 49 for MTProto",
+  showHash:"👁 Show", hideHash:"🙈 Hide",
   upload:"Upload / Ingest",
   empty:"No files yet",
   setT:"Admin settings", secAuth:"Authentication", secRate:"Rate limits (per minute)",
@@ -1081,6 +1083,7 @@ function applyI18n(){
   updateLimTag();
   renderRows();
   renderThemeIcon();
+  syncHashToggleBtn();
 }
 let langSwitching=false;
 function setLang(l){
@@ -2642,6 +2645,16 @@ async function loadSettings(){
     await loadTelegramConfig();
   }catch(e){toast(e.message,"err");}
 }
+function syncHashToggleBtn(){
+  const btn=$("#s_tg_hash_toggle");
+  const inp=$("#s_tg_api_hash");
+  if(!btn||!inp)return;
+  const isVis=inp.type==="text";
+  btn.textContent=isVis?t("hideHash"):t("showHash");
+  btn.classList.toggle("btn-primary",isVis);
+  btn.classList.toggle("btn-ghost",!isVis);
+  btn.style.borderColor=isVis?"var(--brand)":"";
+}
 async function loadTelegramConfig(){
   try{
     const r=await api("/api/v1/admin/telegram-config");
@@ -2657,11 +2670,15 @@ async function loadTelegramConfig(){
     }
     if($("#s_tg_peer"))$("#s_tg_peer").value=r.mtproto_peer||"";
     if($("#s_tg_chunk_size"))$("#s_tg_chunk_size").value=r.chunk_size_mb||16;
+    syncHashToggleBtn();
   }catch(e){}
 }
 $("#s_tg_hash_toggle").onclick=()=>{
   const inp=$("#s_tg_api_hash");
-  if(inp)inp.type=inp.type==="password"?"text":"password";
+  if(inp){
+    inp.type=inp.type==="password"?"text":"password";
+    syncHashToggleBtn();
+  }
 };
 $("#swAuth").onclick=async()=>{
   const sw=$("#swAuth");sw.style.opacity=".5";
