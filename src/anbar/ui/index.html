@@ -1634,14 +1634,28 @@ $("#selAllBtn").onclick=()=>{
 };
 $("#selDelBtn").onclick=async()=>{
   if(!selSet.size)return;
-  const ids=[...selSet].filter(id=>!String(id).startsWith("folder:"));
-  if(!ids.length){toast("حذف گروهی فقط برای فایل‌هاست — پوشه را از دکمهٔ خودش حذف کن","err");return;}
-  if(!confirm(t("delSel")+" ("+ids.length+")؟"))return;
+  if(!confirm(t("delSel")+" ("+selSet.size+")؟"))return;
+  const folders=[...selSet].filter(id=>String(id).startsWith("folder:"));
+  const realIds=[...selSet].filter(id=>!String(id).startsWith("folder:"));
   let ok=0;
-  for(const id of ids){
-    try{await api("/f/"+id,{method:"DELETE"});ok++;}catch(e){}
+  // delete selected folders (and their contents)
+  for(const fid of folders){
+    const fullPrefix=String(fid).slice("folder:".length);
+    try{
+      await api("/api/v1/admin/folders/delete",{method:"POST",body:JSON.stringify({path:fullPrefix})});
+      ok++;
+    }catch(e){toast(e.message,"err");}
   }
-  selSet.clear();toast(ok+" ✓");refresh();
+  // delete selected individual files
+  for(const id of realIds){
+    try{
+      await api("/f/"+id,{method:"DELETE"});
+      ok++;
+    }catch(e){toast(e.message,"err");}
+  }
+  selSet.clear();
+  toast(ok+" ✓");
+  refresh();
 };
 /* bulk move: files via the move endpoint, folder markers via folder rename */
 $("#selMoveBtn").onclick=()=>{
