@@ -1076,6 +1076,10 @@ function humanDate(ts){
 
 /* ================= api ================= */
 let _apiKey=localStorage.getItem("anbar-key")||"";
+function mediaUrl(o){
+  if(!o||!o.id)return"";
+  return"/f/"+encodeURIComponent(o.id)+(_apiKey?"?k="+encodeURIComponent(_apiKey):"");
+}
 async function api(path,opt={}){
   const hdrs={};
   if(opt.body&&!(opt.body instanceof FormData))hdrs["Content-Type"]="application/json";
@@ -1592,7 +1596,7 @@ function renderGallery(list){
   list.forEach(o=>{
     const isDir=!!o.isFolder;
     const kind=isDir?null:mediaKind(o);
-    const url="/f/"+o.id;
+    const url=mediaUrl(o);
     const cell=document.createElement("div");
     cell.className="gcell"+(kind?" has":"");
     let inner;
@@ -2017,7 +2021,7 @@ async function openFileModal(o){
   const pv=$("#fmPreview");
   pv.innerHTML="";pv.className="fm-preview";
   const kind=mediaKind(o);
-  const url="/f/"+o.id;
+  const url=mediaUrl(o);
   if(kind==="image"){
     pv.classList.add("has");
     pv.innerHTML='<img loading="lazy" src="'+url+'" alt="">';
@@ -2035,7 +2039,7 @@ async function openFileModal(o){
     pv.classList.add("has");
     pv.innerHTML='<div class="spin"></div>';
     try{
-      const res=await fetch(url);
+      const res=await fetch(url,{headers:_apiKey?{"Authorization":"Bearer "+_apiKey}:{}});
       if(res.ok){
         const txt=await res.text();
         pv.innerHTML='<pre>'+esc(txt.slice(0, 10000))+(txt.length>10000?'\n... [truncated]':'')+'</pre>';

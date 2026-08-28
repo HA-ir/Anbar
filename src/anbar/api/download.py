@@ -190,6 +190,24 @@ def _authenticate_download(request: Request, obj_id: str) -> None:
     role = whoami(request)
     if role in ("admin", "uploader"):
         return
+    # Direct media / UI embed key fallback (?k=...)
+    k = request.query_params.get("k")
+    if k:
+        from ..auth import _match_dynamic_key, constant_time_equal
+        admin_key = (
+            settings.admin_key.get_secret_value()
+            if hasattr(settings.admin_key, "get_secret_value")
+            else (str(settings.admin_key) if settings.admin_key else None)
+        )
+        api_key = (
+            settings.api_key.get_secret_value()
+            if hasattr(settings.api_key, "get_secret_value")
+            else (str(settings.api_key) if settings.api_key else None)
+        )
+        if (admin_key and constant_time_equal(k, admin_key)) or (
+            api_key and constant_time_equal(k, api_key)
+        ) or _match_dynamic_key(k, db):
+            return
     sig = request.query_params.get("sig")
     exp_raw = request.query_params.get("exp")
     if not sig or not exp_raw:
