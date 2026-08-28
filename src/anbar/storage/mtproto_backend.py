@@ -156,16 +156,7 @@ class MTProtoBackend(StorageBackend):
         return InputFileBig(id=file_id, parts=parts, name=name)
 
     async def open(self, ref: ObjectRef) -> bytes:
-        """Re-fetch a blob from the destination peer (bounded by chunk size).
-
-        The document is split into _DOWNLOAD_RANGE slices fetched by
-        _DOWNLOAD_WORKERS workers. With ``export_conns == 0`` each worker
-        streams its slice via iter_download; with ``export_conns > 0``
-        slices are downloaded through a pipelined GetFileRequest window
-        (window = export_conns x 4, cap 16) on the main socket — Telegram
-        rejects same-dc auth export, so extra sockets need a second login.
-        Small files (<2 ranges) always stream sequentially.
-        """
+        """Re-fetch a blob from the destination peer (bounded by chunk size)."""
         if ref.message_id is None:
             raise RuntimeError("mtproto ref without message_id")
 
@@ -175,85 +166,10 @@ class MTProtoBackend(StorageBackend):
                 raise FileNotFoundError(
                     f"mtproto: message {ref.message_id} not found or has no document"
                 )
-            doc = getattr(msg.media, "document", None)
-            size = doc.size if doc is not None and hasattr(doc, "size") else 0
-            if size <= _DOWNLOAD_RANGE:
-                buf = io.BytesIO()
-                async for piece in self._client.iter_download(msg, request_size=524288):
-                    buf.write(piece)
-                return buf.getvalue()
-
-            # Parallel ranged fetch: queue of (offset, limit) slices.
-            slices = [
-                (off, min(_DOWNLOAD_RANGE, size - off)) for off in range(0, size, _DOWNLOAD_RANGE)
-            ]
-            out = bytearray(size)
-            lock = asyncio.Lock()
-            idx = {"i": 0}
-
-            # mtproto_export_conns>0 switches from sequential iter_download
-            # slices to a pipelined GetFileRequest window on the main socket
-            # (Telegram blocks same-dc auth export, so true multi-socket
-            # download needs a second login; pipelining is the honest lever).
-            window = max(1, min(16, self.export_conns * 4)) if self.export_conns else 0
-
-            if window <= 2:
-
-                async def worker() -> None:
-                    while True:
-                        async with lock:
-                            if idx["i"] >= len(slices):
-                                return
-                            off, limit = slices[idx["i"]]
-                            idx["i"] += 1
-                        pos = off
-                        async for piece in self._client.iter_download(
-                            msg, offset=pos, request_size=524288, limit=limit
-                        ):
-                            out[pos : pos + len(piece)] = piece
-                            pos += len(piece)
-
-                await asyncio.gather(*[worker() for _ in range(_DOWNLOAD_WORKERS)])
-                return bytes(out)
-
-            from telethon.tl.functions.upload import GetFileRequest
-            from telethon.tl.types import InputDocumentFileLocation
-
-            loc = InputDocumentFileLocation(doc.id, doc.access_hash, doc.file_reference, "")
-            CH = 524288
-
-            async def fetch(off: int) -> tuple[int, bytes]:
-                r = await self._client(GetFileRequest(loc, offset=off, limit=CH))
-                return off, r.bytes
-
-            async def pump_slice(off: int, limit: int) -> None:
-                inflight: set = set()
-                next_off = off
-                end = off + limit
-                while next_off < end and len(inflight) < window:
-                    inflight.add(asyncio.create_task(fetch(next_off)))
-                    next_off += CH
-                while inflight:
-                    done, _ = await asyncio.wait(inflight, return_when=asyncio.FIRST_COMPLETED)
-                    for f in done:
-                        o, b = f.result()
-                        out[o : o + len(b)] = b
-                        inflight.discard(f)
-                    while next_off < end and len(inflight) < window:
-                        inflight.add(asyncio.create_task(fetch(next_off)))
-                        next_off += CH
-
-            async def worker() -> None:
-                while True:
-                    async with lock:
-                        if idx["i"] >= len(slices):
-                            return
-                        off, limit = slices[idx["i"]]
-                        idx["i"] += 1
-                    await pump_slice(off, limit)
-
-            await asyncio.gather(*[worker() for _ in range(_DOWNLOAD_WORKERS)])
-            return bytes(out)
+            buf = io.BytesIO()
+            async for piece in self._client.iter_download(msg, request_size=524288):
+                buf.write(piece)
+            return buf.getvalue()
 
         return await self._run_healed(_fetch)
 

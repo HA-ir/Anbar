@@ -427,7 +427,14 @@ async def download(request: Request, obj_id: str):
             message_id=chunk_obj.message_id,
             backend=backend.name,
         )
-        return await backend.open(ref)
+        last_err = None
+        for attempt in range(3):
+            try:
+                return await backend.open(ref)
+            except Exception as e:
+                last_err = e
+                await asyncio.sleep(0.5 * (attempt + 1))
+        raise last_err or RuntimeError("failed to fetch chunk from backend")
 
     if use_cache:
         # cache miss: stream from the backend AND fill a temp file; commit to
