@@ -319,7 +319,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
   font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;
   direction:ltr;text-align:left;user-select:all;max-height:40vh;overflow-y:auto}
 /* file detail modal & lightbox */
-.file-card{max-width:580px;position:relative}
+.file-card{max-width:620px;position:relative}
 .fm-nav-btn{display:inline-flex;align-items:center;justify-content:center;border-radius:8px;
   background:var(--bg3);color:var(--tx);border:1px solid var(--line2);transition:.15s;cursor:pointer}
 .fm-nav-btn:hover{background:var(--brand-soft);color:var(--brand);border-color:var(--brand)}
@@ -336,12 +336,16 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 .fm-preview.audio svg{width:34px;height:34px;fill:none;stroke:var(--brand);stroke-width:1.7;stroke-linecap:round}
 .fm-preview.audio audio{width:100%}
 .fm-fallback{padding:26px;color:var(--tx3);font-weight:700;font-size:13px;letter-spacing:.08em}
-.fm-name{font-size:14.5px;font-weight:700;word-break:break-all;margin-bottom:6px;
+.fm-name{font-size:14.5px;font-weight:700;word-break:break-all;margin-bottom:8px;
   font-family:ui-monospace,Menlo,Consolas,monospace}
-.fm-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:var(--tx);font-size:13px;margin-bottom:16px}
-.fm-meta span{color:var(--tx);font-weight:500}
-.fm-meta .fm-dot{color:var(--tx3);font-weight:normal;padding:0 2px}
-.fm-actions{display:flex;gap:10px}
+.fm-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:var(--tx2);font-size:12.5px;margin-bottom:16px}
+.fm-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;
+  background:var(--bg3);border:1px solid var(--line2);font-size:12px;font-weight:500;color:var(--tx)}
+.fm-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:center}
+.fm-actions .btn{width:100%;justify-content:center;padding:9px 8px;font-size:13px;white-space:nowrap}
+@media(max-width:520px){
+  .fm-actions{grid-template-columns:repeat(2,1fr);gap:8px}
+}
 .spin{width:15px;height:15px;border:2px solid var(--line2);border-top-color:var(--brand);border-radius:50%;
   animation:sp .7s linear infinite;display:inline-block;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -863,13 +867,11 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
     <div class="fm-preview" id="fmPreview"></div>
     <div class="fm-name" id="fmName"></div>
     <div class="fm-meta" id="fmMeta"></div>
-    <div class="fm-actions" style="flex-wrap:wrap;justify-content:space-between">
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" style="width:auto" id="fmDl" data-i18n="download">دانلود</button>
-        <button class="btn btn-ghost" style="width:auto" id="fmShare" data-i18n="linkT">…</button>
-        <button class="btn btn-ghost" style="width:auto" id="fmRename" data-i18n="renameT">…</button>
-      </div>
-      <button class="btn btn-ghost" style="width:auto" id="fmClose" data-i18n="close">بستن</button>
+    <div class="fm-actions">
+      <button class="btn btn-primary" id="fmDl" data-i18n="download">دانلود</button>
+      <button class="btn btn-ghost" id="fmShare" data-i18n="linkT">لینک</button>
+      <button class="btn btn-ghost" id="fmRename" data-i18n="renameT">تغییر نام</button>
+      <button class="btn btn-ghost" id="fmClose" data-i18n="close">بستن</button>
     </div>
   </div>
 </div>
@@ -2127,10 +2129,10 @@ async function openFileModal(o){
   const dlCount = (o.downloaded ?? 0);
   const dlText = "↓ " + dlCount + " " + (lang === "fa" ? "دانلود" : "downloads");
   $("#fmMeta").innerHTML=
-    '<span class="num">'+humanSize(o.size)+'</span><span class="fm-dot">·</span>'
-    +'<span data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</span><span class="fm-dot">·</span>'
-    +'<span class="num">'+chunkText+'</span><span class="fm-dot">·</span>'
-    +'<span class="num">'+dlText+'</span>';
+    '<span class="fm-chip num">💾 '+humanSize(o.size)+'</span>'
+    +'<span class="fm-chip date-cell" data-ts="'+(o.created_at||"")+'">📅 '+humanDate(o.created_at)+'</span>'
+    +'<span class="fm-chip num">📦 '+chunkText+'</span>'
+    +'<span class="fm-chip num">'+dlText+'</span>';
   $("#fileModal").classList.add("on");
 }
 $("#fmClose").onclick=()=>{$("#fileModal").classList.remove("on");$("#fmPreview").innerHTML="";};
