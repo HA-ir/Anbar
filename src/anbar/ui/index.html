@@ -2615,6 +2615,8 @@ function uploadOne(it){
     const fd=new FormData();fd.append("file",it.file,it.file.name);
     const xhr=new XMLHttpRequest();
     xhr.open("POST","/api/v1/upload");
+    xhr.withCredentials=true;
+    if(_apiKey)xhr.setRequestHeader("Authorization","Bearer "+_apiKey);
     xhr.setRequestHeader("X-Upload-Id",it.id);          // resumable upload id
     if(it.resumeFrom)xhr.setRequestHeader("X-Resume-From",String(it.resumeFrom));
     xhr.upload.onprogress=e=>{
