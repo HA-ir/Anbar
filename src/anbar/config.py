@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     mtproto_peer: str = "me"  # destination entity for mtproto blobs ("me"=Saved)
 
     # limits
-    max_upload_mb: int = Field(default=2000, ge=1)
+    max_upload_mb: int = Field(default=10240, ge=1)
 
     # chunking (v1.1)
     chunking: ChunkingMode = ChunkingMode.AUTO
