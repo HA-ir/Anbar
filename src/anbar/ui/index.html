@@ -1037,6 +1037,9 @@ function updateLimTag(){
   $("#limTag").innerHTML=esc(t("limit"))+'<span style="direction:ltr;display:inline-block;unicode-bidi:isolate">'+humanSize(maxUploadBytes)+'</span>';
 }
 let curFolderPrefix = "";
+let fQuery="";
+let fType="";
+let fSortMode=localStorage.getItem("anbar-sort")||"new";
 
 function updateBreadcrumb() {
   const trail = $("#bcTrail");
