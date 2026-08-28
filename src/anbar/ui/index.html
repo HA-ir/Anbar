@@ -2652,8 +2652,8 @@ async function loadTelegramConfig(){
     if($("#s_tg_thread_id"))$("#s_tg_thread_id").value=r.channel_thread_id||"";
     if($("#s_tg_api_id"))$("#s_tg_api_id").value=r.api_id||"";
     if($("#s_tg_api_hash")){
-      $("#s_tg_api_hash").value="";
-      $("#s_tg_api_hash").placeholder=r.api_hash_set?r.api_hash_masked:"Telegram API Hash...";
+      $("#s_tg_api_hash").value=r.api_hash||"";
+      $("#s_tg_api_hash").placeholder="Telegram API Hash...";
     }
     if($("#s_tg_peer"))$("#s_tg_peer").value=r.mtproto_peer||"";
     if($("#s_tg_chunk_size"))$("#s_tg_chunk_size").value=r.chunk_size_mb||16;

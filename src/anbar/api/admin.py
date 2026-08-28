@@ -401,6 +401,7 @@ async def telegram_config_get(request: Request):
         "channel_id": channel_id,
         "channel_thread_id": channel_thread_id,
         "api_id": api_id_raw,
+        "api_hash": api_hash_raw,
         "api_hash_masked": _mask_secret(api_hash_raw, 4),
         "api_hash_set": bool(api_hash_raw),
         "mtproto_peer": mtproto_peer,
