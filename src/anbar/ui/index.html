@@ -333,7 +333,9 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 .fm-fallback{padding:26px;color:var(--tx3);font-weight:700;font-size:13px;letter-spacing:.08em}
 .fm-name{font-size:14.5px;font-weight:700;word-break:break-all;margin-bottom:6px;
   font-family:ui-monospace,Menlo,Consolas,monospace}
-.fm-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--tx2);font-size:12.5px;margin-bottom:16px}
+.fm-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:var(--tx);font-size:13px;margin-bottom:16px}
+.fm-meta span{color:var(--tx);font-weight:500}
+.fm-meta .fm-dot{color:var(--tx3);font-weight:normal;padding:0 2px}
 .fm-actions{display:flex;gap:10px}
 .spin{width:15px;height:15px;border:2px solid var(--line2);border-top-color:var(--brand);border-radius:50%;
   animation:sp .7s linear infinite;display:inline-block;vertical-align:-2px}
@@ -1014,7 +1016,8 @@ function humanSize(b){
   if(b==null)return"—";
   const u=["B","KB","MB","GB"];let i=0;
   while(b>=1024&&i<3){b/=1024;i++}
-  return (b>=100?b.toFixed(0):b.toFixed(1))+" "+u[i];
+  const n = (b>=100?b.toFixed(0):b.toFixed(1));
+  return "\u200E" + n + " " + u[i] + "\u200E";
 }
 function humanDate(ts){
   if(!ts)return"—";
@@ -1929,11 +1932,14 @@ async function openFileModal(o){
     pv.innerHTML='<div class="fm-fallback">'+esc((extOf(o.filename)||"file").toUpperCase())+'</div>';
   }
   $("#fmName").textContent=o.filename||o.id;
+  const chunkText = (o.chunks || 1) + " " + (lang === "fa" ? "بخش" : "chunks");
+  const dlCount = (o.downloaded ?? 0);
+  const dlText = "↓ " + dlCount + " " + (lang === "fa" ? "دانلود" : "downloads");
   $("#fmMeta").innerHTML=
-    '<span class="num">'+humanSize(o.size)+'</span><span>·</span>'
-    +'<span data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</span><span>·</span>'
-    +'<span class="num">'+(o.chunks||1)+' chunk</span><span>·</span>'
-    +'<span class="num">↓ '+(o.downloaded??0)+'</span>';
+    '<span class="num">'+humanSize(o.size)+'</span><span class="fm-dot">·</span>'
+    +'<span data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</span><span class="fm-dot">·</span>'
+    +'<span class="num">'+chunkText+'</span><span class="fm-dot">·</span>'
+    +'<span class="num">'+dlText+'</span>';
   $("#fileModal").classList.add("on");
 }
 $("#fmClose").onclick=()=>{$("#fileModal").classList.remove("on");$("#fmPreview").innerHTML="";};
