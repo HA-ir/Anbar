@@ -22,6 +22,18 @@ def new_object_id() -> str:
     return "".join(secrets.choice(_ALPHABET) for _ in range(_ID_LEN))
 
 
+def opaque_chunk_name(chunk_index: int = 0) -> str:
+    """Generate an opaque random chunk filename for Telegram storage.
+
+    Zero information leakage:
+    - No original filename
+    - No original extension
+    - No object ID or user metadata
+    """
+    token = secrets.token_hex(16)
+    return f"blob_{token}_{chunk_index:04d}.bin"
+
+
 @dataclass
 class Chunk:
     index: int

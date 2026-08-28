@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 
 from .. import runtime
 from ..auth import require_uploader
-from ..objects import Chunk, Manifest, chunk_stream, new_object_id
+from ..objects import Chunk, Manifest, chunk_stream, new_object_id, opaque_chunk_name
 from ..ratelimit import limit_upload
 from ..storage import FloodBudgetExceeded, ObjectRef, TelegramError
 
@@ -136,8 +136,8 @@ async def _store_stream(
             return ""
         ref = await backend.store(
             data,
-            f"{filename}.part",
-            content_type=content_type if media else None,
+            opaque_chunk_name(len(manifest.chunks)),
+            content_type=None,
         )
         bot_fid = None
         if harvester and ref.message_id is not None:

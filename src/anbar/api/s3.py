@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 
 from ..auth import effective_auth_enabled, whoami
 from ..db import Database
-from ..objects import Chunk, Manifest, chunk_stream, new_object_id
+from ..objects import Chunk, Manifest, chunk_stream, new_object_id, opaque_chunk_name
 from ..storage import ObjectRef
 
 router = APIRouter(prefix="/s3")
@@ -85,7 +85,7 @@ async def put_object(bucket: str, key: str, request: Request):
     manifest = Manifest()
 
     async def on_chunk(data: bytes, media: bool = False) -> str:
-        ref = await backend.store(data, f"{key}.part", content_type=content_type if media else None)
+        ref = await backend.store(data, opaque_chunk_name(len(manifest.chunks)), content_type=None)
         manifest.chunks.append(
             Chunk(
                 index=len(manifest.chunks),

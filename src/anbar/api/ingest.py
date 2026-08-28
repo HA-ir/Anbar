@@ -22,7 +22,12 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 
 from ..auth import require_admin
-from ..objects import Chunk, Manifest, new_object_id  # noqa: F401 (Chunk re-used in _run_job)
+from ..objects import (  # noqa: F401 (Chunk re-used in _run_job)
+    Chunk,
+    Manifest,
+    new_object_id,
+    opaque_chunk_name,
+)
 from ..storage.base import ObjectRef
 
 router = APIRouter()
@@ -115,7 +120,7 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                         total_in += len(data)
                         job["bytes"] = total_in
                         job["chunks"] += 1
-                        return await app.state.backend.store(data, f"{fname}.part")
+                        return await app.state.backend.store(data, opaque_chunk_name(job["chunks"]))
 
                     manifest = Manifest(chunks=[], total_size=0)
 
