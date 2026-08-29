@@ -475,30 +475,36 @@ async def download(request: Request, obj_id: str):
                 for i in range(0, len(mv), SLICE):
                     yield bytes(mv[i : i + SLICE])
         else:
-            # Pipelined predictive prefetching: while streaming segment i,
-            # prefetch segment i+1 concurrently from Telegram backend.
-            next_task = None
+            # Adaptive Deep Lookahead Prefetching (Depth 2 Buffer)
+            # Concurrently prefetches upcoming chunks to saturate network pipes and eliminate gaps
+            tasks: dict[int, asyncio.Task[bytes]] = {}
+
+            def _ensure_prefetch(current_i: int) -> None:
+                for lookahead in (1, 2):
+                    target_i = current_i + lookahead
+                    if target_i < len(segments) and target_i not in tasks:
+                        t_idx = segments[target_i][0]
+                        tasks[target_i] = asyncio.create_task(
+                            _fetch_chunk_bytes(manifest.chunks[t_idx])
+                        )
+
             try:
+                _ensure_prefetch(0)
                 for seg_i, (idx, off, n) in enumerate(segments):
-                    if next_task is not None:
-                        chunk = await next_task
+                    if seg_i in tasks:
+                        chunk = await tasks.pop(seg_i)
                     else:
                         chunk = await _fetch_chunk_bytes(manifest.chunks[idx])
 
-                    if seg_i + 1 < len(segments):
-                        next_idx = segments[seg_i + 1][0]
-                        next_task = asyncio.create_task(
-                            _fetch_chunk_bytes(manifest.chunks[next_idx])
-                        )
-                    else:
-                        next_task = None
+                    _ensure_prefetch(seg_i)
 
                     mv = memoryview(chunk)[off : off + n]
                     for i in range(0, len(mv), SLICE):
                         yield bytes(mv[i : i + SLICE])
             finally:
-                if next_task and not next_task.done():
-                    next_task.cancel()
+                for t in tasks.values():
+                    if not t.done():
+                        t.cancel()
 
     return StreamingResponse(stream(), status_code=status, headers=headers)
 

@@ -4,6 +4,15 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.1] — 2026-08-29
+
+### Added
+- **In-Memory Hot Metadata LRU Cache**: Zero-I/O in-memory LRU cache (`_ObjectLRU`, capacity 4,000) for hot object metadata and manifests in `Database`, slashing TTFB to sub-millisecond speeds.
+- **Adaptive Deep Lookahead Prefetching**: Dual-buffer lookahead pipeline in streaming download, prefetching upcoming segments concurrently to eliminate streaming latency.
+- **Master Secret Custom Setting & Dynamic Rotation**: Dedicated admin UI and API (`GET/POST /api/v1/admin/auth/secret`, `/api/v1/admin/auth/rotate-secret`) for configuring custom master HMAC/encryption secrets or triggering cryptographically secure rotations.
+- **Daily Auto-Backup Master Switch**: Runtime tunable toggle (`auto_backup_enabled`) with UI switch in the admin drawer.
+- **Top-Most Toast Stacking**: Re-elevated `#toasts` container with `z-index: 99999` and non-blocking pointer events.
+
 ## [0.15.0] — 2026-08-29
 
 ### Added

@@ -7,8 +7,37 @@ import os
 import sqlite3
 import tempfile
 import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
+
+
+class _ObjectLRU:
+    """Thread-safe fast in-memory LRU cache for hot metadata records."""
+
+    def __init__(self, capacity: int = 4000):
+        self.capacity = capacity
+        self._cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
+
+    def get(self, key: str) -> dict[str, Any] | None:
+        if key not in self._cache:
+            return None
+        self._cache.move_to_end(key)
+        return dict(self._cache[key])
+
+    def put(self, key: str, value: dict[str, Any]) -> None:
+        if key in self._cache:
+            self._cache.move_to_end(key)
+        self._cache[key] = dict(value)
+        if len(self._cache) > self.capacity:
+            self._cache.popitem(last=False)
+
+    def invalidate(self, key: str) -> None:
+        self._cache.pop(key, None)
+
+    def clear(self) -> None:
+        self._cache.clear()
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS objects (
@@ -73,6 +102,7 @@ class Database:
         self._conn.executescript(SCHEMA)
         self._migrate()
         self._conn.commit()
+        self._obj_cache = _ObjectLRU()
 
     def _migrate(self) -> None:
         """Add columns introduced after v0.9 (idempotent, ALTER-only)."""
@@ -83,11 +113,13 @@ class Database:
 
     # -- objects ---------------------------------------------------------
     def insert_object(self, obj: dict[str, Any]) -> None:
+        created_at = obj.get("created_at", int(time.time()))
+        downloaded = obj.get("downloaded", 0)
         self._conn.execute(
             """INSERT INTO objects
                (id, file_id, backend, filename, size, content_type, sha256,
-                manifest, uploader_key, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                manifest, uploader_key, created_at, downloaded)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 obj["id"],
                 obj["file_id"],
@@ -98,18 +130,40 @@ class Database:
                 obj.get("sha256"),
                 obj.get("manifest"),
                 obj.get("uploader_key"),
-                obj.get("created_at", int(time.time())),
+                created_at,
+                downloaded,
             ),
         )
         self._conn.commit()
+        full_obj = {
+            "id": obj["id"],
+            "file_id": obj["file_id"],
+            "backend": obj["backend"],
+            "filename": obj["filename"],
+            "size": obj["size"],
+            "content_type": obj.get("content_type"),
+            "sha256": obj.get("sha256"),
+            "manifest": obj.get("manifest"),
+            "uploader_key": obj.get("uploader_key"),
+            "created_at": created_at,
+            "downloaded": downloaded,
+            "deleted_at": None,
+        }
+        self._obj_cache.put(obj["id"], full_obj)
 
     def get_object(self, obj_id: str, *, include_trashed: bool = False) -> dict[str, Any] | None:
+        if not include_trashed:
+            cached = self._obj_cache.get(obj_id)
+            if cached is not None and not cached.get("deleted_at"):
+                return cached
         row = self._conn.execute("SELECT * FROM objects WHERE id = ?", (obj_id,)).fetchone()
         if row is None:
             return None
         d = dict(row)
         if not include_trashed and d.get("deleted_at"):
             return None  # soft-deleted rows vanish from the normal path
+        if not d.get("deleted_at"):
+            self._obj_cache.put(obj_id, d)
         return d
 
     def list_objects(
@@ -169,6 +223,7 @@ class Database:
         return out
 
     def delete_object(self, obj_id: str) -> bool:
+        self._obj_cache.invalidate(obj_id)
         cur = self._conn.execute("DELETE FROM objects WHERE id = ?", (obj_id,))
         self._conn.commit()
         return cur.rowcount > 0
@@ -293,6 +348,7 @@ class Database:
 
     def soft_delete_folder(self, prefix: str) -> int:
         """Soft-delete all files under a prefix."""
+        self._obj_cache.clear()
         prefix = prefix.rstrip("/") + "/"
         now = int(time.time())
         cur = self._conn.execute(
@@ -305,6 +361,7 @@ class Database:
 
     # -- trash (v0.10): soft delete → restore / hard purge -----------------
     def soft_delete(self, obj_id: str) -> bool:
+        self._obj_cache.invalidate(obj_id)
         cur = self._conn.execute(
             "UPDATE objects SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
             (int(time.time()), obj_id),
@@ -313,6 +370,7 @@ class Database:
         return cur.rowcount > 0
 
     def restore_object(self, obj_id: str) -> bool:
+        self._obj_cache.invalidate(obj_id)
         cur = self._conn.execute(
             "UPDATE objects SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
             (obj_id,),
@@ -333,6 +391,7 @@ class Database:
         Telegram blobs before (or after) dropping the row. Returns the ids
         purged so the API layer can clean remote blobs.
         """
+        self._obj_cache.clear()
         cutoff = int(time.time()) - self.TRASH_TTL_S
         rows = self._conn.execute(
             "SELECT id FROM objects WHERE deleted_at IS NOT NULL AND deleted_at < ?",
@@ -345,6 +404,7 @@ class Database:
         return ids
 
     def rename_object(self, obj_id: str, filename: str) -> bool:
+        self._obj_cache.invalidate(obj_id)
         cur = self._conn.execute("UPDATE objects SET filename = ? WHERE id = ?", (filename, obj_id))
         self._conn.commit()
         return cur.rowcount > 0
@@ -354,6 +414,7 @@ class Database:
         filename changes; the basename is preserved. Collisions are skipped,
         not overwritten. Returns {"moved": int, "skipped": [{id, reason}]}.
         """
+        self._obj_cache.clear()
         if not ids:
             return {"moved": 0, "skipped": []}
         prefix = (new_prefix or "").strip("/")
@@ -391,6 +452,10 @@ class Database:
     def bump_downloads(self, obj_id: str) -> None:
         self._conn.execute("UPDATE objects SET downloaded = downloaded + 1 WHERE id = ?", (obj_id,))
         self._conn.commit()
+        cached = self._obj_cache.get(obj_id)
+        if cached is not None:
+            cached["downloaded"] = cached.get("downloaded", 0) + 1
+            self._obj_cache.put(obj_id, cached)
 
     # -- kv (toggles, stats) ---------------------------------------------
     def kv_get(self, key: str, default: str | None = None) -> str | None:
@@ -493,6 +558,7 @@ class Database:
             # Atomic copy to active live database
             src_conn.backup(self._conn)
             src_conn.close()
+            self._obj_cache.clear()
 
             # Re-apply WAL & performance pragmas
             self._conn.execute("PRAGMA journal_mode=WAL")
