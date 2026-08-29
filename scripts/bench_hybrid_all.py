@@ -13,9 +13,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import time
-
 import httpx
 
 MB = 1024 * 1024
@@ -39,13 +39,17 @@ def set_rate_limits(key: str, upload: int, download: int):
             client.post(
                 url,
                 json={"rate_upload": upload, "rate_download": download},
-                headers={"Authorization": f"Bearer {key}"}
+                headers={"Authorization": f"Bearer {key}"},
             )
     except Exception as e:
         print(f"Warning: Failed setting rate limits: {e}")
 
 
-def stream_generator(total_bytes: int, chunk_size: int = 1024 * 1024 * 2, sha_tracker: hashlib._Hash | None = None):
+def stream_generator(
+    total_bytes: int,
+    chunk_size: int = 1024 * 1024 * 2,
+    sha_tracker: hashlib._Hash | None = None,
+):
     pattern = b"ANBAR_HYBRID_BENCH_STREAM_BLOCK_DATA_2026_FAST_RELIABLE_" * 1170  # ~64KB
     pattern_len = len(pattern)
     sent = 0
@@ -62,7 +66,10 @@ def stream_generator(total_bytes: int, chunk_size: int = 1024 * 1024 * 2, sha_tr
 def benchmark_size(size_bytes: int, key: str, client: httpx.Client) -> dict:
     size_mb = size_bytes / MB
     tag = f"{size_mb:.0f} MB" if size_mb < 1024 else f"{size_mb/1024:.0f} GB"
-    print(f"\n{'='*70}\n>>> Benchmarking {tag} ({size_bytes:,} bytes)\n{'='*70}", flush=True)
+    print(
+        f"\n{'='*70}\n>>> Benchmarking {tag} ({size_bytes:,} bytes)\n{'='*70}",
+        flush=True,
+    )
 
     # ── 1. Upload Phase ──
     print(f"[{tag}] Uploading...", flush=True)
@@ -120,20 +127,24 @@ def benchmark_size(size_bytes: int, key: str, client: httpx.Client) -> dict:
             if size_bytes >= 500 * MB and (now - last_log >= 15):
                 cur_s = (dl_bytes / MB) / (now - t0_dl)
                 pct = (dl_bytes / size_bytes) * 100
-                print(f"[{tag}] Progress: {pct:5.1f}% ({dl_bytes/MB:.1f} MB in {now-t0_dl:.1f}s — {cur_s:.1f} MB/s)", flush=True)
+                mb_so_far = dl_bytes / MB
+                el = now - t0_dl
+                print(f"[{tag}] Progress: {pct:5.1f}% ({mb_so_far:.1f} MB in {el:.1f}s — {cur_s:.1f} MB/s)", flush=True)
                 last_log = now
 
     t_dl = time.monotonic() - t0_dl
     dl_speed = size_mb / t_dl
     actual_sha = sha_dl.hexdigest()
-    sha_ok = (actual_sha == expected_sha)
+    sha_ok = actual_sha == expected_sha
     total_time = t_up + t_dl
 
-    print(f"[{tag}] Download OK in {t_dl:.2f}s ({dl_speed:.2f} MB/s) | SHA-256: {'OK' if sha_ok else 'FAIL'}", flush=True)
+    sha_stat = "OK" if sha_ok else "FAIL"
+    print(f"[{tag}] Download OK in {t_dl:.2f}s ({dl_speed:.2f} MB/s) | SHA-256: {sha_stat}", flush=True)
 
     # Purge
     try:
-        client.delete(f"{BASE_URL}/f/{obj_id}?purge=true", headers={"Authorization": f"Bearer {key}"})
+        purge_url = f"{BASE_URL}/f/{obj_id}?purge=true"
+        client.delete(purge_url, headers={"Authorization": f"Bearer {key}"})
     except Exception:
         pass
 
@@ -151,7 +162,8 @@ def benchmark_size(size_bytes: int, key: str, client: httpx.Client) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="Anbar Hybrid Speed Benchmark")
-    parser.add_argument("--sizes", nargs="+", type=str, default=["1MB", "8MB", "45MB", "100MB", "500MB", "1GB", "5GB", "10GB"])
+    default_sizes = ["1MB", "8MB", "45MB", "100MB", "500MB", "1GB", "5GB", "10GB"]
+    parser.add_argument("--sizes", nargs="+", type=str, default=default_sizes)
     parser.add_argument("--out", type=str, default="/tmp/bench_hybrid_results.json")
     args = parser.parse_args()
 
@@ -190,9 +202,9 @@ def main():
         set_rate_limits(key, 5, 10)
         client.close()
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("HYBRID BENCHMARK RESULTS (v0.15.7)")
-    print("="*80)
+    print("=" * 80)
     print("| Size | Upload | Download | Total | SHA-256 |")
     print("| :--- | :--- | :--- | :--- | :--- |")
     for r in results:
