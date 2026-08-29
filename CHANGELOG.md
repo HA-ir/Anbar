@@ -4,6 +4,11 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.5] — 2026-08-29
+
+### Fixed
+- **LRU Invalidation on Folder Renames**: Invalidate in-memory `_ObjectLRU` cache during `Database.rename_folder` to ensure instant consistency of updated object paths.
+
 ## [0.15.4] — 2026-08-29
 
 ### Added

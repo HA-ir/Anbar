@@ -245,6 +245,7 @@ class Database:
 
     def rename_folder(self, old_prefix: str, new_prefix: str) -> int:
         """Rename/move all files under old_prefix to new_prefix."""
+        self._obj_cache.clear()
         old_prefix = old_prefix.rstrip("/") + "/"
         new_prefix = new_prefix.rstrip("/") + "/"
         rows = self._conn.execute(
