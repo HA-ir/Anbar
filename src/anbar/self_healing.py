@@ -177,6 +177,12 @@ def replay_meta_events(events: list[dict[str, Any]], db: Database) -> int:
             if obj_id:
                 db.delete_object(obj_id)
                 applied += 1
+        elif op == "del_batch":
+            obj_ids = evt.get("ids", [])
+            for oid in obj_ids:
+                if oid:
+                    db.delete_object(str(oid))
+                    applied += 1
     return applied
 
 

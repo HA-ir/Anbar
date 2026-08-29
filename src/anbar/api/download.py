@@ -646,7 +646,9 @@ async def delete(request: Request, obj_id: str, purge: bool = False):
             return {"trashed": True, "id": obj_id, "restore_within_s": Database.TRASH_TTL_S}
         # already trashed → fall through to a real purge (idempotent UI)
 
-    deleted_blobs = await _purge_object_blobs(backend, db, row)
+    configured_sec = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
+    sec = effective_hmac_secret(db, configured_sec)
+    deleted_blobs = await _purge_object_blobs(backend, db, row, secret=sec)
     cache = getattr(request.app.state, "cache", None)
     if cache is not None:
         cache.remove(obj_id)
@@ -707,12 +709,14 @@ def _key_matches(request: Request, uploader_key: str) -> bool:
     return constant_time_equal(key, uploader_key)
 
 
-async def _purge_object_blobs(backend, db, row: dict) -> int:
+async def _purge_object_blobs(backend, db, row: dict, secret: str | None = None) -> int:
     """Hard-destroy one object row + its Telegram blobs. Returns blob count."""
     obj_id = row["id"]
     manifest = json.loads(row["manifest"]) if row["manifest"] else {"chunks": []}
+    chunks = manifest.get("chunks", [])
+    total_chunks = len(chunks)
     deleted = 0
-    for c in manifest.get("chunks", []):
+    for c in chunks:
         try:
             ref = ObjectRef(
                 file_id=c["f"],
@@ -735,6 +739,15 @@ async def _purge_object_blobs(backend, db, row: dict) -> int:
             db.kv_delete(k)
     for tag in ("pw:", "maxdl:", "dlc:"):
         db.kv_delete(f"{tag}{obj_id}")
+
+    # Only emit Tombstone event if remote blobs failed to be completely deleted from Telegram
+    if deleted < total_chunks:
+        from ..self_healing import emit_meta_event
+
+        asyncio.create_task(
+            emit_meta_event(backend, {"op": "del_obj", "id": obj_id}, secret=secret)
+        )
+
     return deleted
 
 

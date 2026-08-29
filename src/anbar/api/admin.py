@@ -1122,17 +1122,10 @@ async def trash_purge_one(request: Request, obj_id: str):
     row = db.get_object(obj_id, include_trashed=True)
     if row is None:
         raise HTTPException(404, "object not found")
-    removed = await _purge_object_blobs(request.app.state.backend, db, row)
-    db.log_audit("file.purge", actor="admin", target=obj_id)
-
-    # Emit background delete event
-    from ..self_healing import emit_meta_event
     s = request.app.state.settings
     env_sec = s.hmac_secret.get_secret_value() if s.hmac_secret else None
     sec = effective_hmac_secret(db, env_sec)
-    asyncio.create_task(
-        emit_meta_event(request.app.state.backend, {"op": "del_obj", "id": obj_id}, secret=sec)
-    )
-
+    removed = await _purge_object_blobs(request.app.state.backend, db, row, secret=sec)
+    db.log_audit("file.purge", actor="admin", target=obj_id)
     return {"purged": obj_id, "blobs_removed": removed}
 

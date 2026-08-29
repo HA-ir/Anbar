@@ -4,6 +4,11 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.4] — 2026-08-29
+
+### Added
+- **Conditional & Batched Delete Tombstones (`del_batch`)**: Only emit delete tombstones if remote chunk deletion fails on Telegram (zero chat pollution when deletion succeeds), with batched event payloads to prevent FloodWait rate-limiting.
+
 ## [0.15.3] — 2026-08-29
 
 ### Added
