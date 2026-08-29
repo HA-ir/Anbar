@@ -3,44 +3,56 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>انبار · مینی‌اپ تلگرام</title>
+<title>انبار · Telegram Mini App</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root {
   --bg-color: var(--tg-theme-bg-color, #0d1117);
   --text-color: var(--tg-theme-text-color, #e6edf3);
   --hint-color: var(--tg-theme-hint-color, #8b949e);
+  --link-color: var(--tg-theme-link-color, #2f6bff);
   --button-color: var(--tg-theme-button-color, #2f6bff);
   --button-text-color: var(--tg-theme-button-text-color, #ffffff);
   --secondary-bg-color: var(--tg-theme-secondary-bg-color, #161b22);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Vazirmatn", sans-serif; }
-body { background: var(--bg-color); color: var(--text-color); padding: 16px; min-height: 100vh; }
-.header { text-align: center; margin-bottom: 20px; }
-.header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
-.header p { font-size: 13px; color: var(--hint-color); }
-.card { background: var(--secondary-bg-color); border-radius: 14px; padding: 16px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.06); }
-.upload-btn { display: block; width: 100%; padding: 14px; background: var(--button-color); color: var(--button-text-color); border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; }
-.file-list { margin-top: 16px; }
-.file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.file-name { font-size: 14px; font-weight: 500; }
-.file-meta { font-size: 12px; color: var(--hint-color); }
+body { background: var(--bg-color); color: var(--text-color); padding: 14px; min-height: 100vh; }
+.header { text-align: center; margin-bottom: 16px; }
+.header h1 { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+.header p { font-size: 12.5px; color: var(--hint-color); }
+.card { background: var(--secondary-bg-color); border-radius: 14px; padding: 14px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.06); }
+.upload-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; background: var(--button-color); color: var(--button-text-color); border: none; border-radius: 10px; font-size: 14.5px; font-weight: 600; cursor: pointer; text-align: center; }
+.upload-btn:active { opacity: 0.85; }
+.search-input { width: 100%; padding: 9px 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.1); background: var(--bg-color); color: var(--text-color); font-size: 13.5px; margin-bottom: 12px; }
+.file-list { margin-top: 8px; }
+.file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); gap: 10px; }
+.file-name { font-size: 13.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; direction: ltr; text-align: right; }
+.file-meta { font-size: 11.5px; color: var(--hint-color); margin-top: 2px; }
+.btn-act { padding: 5px 10px; border-radius: 7px; background: rgba(255,255,255,0.08); color: var(--text-color); text-decoration: none; font-size: 12px; font-weight: 600; border: none; cursor: pointer; }
+.btn-act:hover { background: rgba(255,255,255,0.15); }
+.stat-pill { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; background: rgba(47,107,255,0.15); color: var(--button-color); font-weight: 700; margin-left: 6px; }
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>📦 انبار (Telegram Mini App)</h1>
-  <p>فضای ذخیره‌سازی ابری امن و فوق‌سریع</p>
+  <h1>📦 انبار · Object Storage</h1>
+  <p>فضای ذخیره‌سازی ابری مستقیم در تلگرام</p>
 </div>
 
 <div class="card">
   <input type="file" id="file-input" style="display: none;" onchange="handleFileUpload(event)">
-  <button class="upload-btn" onclick="document.getElementById('file-input').click()">📤 انتخاب و آپلود فایل</button>
-  <div id="status" style="margin-top: 10px; font-size: 13px; text-align: center; color: var(--hint-color);"></div>
+  <button class="upload-btn" onclick="document.getElementById('file-input').click()">
+    <span>📤</span> انتخاب و آپلود فایل
+  </button>
+  <div id="status" style="margin-top: 10px; font-size: 12.5px; text-align: center; color: var(--hint-color);"></div>
 </div>
 
 <div class="card">
-  <h3 style="font-size: 15px; margin-bottom: 12px;">📁 آخرین فایل‌ها</h3>
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+    <h3 style="font-size: 14.5px;">📁 فایل‌های ذخیره‌شده</h3>
+    <span id="fileCountBadge" class="stat-pill">0</span>
+  </div>
+  <input type="text" id="searchInput" class="search-input" placeholder="جستجو در فایل‌ها..." oninput="filterFiles()">
   <div id="files" class="file-list">
     <p style="color: var(--hint-color); font-size: 13px; text-align: center;">درحال بارگذاری...</p>
   </div>
@@ -51,32 +63,59 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
   tg.ready();
   tg.expand();
+  if (tg.setHeaderColor) tg.setHeaderColor('secondary_bg_color');
 }
+
+let allFiles = [];
 
 async function loadFiles() {
   try {
-    const res = await fetch('/api/v1/admin/objects?limit=10', { credentials: 'omit' });
+    const res = await fetch('/api/v1/admin/objects?limit=50', { credentials: 'omit' });
     if (!res.ok) {
-      document.getElementById('files').innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">برای مشاهده فایل‌ها لاگین کنید.</p>';
+      document.getElementById('files').innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">برای مشاهده کامل کلید ادمین لازم است.</p>';
       return;
     }
     const data = await res.json();
-    const list = data.objects || [];
-    if (list.length === 0) {
-      document.getElementById('files').innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">هیچ فایلی یافت نشد.</p>';
-      return;
-    }
-    document.getElementById('files').innerHTML = list.map(f => `
-      <div class="file-item">
-        <div>
-          <div class="file-name">${f.filename}</div>
-          <div class="file-meta">${(f.size / (1024*1024)).toFixed(2)} MB</div>
-        </div>
-        <a href="/f/${f.id}" target="_blank" style="color: var(--button-color); text-decoration: none; font-size: 13px;">دانلود</a>
-      </div>
-    `).join('');
+    allFiles = data.objects || [];
+    document.getElementById('fileCountBadge').textContent = allFiles.length;
+    renderList(allFiles);
   } catch(e) {
     document.getElementById('files').innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">خطا در دریافت لیست</p>';
+  }
+}
+
+function renderList(list) {
+  const box = document.getElementById('files');
+  if (!list.length) {
+    box.innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center; padding: 12px;">فایلی یافت نشد.</p>';
+    return;
+  }
+  box.innerHTML = list.map(f => `
+    <div class="file-item">
+      <div>
+        <div class="file-name">${f.filename || f.id}</div>
+        <div class="file-meta">${(f.size / (1024*1024)).toFixed(2)} MB · ${f.downloaded || 0} دانلود</div>
+      </div>
+      <div style="display: flex; gap: 6px;">
+        <button class="btn-act" onclick="copyLink('${f.id}')">🔗</button>
+        <a href="/f/${f.id}" target="_blank" class="btn-act">⬇</a>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterFiles() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  if (!q) { renderList(allFiles); return; }
+  const filtered = allFiles.filter(f => (f.filename || f.id).toLowerCase().includes(q));
+  renderList(filtered);
+}
+
+function copyLink(id) {
+  const url = location.origin + '/f/' + id;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url);
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
   }
 }
 
@@ -84,7 +123,7 @@ async function handleFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
   const status = document.getElementById('status');
-  status.textContent = 'درحال آپلود: ' + file.name + '...';
+  status.textContent = '⏳ درحال آپلود: ' + file.name + '...';
   const formData = new FormData();
   formData.append('file', file);
   try {
@@ -94,7 +133,8 @@ async function handleFileUpload(e) {
     });
     if (res.ok) {
       const data = await res.json();
-      status.textContent = '✅ آپلود موفق: ' + (data.id || data.object_id);
+      status.textContent = '✅ آپلود با موفقیت انجام شد: ' + (data.filename || data.id);
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       loadFiles();
     } else {
       status.textContent = '❌ خطا در آپلود (' + res.status + ')';

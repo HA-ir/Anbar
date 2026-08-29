@@ -339,9 +339,47 @@ async def system_stats_get(request: Request):
     encryption_on = bool(runtime.get_int(db, "encryption_enabled", enc_default))
     hybrid_on = bool(runtime.get_int(db, "hybrid_enabled", hyb_default))
 
+    # File size category breakdown
+    breakdown = {
+        "image": 0,
+        "video": 0,
+        "audio": 0,
+        "pdf": 0,
+        "text": 0,
+        "archive": 0,
+        "other": 0,
+    }
+    img_exts = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif")
+    vid_exts = (".mp4", ".webm", ".mkv", ".mov", ".avi")
+    aud_exts = (".mp3", ".ogg", ".wav", ".flac", ".m4a", ".opus", ".aac")
+    txt_exts = (
+        ".txt", ".json", ".js", ".ts", ".py", ".md", ".sh",
+        ".yaml", ".yml", ".html", ".css", ".sql",
+    )
+    arc_exts = (".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz")
+
+    for r in rows:
+        sz = int(r.get("size") or 0)
+        fn = (r.get("filename") or "").lower()
+        ct = (r.get("content_type") or "").lower()
+        if ct.startswith("image/") or fn.endswith(img_exts):
+            breakdown["image"] += sz
+        elif ct.startswith("video/") or fn.endswith(vid_exts):
+            breakdown["video"] += sz
+        elif ct.startswith("audio/") or fn.endswith(aud_exts):
+            breakdown["audio"] += sz
+        elif ct == "application/pdf" or fn.endswith(".pdf"):
+            breakdown["pdf"] += sz
+        elif ct.startswith("text/") or fn.endswith(txt_exts):
+            breakdown["text"] += sz
+        elif fn.endswith(arc_exts):
+            breakdown["archive"] += sz
+        else:
+            breakdown["other"] += sz
+
     return {
         "status": "healthy",
-        "version": getattr(request.app, "version", "0.14.2"),
+        "version": getattr(request.app, "version", "0.14.3"),
         "backend": "hybrid" if (backend_str == "mtproto" and hybrid_on) else backend_str,
         "total_objects": len(rows),
         "total_bytes": total_bytes,
@@ -349,8 +387,18 @@ async def system_stats_get(request: Request):
         "bot_tokens_count": tokens_count,
         "encryption_enabled": encryption_on,
         "hybrid_enabled": hybrid_on,
+        "breakdown": breakdown,
         "last_backup_time": int(last_backup_ts) if last_backup_ts else None,
     }
+
+
+@router.get("/admin/audit-logs")
+async def audit_logs_list(request: Request, limit: int = 50, offset: int = 0):
+    """List security and administrative audit logs."""
+    require_admin(request)
+    db = request.app.state.db
+    logs = db.list_audit_logs(limit=limit, offset=offset)
+    return {"logs": logs, "count": len(logs)}
 
 
 # ── API key management (v0.8.7) ──────────────────────────────────────────────

@@ -37,6 +37,16 @@ CREATE TABLE IF NOT EXISTS rate (
   window_start INTEGER NOT NULL,
   n INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at   INTEGER NOT NULL,
+  event        TEXT NOT NULL,
+  actor        TEXT NOT NULL,
+  target       TEXT,
+  ip           TEXT,
+  details      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 """
 
 
@@ -498,6 +508,52 @@ class Database:
         finally:
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
+
+    def log_audit(
+        self,
+        event: str,
+        actor: str = "admin",
+        target: str | None = None,
+        ip: str | None = None,
+        details: dict | str | None = None,
+    ) -> int:
+        """Record an audit trail event."""
+        det_str = (
+            json.dumps(details, ensure_ascii=False)
+            if isinstance(details, (dict, list))
+            else (str(details) if details else None)
+        )
+        cur = self._conn.execute(
+            """
+            INSERT INTO audit_logs (created_at, event, actor, target, ip, details)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (int(time.time()), event, actor, target, ip, det_str),
+        )
+        self._conn.commit()
+        return cur.lastrowid
+
+    def list_audit_logs(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+        """List audit logs ordered by newest first."""
+        cur = self._conn.execute(
+            """
+            SELECT id, created_at, event, actor, target, ip, details
+            FROM audit_logs
+            ORDER BY created_at DESC, id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (max(1, min(limit, 200)), max(0, offset)),
+        )
+        out = []
+        for r in cur.fetchall():
+            d = dict(r)
+            if d.get("details"):
+                try:
+                    d["details"] = json.loads(d["details"])
+                except Exception:
+                    pass
+            out.append(d)
+        return out
 
     def close(self) -> None:
         self._conn.close()

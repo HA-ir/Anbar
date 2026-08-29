@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -76,9 +77,37 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
                 except Exception:  # pragma: no cover - db already closed
                     return
 
+        async def _auto_backup_loop() -> None:
+            """Periodic database snapshot push to Telegram (every 24 hours)."""
+            while True:
+                await asyncio.sleep(86400)
+                try:
+                    last_bk = db.kv_get("last_backup_time")
+                    now_ts = int(time.time())
+                    if not last_bk or now_ts - int(last_bk) >= 86400:
+                        data = db.backup_bytes()
+                        ts_str = time.strftime("%Y%m%d_%H%M%S")
+                        filename = f"anbar_autobackup_{ts_str}.db"
+                        backend = app.state.backend
+                        if backend and hasattr(backend, "store"):
+                            await backend.store(
+                                data, filename, content_type="application/x-sqlite3"
+                            )
+                            db.kv_set("last_backup_time", str(now_ts))
+                            db.log_audit(
+                                "backup.auto",
+                                actor="system",
+                                target=filename,
+                                details={"size": len(data)},
+                            )
+                except Exception:  # pragma: no cover
+                    pass
+
         prune_task = asyncio.create_task(_prune_rate_loop())
+        backup_task = asyncio.create_task(_auto_backup_loop())
         yield
         prune_task.cancel()
+        backup_task.cancel()
         if app.state.harvester is not None:
             await app.state.harvester.stop()
         if app.state.bot_pool is not None:

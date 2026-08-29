@@ -4,6 +4,17 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.0] — 2026-08-29
+
+### Added
+- **Predictive Chunk Prefetching**: Pipelined bounded lookahead prefetching during streaming download; while chunk $N$ is being served to the client, chunk $N+1$ downloads concurrently in the background, eliminating buffering stalls.
+- **Directory Tree Drag & Drop Upload**: Recursive batch traversal for dropped folder hierarchies (`webkitGetAsEntry`) and dedicated folder upload button (`#upFolderBtn`).
+- **Rich Markdown Document Preview**: Built-in renderer with interactive tabs (Rendered View vs. Raw Code), markdown tables, task checkboxes, code syntax blocks, blockquotes, and links.
+- **Storage Breakdown Telemetry & Distribution Bar**: Real-time category breakdown (Images, Videos, Audio, PDF, Text/Code, Archives, Others) with colored progress visualization in the admin drawer.
+- **Security Audit Logging System** (`GET /api/v1/admin/audit-logs`): SQLite-backed audit log tracking sensitive admin actions and automated events with an interactive drawer viewer.
+- **Automated Daily Backup Daemon**: Automated periodic database snapshotting and push to Telegram storage.
+- **Telegram Mini App Enhancements**: Responsive `/tg-app` with native theme synchronization (`themeParams`), file search, and haptic feedback.
+
 ## [0.14.3] — 2026-08-29
 
 ### Added

@@ -465,14 +465,39 @@ async def download(request: Request, obj_id: str):
         return StreamingResponse(filling_stream(), status_code=status, headers=headers)
 
     async def stream():
-        # one chunk in flight per request — never the whole object
         # Stream in 128KB slices with memoryview for zero-copy socket backpressure
         SLICE = 128 * 1024
-        for idx, off, n in segments:
-            chunk = await _fetch_chunk_bytes(manifest.chunks[idx])
-            mv = memoryview(chunk)[off : off + n]
-            for i in range(0, len(mv), SLICE):
-                yield bytes(mv[i : i + SLICE])
+        if len(segments) <= 1:
+            for idx, off, n in segments:
+                chunk = await _fetch_chunk_bytes(manifest.chunks[idx])
+                mv = memoryview(chunk)[off : off + n]
+                for i in range(0, len(mv), SLICE):
+                    yield bytes(mv[i : i + SLICE])
+        else:
+            # Pipelined predictive prefetching: while streaming segment i,
+            # prefetch segment i+1 concurrently from Telegram backend.
+            next_task = None
+            try:
+                for seg_i, (idx, off, n) in enumerate(segments):
+                    if next_task is not None:
+                        chunk = await next_task
+                    else:
+                        chunk = await _fetch_chunk_bytes(manifest.chunks[idx])
+
+                    if seg_i + 1 < len(segments):
+                        next_idx = segments[seg_i + 1][0]
+                        next_task = asyncio.create_task(
+                            _fetch_chunk_bytes(manifest.chunks[next_idx])
+                        )
+                    else:
+                        next_task = None
+
+                    mv = memoryview(chunk)[off : off + n]
+                    for i in range(0, len(mv), SLICE):
+                        yield bytes(mv[i : i + SLICE])
+            finally:
+                if next_task and not next_task.done():
+                    next_task.cancel()
 
     return StreamingResponse(stream(), status_code=status, headers=headers)
 

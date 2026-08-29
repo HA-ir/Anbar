@@ -60,3 +60,12 @@ def test_backup_and_system_stats(client: TestClient):
     )
     assert r_bad.status_code == 400
 
+    # 8. Test breakdown and audit logs
+    assert "breakdown" in data
+    assert "image" in data["breakdown"]
+    assert "text" in data["breakdown"]
+
+    r_audit = client.get("/api/v1/admin/audit-logs", headers=ADMIN)
+    assert r_audit.status_code == 200
+    assert "logs" in r_audit.json()
+

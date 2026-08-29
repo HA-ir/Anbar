@@ -237,6 +237,28 @@ tbody tr.selected .fname .fn{color:var(--brand)}
   border-radius:50%;background:var(--brand);color:#fff;font-size:12px;font-weight:700;
   display:flex;align-items:center;justify-content:center;z-index:2}
 .gcell.drag-over, tbody tr.drag-over td{background:var(--brand-soft) !important;outline:2px dashed var(--brand)}
+/* ============ markdown preview styling ============ */
+.md-wrap{padding:14px 16px;background:var(--bg2);color:var(--tx);font-size:13px;line-height:1.65;border-radius:10px;max-height:380px;overflow-y:auto;direction:auto;text-align:start;border:1px solid var(--line)}
+.md-rendered h1,.md-rendered h2,.md-rendered h3{margin:12px 0 6px;color:var(--tx);font-weight:700}
+.md-rendered h1{font-size:17px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.md-rendered h2{font-size:15px;border-bottom:1px solid var(--line);padding-bottom:3px}
+.md-rendered h3{font-size:13.5px}
+.md-rendered p{margin-bottom:8px}
+.md-rendered code.md-inline{padding:2px 6px;border-radius:5px;background:var(--bg3);font-family:ui-monospace,monospace;font-size:11.5px;color:var(--brand)}
+.md-rendered .md-code-block{background:var(--bg3);border:1px solid var(--line);border-radius:8px;margin:10px 0;overflow:hidden}
+.md-rendered .md-code-lang{padding:3px 10px;background:rgba(0,0,0,.15);font-size:10.5px;font-family:ui-monospace,monospace;color:var(--tx3);border-bottom:1px solid var(--line)}
+.md-rendered pre{padding:10px;overflow-x:auto;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.5}
+.md-rendered .md-quote{border-inline-start:3px solid var(--brand);padding-inline-start:10px;margin:8px 0;color:var(--tx2);font-style:italic}
+.md-rendered ul,.md-rendered ol{padding-inline-start:20px;margin-bottom:8px}
+.md-rendered li{margin-bottom:3px}
+.md-rendered .md-task{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.md-rendered .md-task.done span{text-decoration:line-through;color:var(--tx3)}
+.md-rendered .md-link{color:var(--brand);text-decoration:underline}
+.md-rendered .md-tbl-wrap{overflow-x:auto;margin:10px 0}
+.md-rendered table.md-table{width:100%;border-collapse:collapse;font-size:12px}
+.md-rendered table.md-table th,.md-rendered table.md-table td{padding:6px 10px;border:1px solid var(--line);text-align:start}
+.md-rendered table.md-table th{background:var(--bg3);font-weight:700}
+
 /* ============ breadcrumb bar ============ */
 .bc-wrap{display:flex;align-items:center;gap:6px;padding:6px 2px 10px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .bc-wrap::-webkit-scrollbar{display:none}
@@ -545,6 +567,9 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       <button class="btn btn-ghost" id="newFolderBtn" style="width:auto;padding:8px 11px" data-i18n-title="newFolder" title="پوشه جدید">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
       </button>
+      <button class="btn btn-ghost" id="upFolderBtn" style="width:auto;padding:8px 11px" data-i18n-title="upFolder" title="آپلود پوشه">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 11v6M9 14l3-3 3 3"/></svg>
+      </button>
       <button class="btn btn-ghost" id="viewBtn" style="width:auto;padding:8px 11px" title="gallery">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       </button>
@@ -777,6 +802,25 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="stat-box"><span class="title" data-i18n="statBots">بات‌های فعال</span><span class="val" id="statBotsVal">-</span></div>
         <div class="stat-box"><span class="title" data-i18n="statLastBk">آخرین پشتیبان</span><span class="val" id="statLastBkVal">-</span></div>
       </div>
+      
+      <!-- Storage Distribution Bar -->
+      <div style="margin:12px 0 10px">
+        <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--tx2);margin-bottom:5px">
+          <span data-i18n="storageDist">تفکیک مصرف فضا</span>
+          <span id="storageQuotaPercent" style="font-weight:700;color:var(--brand)">0%</span>
+        </div>
+        <div id="storageDistBar" style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--bg3);gap:1px">
+          <div id="sdImg" style="background:#3b82f6;width:0%" title="Images"></div>
+          <div id="sdVid" style="background:#8b5cf6;width:0%" title="Videos"></div>
+          <div id="sdAud" style="background:#f59e0b;width:0%" title="Audio"></div>
+          <div id="sdPdf" style="background:#ef4444;width:0%" title="PDF"></div>
+          <div id="sdTxt" style="background:#10b981;width:0%" title="Text / Code"></div>
+          <div id="sdZip" style="background:#6366f1;width:0%" title="Archives"></div>
+          <div id="sdOth" style="background:#9ca3af;width:0%" title="Others"></div>
+        </div>
+        <div id="storageDistLegend" style="display:flex;flex-wrap:wrap;gap:8px;font-size:10.5px;color:var(--tx3);margin-top:6px"></div>
+      </div>
+
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost" id="btnDownloadBackup" type="button" style="flex:1;min-width:130px;font-size:12px">
           💾 <span data-i18n="btnDlBackup">دانلود بکاپ</span>
@@ -789,6 +833,15 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
           ☁️ <span data-i18n="btnTgBackup">ارسال بکاپ به تلگرام</span>
         </button>
       </div>
+    </div>
+
+    <!-- Audit Logs (v0.14.3) -->
+    <div class="sec">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 data-i18n="secAuditLogs">لاگ‌های امنیتی و رویدادها</h3>
+        <button class="btn btn-ghost" id="refreshAuditBtn" type="button" style="width:auto;padding:2px 8px;font-size:11px">🔄</button>
+      </div>
+      <div id="auditLogList" style="max-height:160px;overflow-y:auto;background:var(--bg3);border-radius:8px;padding:8px;font-size:11px;font-family:ui-monospace,monospace;border:1px solid var(--line);margin-top:8px"></div>
     </div>
   </div>
   <div class="drawer-foot">
@@ -994,6 +1047,9 @@ const I18N={
   btnTgBackup:"ارسال بکاپ به تلگرام",
   backupSentOk:"نسخه پشتیبان با موفقیت در تلگرام ذخیره شد",
   quickCopyLink:"کپی لینک مستقیم",
+  storageDist:"تفکیک مصرف فضا",
+  secAuditLogs:"لاگ‌های امنیتی و رویدادها",
+  upFolder:"آپلود پوشه",
   copyCode:"کپی کد",
   openTgApp:"باز کردن ↗",
   newFolder:"پوشه جدید",
@@ -1112,6 +1168,9 @@ const I18N={
   btnTgBackup:"Push Backup to Telegram",
   backupSentOk:"Database backup pushed to Telegram successfully",
   quickCopyLink:"Copy direct link",
+  storageDist:"Storage Distribution",
+  secAuditLogs:"Security Audit Logs",
+  upFolder:"Upload Folder",
   copyCode:"Copy code",
   openTgApp:"Open ↗",
   newFolder:"New folder",
@@ -2380,6 +2439,46 @@ async function renameObj(o){
     toast(t("renameOk"));refresh();
   }catch(e){toast(e.message,"err");}
 }
+function renderMarkdown(md) {
+  if (!md) return "";
+  let html = esc(md);
+  html = html.replace(/```([a-z0-9_-]*)\r?\n([\s\S]*?)```/g, (m, l, code) => {
+    return '<div class="md-code-block"><div class="md-code-lang">' + esc(l || "code") + '</div><pre><code>' + code + '</code></pre></div>';
+  });
+  html = html.replace(/`([^`\n]+)`/g, '<code class="md-inline">$1</code>');
+  html = html.replace(/^### (.*$)/gim, '<h3 class="md-h3">$1</h3>');
+  html = html.replace(/^## (.*$)/gim, '<h2 class="md-h2">$1</h2>');
+  html = html.replace(/^# (.*$)/gim, '<h1 class="md-h1">$1</h1>');
+  html = html.replace(/^\> (.*$)/gim, '<blockquote class="md-quote">$1</blockquote>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  html = html.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+  html = html.replace(/^- \[x\] (.*$)/gim, '<div class="md-task done"><input type="checkbox" checked disabled> <span>$1</span></div>');
+  html = html.replace(/^- \[ \] (.*$)/gim, '<div class="md-task"><input type="checkbox" disabled> <span>$1</span></div>');
+  html = html.replace(/^[\*\-] (.*$)/gim, '<li class="md-li">$1</li>');
+  html = html.replace(/^[0-9]+\. (.*$)/gim, '<li class="md-oli">$1</li>');
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="md-link">$1 ↗</a>');
+  html = html.replace(/((?:\|[^\n]+\|\r?\n)+)/g, (match) => {
+    const lines = match.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) return match;
+    let tHtml = '<div class="md-tbl-wrap"><table class="md-table"><thead><tr>';
+    const headers = lines[0].split('|').slice(1, -1).map(h => h.trim());
+    headers.forEach(h => { tHtml += '<th>' + h + '</th>'; });
+    tHtml += '</tr></thead><tbody>';
+    const bodyLines = lines.slice(lines[1].includes('---') ? 2 : 1);
+    bodyLines.forEach(bl => {
+      tHtml += '<tr>';
+      const cells = bl.split('|').slice(1, -1).map(c => c.trim());
+      cells.forEach(c => { tHtml += '<td>' + c + '</td>'; });
+      tHtml += '</tr>';
+    });
+    tHtml += '</tbody></table></div>';
+    return tHtml;
+  });
+  html = html.replace(/\n{2,}/g, '<br><br>');
+  return '<div class="md-wrap"><div class="md-rendered">' + html + '</div></div>';
+}
+
 function highlightCode(raw, ext) {
   const cleanExt = (ext || "").toLowerCase();
   const allLines = raw.split(/\r?\n/);
@@ -2491,7 +2590,29 @@ async function openFileModal(o){
       const res=await fetch(url,{headers:_apiKey?{"Authorization":"Bearer "+_apiKey}:{}});
       if(res.ok){
         const txt=await res.text();
-        pv.innerHTML=highlightCode(txt, extOf(o.filename));
+        const ext = extOf(o.filename);
+        if(ext === "md" || ext === "markdown"){
+          pv.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:8px;justify-content:flex-end">'
+            + '<button class="btn btn-ghost" id="mdTabRender" style="padding:2px 8px;font-size:11.5px;height:24px;border-color:var(--brand);color:var(--brand)">👁️ ' + (lang==="fa"?"پیش‌نمایش":"Preview") + '</button>'
+            + '<button class="btn btn-ghost" id="mdTabRaw" style="padding:2px 8px;font-size:11.5px;height:24px">📝 ' + (lang==="fa"?"کد خام":"Raw") + '</button>'
+            + '</div>'
+            + '<div id="mdRenderBox">' + renderMarkdown(txt) + '</div>'
+            + '<div id="mdRawBox" style="display:none">' + highlightCode(txt, ext) + '</div>';
+          const btnR = pv.querySelector("#mdTabRender"), btnRaw = pv.querySelector("#mdTabRaw");
+          const boxR = pv.querySelector("#mdRenderBox"), boxRaw = pv.querySelector("#mdRawBox");
+          btnR.onclick = () => {
+            btnR.style.borderColor = "var(--brand)"; btnR.style.color = "var(--brand)";
+            btnRaw.style.borderColor = ""; btnRaw.style.color = "";
+            boxR.style.display = "block"; boxRaw.style.display = "none";
+          };
+          btnRaw.onclick = () => {
+            btnRaw.style.borderColor = "var(--brand)"; btnRaw.style.color = "var(--brand)";
+            btnR.style.borderColor = ""; btnR.style.color = "";
+            boxRaw.style.display = "block"; boxR.style.display = "none";
+          };
+        }else{
+          pv.innerHTML=highlightCode(txt, ext);
+        }
         const btn=pv.querySelector("#copyCodeBtn");
         if(btn)btn.onclick=async(e)=>{
           e.stopPropagation();
@@ -2861,44 +2982,62 @@ async function pollIngest(jobId){
 }
 
 /* ================= upload ================= */
-const drop=$("#drop"),fileInput=$("#fileInput"),dirInput=$("#dirInput");
+const drop=$("#drop"),fileInput=$("#fileInput"),dirInput=$("#dirInput"),upFolderBtn=$("#upFolderBtn");
 let queue=[],uploading=false;
 drop.onclick=()=>fileInput.click();
+if(upFolderBtn)upFolderBtn.onclick=()=>dirInput.click();
 // right-click (or long-press) the dropzone → pick a whole folder
 drop.oncontextmenu=e=>{e.preventDefault();dirInput.click();};
 ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over")}));
 ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over")}));
-drop.addEventListener("drop",e=>{
-  const items=e.dataTransfer?.items;
-  if(items&&items.length&&typeof items[0].webkitGetAsEntry==="function"){
-    // folder-aware drop: walk directory entries recursively
-    const entries=[];
-    for(const it of items){
-      const ent=it.webkitGetAsEntry&&it.webkitGetAsEntry();
-      if(ent)entries.push(ent);
+
+async function traverseEntry(entry, basePath="") {
+  if (entry.isFile) {
+    return new Promise(resolve => {
+      entry.file(f => {
+        const rel = basePath ? basePath + "/" + f.name : f.name;
+        f._rel = rel;
+        resolve([f]);
+      }, () => resolve([]));
+    });
+  } else if (entry.isDirectory) {
+    const dirReader = entry.createReader();
+    const readAll = async () => {
+      const all = [];
+      let batch;
+      do {
+        batch = await new Promise(res => dirReader.readEntries(res, () => res([])));
+        all.push(...batch);
+      } while (batch && batch.length > 0);
+      return all;
+    };
+    const entries = await readAll();
+    const curPath = basePath ? basePath + "/" + entry.name : entry.name;
+    const subFiles = [];
+    for (const sub of entries) {
+      const fs = await traverseEntry(sub, curPath);
+      subFiles.push(...fs);
     }
-    if(entries.some(en=>en.isDirectory)){
-      const files=[];
-      let pending=entries.length;
-      const done=()=>{if(files.length)enqueue(files);};
-      const walkDir=(dir,base)=>{
-        const rd=dir.createReader();
-        rd.readEntries(async ents=>{
-          for(const en of ents){
-            if(en.isDirectory)walkDir(en,(base?base+"/":"")+en.name);
-            else{
-              await new Promise(res=>en.file(f=>{
-                f._rel=(base?base+"/":"")+f.name;files.push(f);res();
-              },res));
-            }
-          }
-          if(--pending===0)done();
-        });
-      };
-      for(const en of entries){
-        if(en.isDirectory){walkDir(en,en.name);pending+=0;}
-        else en.file(f=>{f._rel=f.name;files.push(f);if(--pending===0)done();});
+    return subFiles;
+  }
+  return [];
+}
+
+drop.addEventListener("drop", async e=>{
+  e.preventDefault();
+  drop.classList.remove("over");
+  const items=e.dataTransfer?.items;
+  if(items && items.length && items[0].webkitGetAsEntry){
+    const collected = [];
+    for(let i=0; i<items.length; i++){
+      const ent = items[i].webkitGetAsEntry && items[i].webkitGetAsEntry();
+      if(ent){
+        const fs = await traverseEntry(ent);
+        collected.push(...fs);
       }
+    }
+    if(collected.length){
+      enqueue(collected);
       return;
     }
   }
@@ -2907,20 +3046,23 @@ drop.addEventListener("drop",e=>{
 });
 fileInput.onchange=()=>{enqueue([...fileInput.files]);fileInput.value="";};
 dirInput.onchange=()=>{
-  // flatten with relative paths as names so chunks stay distinguishable
   enqueue([...dirInput.files].map(f=>{
     const rel=f.webkitRelativePath||f.name;
-    try{return new File([f],rel,{type:f.type,lastModified:f.lastModified});}
-    catch(e){f.name=rel;return f;}
+    try{
+      const nf = new File([f],rel,{type:f.type,lastModified:f.lastModified});
+      nf._rel = rel;
+      return nf;
+    }
+    catch(e){f._rel=rel;return f;}
   }));
   dirInput.value="";
 };
 
 function enqueue(list){
   for(const f of list){
-    if(f.size>maxUploadBytes){toast(f.name+" — "+t("sizeOver"),"err");continue;}
-    let finalName = f.name;
-    if(curFolderPrefix && !finalName.includes("/")){
+    if(f.size>maxUploadBytes){toast((f._rel||f.name)+" — "+t("sizeOver"),"err");continue;}
+    let finalName = f._rel || f.name;
+    if(curFolderPrefix && !finalName.startsWith(curFolderPrefix)){
       finalName = curFolderPrefix + finalName;
     }
     const targetFile = finalName !== f.name ? new File([f], finalName, {type: f.type, lastModified: f.lastModified}) : f;
@@ -3057,8 +3199,57 @@ async function loadSystemStats(){
     if($("#statLastBkVal")){
       $("#statLastBkVal").textContent=st.last_backup_time ? humanDate(st.last_backup_time) : "—";
     }
+    // Update Storage Distribution Bar
+    if(st.breakdown && st.total_bytes > 0){
+      const bd = st.breakdown;
+      const tot = st.total_bytes;
+      const p = k => ((bd[k] || 0) / tot * 100).toFixed(1);
+      $("#sdImg").style.width = p("image") + "%";
+      $("#sdVid").style.width = p("video") + "%";
+      $("#sdAud").style.width = p("audio") + "%";
+      $("#sdPdf").style.width = p("pdf") + "%";
+      $("#sdTxt").style.width = p("text") + "%";
+      $("#sdZip").style.width = p("archive") + "%";
+      $("#sdOth").style.width = p("other") + "%";
+      
+      const legend = $("#storageDistLegend");
+      if(legend){
+        const items = [
+          { name: "Image", b: bd.image, color: "#3b82f6" },
+          { name: "Video", b: bd.video, color: "#8b5cf6" },
+          { name: "Audio", b: bd.audio, color: "#f59e0b" },
+          { name: "PDF", b: bd.pdf, color: "#ef4444" },
+          { name: "Code/Text", b: bd.text, color: "#10b981" },
+          { name: "Archive", b: bd.archive, color: "#6366f1" },
+        ].filter(x => x.b > 0);
+        legend.innerHTML = items.map(x => `<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:${x.color}"></span>${x.name}: ${humanSize(x.b)}</span>`).join("");
+      }
+    }
+    loadAuditLogs();
   }catch(e){}
 }
+
+async function loadAuditLogs(){
+  const box = $("#auditLogList");
+  if(!box)return;
+  try{
+    const r = await api("/api/v1/admin/audit-logs?limit=25");
+    const logs = r.logs || [];
+    if(!logs.length){
+      box.innerHTML = '<div style="color:var(--tx3);text-align:center;padding:12px">رویدادی ثبت نشده است</div>';
+      return;
+    }
+    box.innerHTML = logs.map(l => {
+      const dt = new Date(l.created_at * 1000).toLocaleTimeString();
+      return `<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;gap:6px">
+        <span><b style="color:var(--brand)">${esc(l.event)}</b> ${esc(l.target||"")}</span>
+        <span style="color:var(--tx3);font-size:10px">${dt}</span>
+      </div>`;
+    }).join("");
+  }catch(e){box.innerHTML = '<div style="color:var(--err)">خطا در دریافت لاگ‌ها</div>';}
+}
+const refAudit = $("#refreshAuditBtn");
+if(refAudit) refAudit.onclick = loadAuditLogs;
 $("#btnDownloadBackup").onclick=async()=>{
   toast(t("loading"));
   try{
