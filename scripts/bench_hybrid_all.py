@@ -13,9 +13,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import sys
 import time
+
 import httpx
 
 MB = 1024 * 1024
@@ -129,7 +129,10 @@ def benchmark_size(size_bytes: int, key: str, client: httpx.Client) -> dict:
                 pct = (dl_bytes / size_bytes) * 100
                 mb_so_far = dl_bytes / MB
                 el = now - t0_dl
-                print(f"[{tag}] Progress: {pct:5.1f}% ({mb_so_far:.1f} MB in {el:.1f}s — {cur_s:.1f} MB/s)", flush=True)
+                print(
+                    f"[{tag}] Progress: {pct:5.1f}% ({mb_so_far:.1f} MB in {el:.1f}s — {cur_s:.1f} MB/s)",
+                    flush=True,
+                )
                 last_log = now
 
     t_dl = time.monotonic() - t0_dl
@@ -139,7 +142,10 @@ def benchmark_size(size_bytes: int, key: str, client: httpx.Client) -> dict:
     total_time = t_up + t_dl
 
     sha_stat = "OK" if sha_ok else "FAIL"
-    print(f"[{tag}] Download OK in {t_dl:.2f}s ({dl_speed:.2f} MB/s) | SHA-256: {sha_stat}", flush=True)
+    print(
+        f"[{tag}] Download OK in {t_dl:.2f}s ({dl_speed:.2f} MB/s) | SHA-256: {sha_stat}",
+        flush=True,
+    )
 
     # Purge
     try:
