@@ -357,10 +357,11 @@ async def download(request: Request, obj_id: str):
     else:
         disposition = "attachment"
 
+    base_fn = os.path.basename(row["filename"]) or row["filename"]
     headers = {
         "Content-Length": str(length),
         "Content-Type": resolved_ct or "application/octet-stream",
-        "Content-Disposition": f'{disposition}; filename="{row["filename"]}"',
+        "Content-Disposition": f'{disposition}; filename="{base_fn}"',
         "Accept-Ranges": "bytes",
     }
     if etag:

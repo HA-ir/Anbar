@@ -216,10 +216,16 @@ html[dir="ltr"] .date-cell{direction:ltr;text-align:left}
 .gplay{position:absolute;inset:auto auto 6px 6px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:8px}
 .gname{font-size:12px;padding:8px 10px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gsub{font-size:11px;color:var(--tx3);padding:0 10px 10px;display:flex;align-items:center;gap:4px;direction:ltr;justify-content:flex-end}
-.gacts{position:absolute;top:6px;inset-inline-end:6px;display:none;gap:4px;z-index:2}
-.gcell:hover .gacts{display:flex}
-@media(hover:none),(max-width:768px){.gacts{display:flex !important}}
-.gacts .act{background:var(--bg2);box-shadow:0 1px 3px rgba(0,0,0,0.15)}
+.gacts{position:absolute;top:6px;inset-inline-end:6px;display:flex;align-items:center;gap:4px;z-index:4}
+.gmenu-btn{width:26px;height:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;background:var(--bg2);box-shadow:0 1px 4px rgba(0,0,0,0.18);border:1px solid var(--line);cursor:pointer;color:var(--tx2);transition:all .15s}
+.gmenu-btn:hover{color:var(--brand);border-color:var(--brand);background:var(--bg3)}
+.gmenu-pop{position:absolute;top:32px;inset-inline-end:0;background:var(--bg2);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.22);padding:5px;display:none;flex-direction:column;gap:2px;min-width:130px;z-index:10}
+.gmenu-pop.on{display:flex}
+.gmenu-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:11.5px;color:var(--tx);background:transparent;border:none;width:100%;text-align:start;cursor:pointer;transition:background .12s}
+.gmenu-item:hover{background:var(--hover)}
+.gmenu-item.del{color:var(--err)}
+.gmenu-item.del:hover{background:var(--err-soft)}
+.gmenu-item svg{width:13px;height:13px;flex:none}
 /* table */
 .tbl-wrap{background:var(--bg2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
 table{width:100%;border-collapse:collapse}
@@ -839,7 +845,9 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     <div class="sec">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <h3 data-i18n="secAuditLogs">لاگ‌های امنیتی و رویدادها</h3>
-        <button class="btn btn-ghost" id="refreshAuditBtn" type="button" style="width:auto;padding:2px 8px;font-size:11px">🔄</button>
+        <button class="btn btn-ghost" id="refreshAuditBtn" type="button" style="width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:7px" title="به‌روزرسانی لاگ‌ها" aria-label="refresh audit logs">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
       </div>
       <div id="auditLogList" style="max-height:160px;overflow-y:auto;background:var(--bg3);border-radius:8px;padding:8px;font-size:11px;font-family:ui-monospace,monospace;border:1px solid var(--line);margin-top:8px"></div>
     </div>
@@ -1354,6 +1362,11 @@ function humanSize(b){
   const n = (b>=100?b.toFixed(0):b.toFixed(1));
   return "\u200E" + n + " " + u[i] + "\u200E";
 }
+function baseName(fn){
+  if(!fn)return "";
+  const s = String(fn).replace(/\/+$/,"").split("/");
+  return s[s.length-1] || fn;
+}
 function humanDate(ts){
   if(!ts)return"—";
   let d;
@@ -1659,37 +1672,6 @@ function visibleFiles() {
     navigateToFolder(target, false);
   });
 
-  /* ================= Touch Gesture: Swipe to Back ================= */
-  let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
-  document.addEventListener("touchstart", (e) => {
-    if (e.touches.length !== 1) return;
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    touchStartTime = Date.now();
-  }, { passive: true });
-
-  document.addEventListener("touchend", (e) => {
-    if (!touchStartX || !curFolderPrefix) return;
-    if (document.querySelector(".modal.on") || document.querySelector("#drawer.on")) return;
-
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    const dx = touchEndX - touchStartX;
-    const dy = touchEndY - touchStartY;
-    const dt = Date.now() - touchStartTime;
-
-    if (dt < 450 && Math.abs(dx) > 70 && Math.abs(dy) < 50) {
-      const isRtl = document.documentElement.dir === "rtl";
-      if ((isRtl && dx < -60) || (!isRtl && dx > 60)) {
-        const parts = curFolderPrefix.split("/").filter(Boolean);
-        parts.pop();
-        const parent = parts.length ? parts.join("/") + "/" : "";
-        navigateToFolder(parent, true);
-      }
-    }
-    touchStartX = 0;
-    touchStartY = 0;
-  }, { passive: true });
   let searchDebounceTimer=null;
   $("#fSearch").oninput=e=>{
     fQuery=e.target.value.trim();
@@ -1779,7 +1761,8 @@ function renderRows(){
   list.forEach(o=>{
     const tr=document.createElement("tr");
     const isDir = o.isFolder;
-    const nameToShow = isDir ? o.filename : (o.displayName || o.filename || o.id);
+    const nameToShow = isDir ? baseName(o.filename) : baseName(o.filename || o.displayName || o.id);
+    const fullName = o.filename || o.displayName || o.id;
     const iconSvg = isDir
       ? '<svg viewBox="0 0 24 24" style="stroke:var(--brand)"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
       : '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
@@ -1788,7 +1771,7 @@ function renderRows(){
       '<td data-th="'+t("thName")+'"><div class="fname">'
       +('<input type="checkbox" class="selbox" data-id="'+o.id+'" style="margin-inline-end:8px;vertical-align:-2px">')
       +'<span class="fic" style="'+(isDir ? 'background:rgba(47,107,255,.15);cursor:pointer' : '')+'">'+iconSvg+'</span>'
-      +'<span class="fn" style="cursor:'+(isDir ? 'pointer;color:var(--brand);font-weight:700' : 'default')+'" title="'+esc(nameToShow)+'">'+esc(nameToShow)+(isDir ? '/' : '')+'</span></div></td>'
+      +'<span class="fn" style="cursor:'+(isDir ? 'pointer;color:var(--brand);font-weight:700' : 'default')+'" title="'+esc(fullName)+'">'+esc(nameToShow)+(isDir ? '/' : '')+'</span></div></td>'
       +'<td class="num" data-th="'+(isDir ? t("thItems") : t("thSize"))+'">'+(isDir ? (o.itemCount + ' ' + t("nItems")) : humanSize(o.size))+'</td>'
       +'<td class="date-cell" data-th="'+t("thDate")+'" data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</td>'
       +'<td class="num" data-th="'+t("thDl")+'">'+(isDir ? '—' : (o.downloaded??0))+'</td>'
@@ -1881,7 +1864,9 @@ function renderRows(){
       tr.querySelector('[data-a=dl]').onclick=()=>{
         toast(t("dlStart"));
         const a=document.createElement("a");
-        a.href="/f/"+o.id;document.body.appendChild(a);a.click();a.remove();
+        a.href=mediaUrl(o);
+        a.download=baseName(o.filename || o.id);
+        document.body.appendChild(a);a.click();a.remove();
       };
       const cpBtn=tr.querySelector('[data-a=cp]');
       if(cpBtn)cpBtn.onclick=async(e)=>{
@@ -2031,29 +2016,50 @@ function renderGallery(list){
     else if(previewsEnabled && kind==="pdf")inner='<div class="gpdf"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg><span>PDF</span></div>';
     else inner='<div class="gicon">'+esc((extOf(o.filename)||"bin").toUpperCase().slice(0,4))+'</div>';
     const acts = isDir
-      ? '<button class="act" data-a="fold-rename" title="'+esc(t("foldRenameT"))+'">'+RN_ICON+'</button>'
-        +'<button class="act" data-a="fold-move" title="'+esc(t("foldMoveT"))+'">'+MV_ICON+'</button>'
-        +'<button class="act" data-a="fold-copy" title="'+esc(t("foldCopyT"))+'">'+CP_ICON+'</button>'
-        +'<button class="act del" data-a="del" title="'+esc(t("foldDelT"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
-      : '<button class="act" data-a="dl" title="'+esc(t("download"))+'"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
-        +'<button class="act" data-a="cp" title="'+esc(t("quickShareLink"))+'"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>'
-        +'<button class="act" data-a="cp-file" title="'+esc(t("copyFileT"))+'">'+CP_ICON+'</button>'
-        +'<button class="act" data-a="rn" title="'+esc(t("renameT"))+'">'+RN_ICON+'</button>'
-        +'<button class="act" data-a="mv" title="'+esc(t("moveTitle"))+'">'+MV_ICON+'</button>'
-        +'<button class="act" data-a="ln" title="'+esc(t("linkT"))+'"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>'
-        +'<button class="act del" data-a="del" title="'+esc(t("delQ"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>';
+      ? '<button class="gmenu-btn" data-a="menu-toggle" title="'+esc(t("manageB")||"گزینه‌ها")+'" aria-label="options"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="19" r="2.2"/></svg></button>'
+        +'<div class="gmenu-pop">'
+        +'<button class="gmenu-item" data-a="fold-rename">'+RN_ICON+' <span>'+esc(t("foldRenameT"))+'</span></button>'
+        +'<button class="gmenu-item" data-a="fold-move">'+MV_ICON+' <span>'+esc(t("foldMoveT"))+'</span></button>'
+        +'<button class="gmenu-item" data-a="fold-copy">'+CP_ICON+' <span>'+esc(t("foldCopyT")||"کپی پوشه")+'</span></button>'
+        +'<button class="gmenu-item del" data-a="del"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg> <span>'+esc(t("foldDelT"))+'</span></button>'
+        +'</div>'
+      : '<button class="gmenu-btn" data-a="menu-toggle" title="'+esc(t("manageB")||"گزینه‌ها")+'" aria-label="options"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="19" r="2.2"/></svg></button>'
+        +'<div class="gmenu-pop">'
+        +'<button class="gmenu-item" data-a="dl"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg> <span>'+esc(t("download"))+'</span></button>'
+        +'<button class="gmenu-item" data-a="cp"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg> <span>'+esc(t("quickShareLink")||"کپی لینک")+'</span></button>'
+        +'<button class="gmenu-item" data-a="ln"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg> <span>'+esc(t("linkT"))+'</span></button>'
+        +'<button class="gmenu-item" data-a="cp-file">'+CP_ICON+' <span>'+esc(t("copyFileT")||"تکثیر فایل")+'</span></button>'
+        +'<button class="gmenu-item" data-a="rn">'+RN_ICON+' <span>'+esc(t("renameT"))+'</span></button>'
+        +'<button class="gmenu-item" data-a="mv">'+MV_ICON+' <span>'+esc(t("moveTitle"))+'</span></button>'
+        +'<button class="gmenu-item del" data-a="del"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg> <span>'+esc(t("delQ"))+'</span></button>'
+        +'</div>';
+    const nameToShow = isDir ? baseName(o.filename) : baseName(o.filename || o.displayName || o.id);
+    const fullName = o.filename || o.displayName || o.id;
     cell.innerHTML='<div class="gthumb">'+inner+'</div>'
-      +'<div class="gname" title="'+esc(o.filename||o.id)+'">'+esc(o.filename||o.id)+'</div>'
+      +'<div class="gname" title="'+esc(fullName)+'">'+esc(nameToShow)+(isDir?'/':'')+'</div>'
       +'<div class="gsub"><span class="num">'+(isDir?(o.itemCount+' '+t("nItems")):humanSize(o.size))+'</span>'+(isDir?'':' · <span class="num">'+(o.downloaded??0)+' ↓')+'</span></div>'
       +'<input type="checkbox" class="selbox" data-id="'+o.id+'">'
       +'<div class="gacts">'+acts+'</div>';
+
+    const menuBtn = cell.querySelector('[data-a="menu-toggle"]');
+    const menuPop = cell.querySelector('.gmenu-pop');
+    if(menuBtn && menuPop){
+      menuBtn.onclick = (e) => {
+        e.stopPropagation();
+        const wasOpen = menuPop.classList.contains("on");
+        document.querySelectorAll(".gmenu-pop.on").forEach(p => p.classList.remove("on"));
+        if(!wasOpen) menuPop.classList.add("on");
+      };
+    }
+
     if(!isDir){
       cell.draggable=true;
       cell.ondragstart=e=>{e.dataTransfer.setData("text/plain",o.id);};
-      cell.querySelector('[data-a=dl]').onclick=()=>{toast(t("dlStart"));const a=document.createElement("a");a.href=url;document.body.appendChild(a);a.click();a.remove();};
+      cell.querySelector('[data-a=dl]').onclick=(e)=>{e.stopPropagation();if(menuPop)menuPop.classList.remove("on");toast(t("dlStart"));const a=document.createElement("a");a.href=url;a.download=baseName(o.filename||o.id);document.body.appendChild(a);a.click();a.remove();};
       const cpBtn=cell.querySelector('[data-a=cp]');
       if(cpBtn)cpBtn.onclick=async(e)=>{
         e.stopPropagation();
+        if(menuPop)menuPop.classList.remove("on");
         try{
           const r=await api("/f/"+encodeURIComponent(o.id)+"/link?ttl=86400",{method:"POST"});
           await copyText(r.pretty_url||r.url);
@@ -2066,16 +2072,17 @@ function renderGallery(list){
       const cpFileBtn=cell.querySelector('[data-a=cp-file]');
       if(cpFileBtn)cpFileBtn.onclick=async(e)=>{
         e.stopPropagation();
+        if(menuPop)menuPop.classList.remove("on");
         try{
           await api("/api/v1/admin/objects/copy",{method:"POST",body:JSON.stringify({id:o.id})});
           toast(t("duplicateOk"));
           refresh();
         }catch(err){toast(err.message,"err");}
       };
-      cell.querySelector('[data-a=rn]').onclick=(e)=>{e.stopPropagation();renameObj(o);};
-      cell.querySelector('[data-a=mv]').onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename||o.id);};
-      cell.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
-      cell.querySelector('[data-a=del]').onclick=()=>delObj(o);
+      cell.querySelector('[data-a=rn]').onclick=(e)=>{e.stopPropagation();if(menuPop)menuPop.classList.remove("on");renameObj(o);};
+      cell.querySelector('[data-a=mv]').onclick=(e)=>{e.stopPropagation();if(menuPop)menuPop.classList.remove("on");openMoveModal([o.id],o.filename||o.id);};
+      cell.querySelector('[data-a=ln]').onclick=(e)=>{e.stopPropagation();if(menuPop)menuPop.classList.remove("on");openShareOpts(o);};
+      cell.querySelector('[data-a=del]').onclick=(e)=>{e.stopPropagation();if(menuPop)menuPop.classList.remove("on");delObj(o);};
     }
     if(isDir){
       cell.ondragover=e=>{e.preventDefault();cell.classList.add("drag-over");};
@@ -2148,6 +2155,7 @@ function renderGallery(list){
   });
   wrap.insertBefore(g,wrap.firstChild);
 }
+document.addEventListener("click", () => document.querySelectorAll(".gmenu-pop.on").forEach(p => p.classList.remove("on")));
 function updateSelBar(){
   const bar=$("#selBar");
   if(!bar)return;
@@ -2646,7 +2654,8 @@ async function openFileModal(o){
   }else{
     pv.innerHTML='<div class="fm-fallback">'+esc((extOf(o.filename)||"file").toUpperCase())+'</div>';
   }
-  $("#fmName").textContent=o.filename||o.id;
+  $("#fmName").textContent = baseName(o.filename || o.id);
+  $("#fmName").title = o.filename || o.id;
   const chunkText = (o.chunks || 1) + " " + (lang === "fa" ? "بخش" : "chunks");
   const dlCount = (o.downloaded ?? 0);
   const dlText = "↓ " + dlCount + " " + (lang === "fa" ? "دانلود" : "downloads");
@@ -2665,7 +2674,9 @@ $("#fileModal").onclick=e=>{if(e.target.id==="fileModal")$("#fmClose").onclick()
 $("#fmDl").onclick=()=>{
   if(!fmObj)return;
   toast(t("dlStart"));
-  const a=document.createElement("a");a.href="/f/"+fmObj.id;
+  const a=document.createElement("a");
+  a.href=mediaUrl(fmObj);
+  a.download=baseName(fmObj.filename || fmObj.id);
   document.body.appendChild(a);a.click();a.remove();
 };
 $("#fmShare").onclick=async()=>{
@@ -3229,9 +3240,11 @@ async function loadSystemStats(){
   }catch(e){}
 }
 
-async function loadAuditLogs(){
+async function loadAuditLogs(manual = false){
   const box = $("#auditLogList");
+  const btn = $("#refreshAuditBtn");
   if(!box)return;
+  if(btn && manual) btn.classList.add("busy");
   try{
     const r = await api("/api/v1/admin/audit-logs?limit=25");
     const logs = r.logs || [];
@@ -3246,10 +3259,17 @@ async function loadAuditLogs(){
         <span style="color:var(--tx3);font-size:10px">${dt}</span>
       </div>`;
     }).join("");
-  }catch(e){box.innerHTML = '<div style="color:var(--err)">خطا در دریافت لاگ‌ها</div>';}
+    if(manual) toast(t("saved") || "به‌روزرسانی شد");
+  }catch(e){
+    box.innerHTML = '<div style="color:var(--err)">خطا در دریافت لاگ‌ها</div>';
+  }finally{
+    if(btn && manual){
+      setTimeout(() => btn.classList.remove("busy"), 350);
+    }
+  }
 }
 const refAudit = $("#refreshAuditBtn");
-if(refAudit) refAudit.onclick = loadAuditLogs;
+if(refAudit) refAudit.onclick = () => loadAuditLogs(true);
 $("#btnDownloadBackup").onclick=async()=>{
   toast(t("loading"));
   try{

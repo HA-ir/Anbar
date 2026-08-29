@@ -113,6 +113,7 @@ async def settings_update(request: Request):
         backend = request.app.state.backend
         if hasattr(backend, "set_export_conns"):
             await backend.set_export_conns(changed["mtproto_export_conns"])
+    db.log_audit("settings.update", actor="admin", details=changed)
     return {"changed": changed, "settings": runtime.effective(db, _env_defaults(s))}
 
 
@@ -178,6 +179,7 @@ async def auth_toggle(request: Request):
     s = request.app.state.settings
     current = effective_auth_enabled(db, s.auth_enabled)
     db.kv_set(KV_AUTH, "0" if current else "1")
+    db.log_audit("auth.toggle", actor="admin", details={"auth_enabled": not current})
     return JSONResponse({"auth_enabled": not current})
 
 
@@ -190,6 +192,7 @@ async def rotate_secret(request: Request):
     db = request.app.state.db
     secret = new_secret()
     db.kv_set(KV_HMAC_SECRET, secret)
+    db.log_audit("secret.rotate", actor="admin")
     return {"hmac_secret": secret, "note": "previously minted links are now invalid"}
 
 
@@ -294,6 +297,7 @@ async def backup_push_telegram(request: Request):
     ref = await backend.store(data, name)
     db.kv_set("last_backup_time", str(int(time.time())))
     db.kv_set("last_backup_ref", ref.file_id)
+    db.log_audit("backup.telegram", actor="admin", target=name, details={"size": len(data)})
     return {
         "status": "ok",
         "backup_time": int(time.time()),
@@ -311,6 +315,7 @@ async def backup_import(request: Request, file: UploadFile):
     content = await file.read()
     try:
         res = db.restore_bytes(content)
+        db.log_audit("backup.restore", actor="admin", details=res)
         return {
             "status": "ok",
             "message": "Database restored successfully",
@@ -634,6 +639,7 @@ async def links_revoke_all(request: Request):
     from .. import links as links_registry
 
     count = links_registry.revoke_all(request.app.state.db)
+    request.app.state.db.log_audit("link.revoke_all", actor="admin", details={"count": count})
     return {"revoked": True, "count": count}
 
 
@@ -646,6 +652,7 @@ async def link_revoke(request: Request, obj_id: str, exp: int):
     ok = links_registry.revoke(request.app.state.db, obj_id, exp)
     if not ok:
         raise HTTPException(404, "unknown link")
+    request.app.state.db.log_audit("link.revoke", actor="admin", target=obj_id)
     return {"revoked": True, "obj_id": obj_id, "exp": exp}
 
 
@@ -907,6 +914,7 @@ async def folder_rename(request: Request):
         raise HTTPException(400, "cannot move a folder into itself")
     db = request.app.state.db
     moved_count = db.rename_folder(old_path, new_path)
+    db.log_audit("folder.rename", actor="admin", target=f"{old_path} -> {new_path}")
     return {"status": "renamed", "moved_count": moved_count, "new_path": new_path}
 
 
@@ -921,6 +929,7 @@ async def folder_copy(request: Request):
         raise HTTPException(400, "both src_path and dst_path are required")
     db = request.app.state.db
     copied_count = db.copy_folder(src_path, dst_path)
+    db.log_audit("folder.copy", actor="admin", target=f"{src_path} -> {dst_path}")
     return {"status": "copied", "copied_count": copied_count, "dst_path": dst_path}
 
 
@@ -934,6 +943,7 @@ async def folder_delete(request: Request):
         raise HTTPException(400, "folder path is required")
     db = request.app.state.db
     deleted_count = db.soft_delete_folder(folder_path)
+    db.log_audit("folder.delete", actor="admin", target=folder_path)
     return {"status": "deleted", "deleted_count": deleted_count, "folder": folder_path}
 
 
@@ -956,6 +966,7 @@ async def objects_move(request: Request):
         raise HTTPException(400, "invalid destination path")
     db = request.app.state.db
     res = db.move_objects_to_prefix([str(i) for i in ids], dest)
+    db.log_audit("file.move", actor="admin", target=f"{len(ids)} items -> {dest}")
     return {
         "status": "moved",
         "moved": res["moved"],
@@ -980,6 +991,7 @@ async def object_copy(request: Request):
     res = db.copy_object(str(obj_id), new_filename)
     if not res:
         raise HTTPException(404, "object not found")
+    db.log_audit("file.copy", actor="admin", target=str(obj_id))
     return {"status": "copied", "object": res}
 
 
@@ -994,5 +1006,6 @@ async def trash_purge_one(request: Request, obj_id: str):
     if row is None:
         raise HTTPException(404, "object not found")
     removed = await _purge_object_blobs(request.app.state.backend, db, row)
+    db.log_audit("file.purge", actor="admin", target=obj_id)
     return {"purged": obj_id, "blobs_removed": removed}
 

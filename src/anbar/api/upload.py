@@ -67,6 +67,12 @@ async def _commit(
             "uploader_key": _uploader_key(request),
         }
     )
+    db.log_audit(
+        "file.upload",
+        actor="admin",
+        target=filename,
+        details={"size": manifest.total_size, "id": obj_id},
+    )
     base = settings.base_url.rstrip("/")
     return JSONResponse(
         {

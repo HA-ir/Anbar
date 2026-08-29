@@ -65,6 +65,7 @@ async def login(request: Request):
     if not admin_key or not key or not constant_time_equal(key, admin_key):
         raise HTTPException(401, "invalid key")
     ttl = runtime.get_int(db, "session_ttl", settings.web_session_ttl)
+    db.log_audit("auth.login", actor="admin", ip=request.client.host if request.client else None)
     resp = JSONResponse({"ok": True, "role": "admin"})
     _set_session(resp, request, issue_session(db, ttl, "admin"), ttl)
     return resp
