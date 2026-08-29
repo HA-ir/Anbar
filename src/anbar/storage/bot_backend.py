@@ -147,7 +147,13 @@ class BotBackend(StorageBackend):
         return e.code in (429, 402, 500, 502)
 
     # ── StorageBackend contract ─────────────────────────────────────
-    async def store(self, data: bytes, name: str, content_type: str | None = None) -> ObjectRef:
+    async def store(
+        self,
+        data: bytes,
+        name: str,
+        content_type: str | None = None,
+        caption: str | None = None,
+    ) -> ObjectRef:
         """Post one blob to the channel, return its file_id ref.
 
         Paced by a single send queue and retried through FloodWait up to
@@ -171,7 +177,7 @@ class BotBackend(StorageBackend):
         deadline = asyncio.get_running_loop().time() + self.flood_budget_s
         while True:
             try:
-                result = await self._paced_multipart(method, name, data)
+                result = await self._paced_multipart(method, name, data, caption=caption)
             except TelegramError as e:
                 if self._is_rate_limited(e):
                     wait_s = (e.retry_after or 3) + 0.5
@@ -206,7 +212,9 @@ class BotBackend(StorageBackend):
                 return result[key]["file_id"]
         raise KeyError(f"no file payload in {method} response")
 
-    async def _paced_multipart(self, method: str, name: str, data: bytes) -> dict:
+    async def _paced_multipart(
+        self, method: str, name: str, data: bytes, caption: str | None = None
+    ) -> dict:
         """One media/document post through the pacing queue (gap between sends)."""
         async with self._send_lock:
             now = asyncio.get_running_loop().time()
@@ -224,6 +232,8 @@ class BotBackend(StorageBackend):
                     fields["message_thread_id"] = str(self._thread_id)
                 if method == "sendVideo":
                     fields["supports_streaming"] = "true"
+                if caption:
+                    fields["caption"] = caption
                 return await self._call_multipart(
                     method,
                     fields=fields,

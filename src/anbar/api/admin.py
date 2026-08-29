@@ -347,6 +347,60 @@ async def backup_import(request: Request, file: UploadFile):
         raise HTTPException(500, detail=f"Database restore failed: {e}") from e
 
 
+@router.post("/admin/channel/rebuild")
+async def channel_rebuild(request: Request):
+    """Scan Telegram storage channel history and reconstruct SQLite objects.
+
+    Self-healing disaster recovery: recovers filenames, folders, manifests and files
+    even if the entire local database was deleted.
+    """
+    require_admin(request)
+    db = request.app.state.db
+    backend = request.app.state.backend
+    s = request.app.state.settings
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    limit = int((body or {}).get("limit", 1000)) if isinstance(body, dict) else 1000
+    custom_secret = (body or {}).get("secret", "").strip() if isinstance(body, dict) else ""
+    env_secret = s.hmac_secret.get_secret_value() if s.hmac_secret else None
+    active_secret = custom_secret or effective_hmac_secret(db, env_secret)
+
+    from ..self_healing import decode_chunk_caption, rebuild_from_manifests
+
+    collected_chunks: dict[str, list[dict]] = {}
+
+    if hasattr(backend, "_client") and hasattr(backend, "_peer") and hasattr(backend, "_connected"):
+        try:
+            if not backend._connected:
+                await backend.connect()
+            async for msg in backend._client.iter_messages(backend._peer, limit=limit):
+                if not msg or not msg.media or not getattr(msg.media, "document", None):
+                    continue
+                caption = msg.text or msg.message or ""
+                meta = decode_chunk_caption(caption, secret=active_secret)
+                if not meta:
+                    continue
+                obj_id = meta.get("id") or meta.get("fn")
+                doc = msg.media.document
+                collected_chunks.setdefault(obj_id, []).append(
+                    {
+                        "meta": meta,
+                        "file_id": str(doc.id),
+                        "message_id": msg.id,
+                        "size": doc.size,
+                        "backend": "mtproto",
+                    }
+                )
+        except Exception as e:
+            raise HTTPException(502, f"Failed scanning MTProto channel history: {e}") from e
+
+    res = rebuild_from_manifests(collected_chunks, db)
+    db.log_audit("channel.rebuild", actor="admin", details=res)
+    return {"status": "ok", **res}
+
+
 @router.get("/admin/system-stats")
 async def system_stats_get(request: Request):
     """Comprehensive telemetry and health stats for Admin Dashboard."""

@@ -863,6 +863,9 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <button class="btn btn-ghost" id="btnPushTgBackup" type="button" style="width:100%;font-size:12px">
           ☁️ <span data-i18n="btnTgBackup">ارسال بکاپ به تلگرام</span>
         </button>
+        <button class="btn btn-ghost" id="btnChannelRebuild" type="button" style="width:100%;font-size:12px;margin-top:2px">
+          🔄 <span data-i18n="btnChannelRebuild">اسکن و بازسازی دیتابیس از کانال تلگرام</span>
+        </button>
       </div>
     </div>
 
@@ -1080,6 +1083,10 @@ const I18N={
   backupRestoredOk:"دیتابیس با موفقیت بازیابی شد",
   importBackupBad:"فایل پشتیبان نامعتبر است",
   btnTgBackup:"ارسال بکاپ به تلگرام",
+  btnChannelRebuild:"اسکن و بازسازی دیتابیس از کانال تلگرام",
+  channelRebuildConfirm:"آیا مایلید کل تاریخچه کانال تلگرام اسکن شده و تمام فایل‌ها و پوشه‌ها با کلید فعلی بازسازی شوند؟",
+  channelRebuilding:"در حال اسکن تاریخچه کانال تلگرام و بازسازی...",
+  channelRebuildDone:"بازسازی کامل شد. موارد بازیابی‌شده",
   backupSentOk:"نسخه پشتیبان با موفقیت در تلگرام ذخیره شد",
   quickCopyLink:"کپی لینک مستقیم",
   storageDist:"تفکیک مصرف فضا",
@@ -1208,6 +1215,10 @@ const I18N={
   backupRestoredOk:"Database restored successfully",
   importBackupBad:"Invalid backup database file",
   btnTgBackup:"Push Backup to Telegram",
+  btnChannelRebuild:"Scan & Rebuild from Telegram Channel",
+  channelRebuildConfirm:"Do you want to scan Telegram channel history and rebuild all objects with current secret?",
+  channelRebuilding:"Scanning Telegram channel history and rebuilding...",
+  channelRebuildDone:"Rebuild completed. Recovered items",
   backupSentOk:"Database backup pushed to Telegram successfully",
   quickCopyLink:"Copy direct link",
   storageDist:"Storage Distribution",
@@ -3383,6 +3394,19 @@ $("#btnPushTgBackup").onclick=async()=>{
     await api("/api/v1/admin/backup/telegram",{method:"POST"});
     toast(t("backupSentOk"));
     loadSystemStats();
+  }catch(e){toast(e.message,"err");}
+  finally{btn.disabled=false;btn.style.opacity="";}
+};
+$("#btnChannelRebuild").onclick=async()=>{
+  if(!confirm(t("channelRebuildConfirm")))return;
+  const btn=$("#btnChannelRebuild");
+  btn.disabled=true;btn.style.opacity=".5";
+  toast(t("channelRebuilding"));
+  try{
+    const res=await api("/api/v1/admin/channel/rebuild",{method:"POST"});
+    toast(t("channelRebuildDone")+": "+(res.recovered_objects||0)+" "+t("files"));
+    await loadSystemStats();
+    refresh();
   }catch(e){toast(e.message,"err");}
   finally{btn.disabled=false;btn.style.opacity="";}
 };

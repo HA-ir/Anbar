@@ -15,9 +15,10 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from .. import runtime
-from ..auth import require_uploader
+from ..auth import effective_hmac_secret, require_uploader
 from ..objects import Chunk, Manifest, chunk_stream, new_object_id, opaque_chunk_name
 from ..ratelimit import limit_upload
+from ..self_healing import encode_chunk_caption
 from ..storage import FloodBudgetExceeded, ObjectRef, TelegramError
 
 router = APIRouter()
@@ -135,15 +136,29 @@ async def _store_stream(
 
     harvester = getattr(request.app.state, "harvester", None)
 
+    configured_sec = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
+    active_secret = effective_hmac_secret(db, configured_sec)
+
     async def on_chunk(data: bytes, media: bool = False) -> str:
         nonlocal skip_remaining
         if skip_remaining > 0:
             skip_remaining -= 1  # duplicate of an already-stored chunk: drain
             return ""
+        chunk_idx = len(manifest.chunks)
+        caption = encode_chunk_caption(
+            obj_id=upload_id or "",
+            chunk_idx=chunk_idx,
+            total_chunks=0,
+            filename=filename,
+            total_size=0,
+            content_type=content_type,
+            secret=active_secret,
+        )
         ref = await backend.store(
             data,
-            opaque_chunk_name(len(manifest.chunks)),
+            opaque_chunk_name(chunk_idx),
             content_type=None,
+            caption=caption,
         )
         bot_fid = None
         if harvester and ref.message_id is not None:

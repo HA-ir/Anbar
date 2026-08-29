@@ -64,6 +64,22 @@ class BotPool:
 
         return await backend.open(ref, max_retries=max_retries)
 
+    async def store(
+        self,
+        data: bytes,
+        name: str,
+        content_type: str | None = None,
+        caption: str | None = None,
+    ) -> ObjectRef:
+        """Store chunk using round-robin bot backend from the pool."""
+        if not self._backends or self._cycle is None:
+            raise RuntimeError("BotPool has no active bot backends")
+
+        async with self._lock:
+            backend = next(self._cycle)
+
+        return await backend.store(data, name, content_type=content_type, caption=caption)
+
     async def close(self) -> None:
         for b in self._backends:
             try:

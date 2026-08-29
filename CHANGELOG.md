@@ -4,6 +4,12 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.2] — 2026-08-29
+
+### Added
+- **Self-Describing & Self-Healing Encrypted Storage (Disaster Recovery)**: Embedded compact, zero-knowledge encrypted metadata envelopes into Telegram document chunk captions (`anbar:v1:e:...` / `anbar:v1:p:...`).
+- **Channel History Rebuild Engine**: Automated channel crawler (`POST /api/v1/admin/channel/rebuild` & UI button) that walks Telegram channel messages, decrypts metadata envelopes using the user's master secret, sorts chunks and fully reconstructs the SQLite database, files, paths and manifests from scratch without local database backups.
+
 ## [0.15.1] — 2026-08-29
 
 ### Added
