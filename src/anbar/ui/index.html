@@ -836,7 +836,10 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
 <!-- links manager modal -->
 <div class="modal" id="linksModal">
   <div class="modal-card">
-    <h3 data-i18n="linksT">لینک‌های فعال</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px">
+      <h3 data-i18n="linksT" style="margin:0">لینک‌های فعال</h3>
+      <button class="btn btn-warn" id="revokeAllLinksBtn" style="width:auto;padding:4px 10px;font-size:11.5px;height:26px" data-i18n="revokeAllLinks">ابطال همه</button>
+    </div>
     <p id="linksSub" data-i18n="linksS">همه لینک‌های ساخته‌شده — امکان ابطال فوری</p>
     <div id="linksList" style="max-height:50vh;overflow-y:auto"></div>
     <div style="margin-top:14px;text-align:end">
@@ -963,7 +966,8 @@ const I18N={
   statBots:"بات‌های فعال",
   statLastBk:"آخرین پشتیبان",
   duplicateOk:"نسخه کپی ایجاد شد",
-  codeTruncated:"نمایش ۱۰۰۰ خط اول — برای مشاهده کامل دانلود کنید",
+  codeTruncated:"نمایش ۱۰۰ خط اول — برای مشاهده کامل دانلود کنید",
+  openFullPage:"مشاهده کامل در صفحه جدید",
   quickShareLink:"ساخت و کپی لینک اشتراک (۲۴ ساعته)",
   shareLinkCreated:"لینک اشتراک امن ۲۴ ساعته در کلیپ‌بورد کپی شد",
   copyFileT:"ایجاد نسخه کپی (Duplicate)",
@@ -1039,6 +1043,9 @@ const I18N={
   shareSel:"اشتراک انتخاب‌شده‌ها", zipDl:"دانلود ZIP",
   albumOk:"لینک آلبوم ساخته شد", albumSub:"یک لینک برای همه فایل‌ها — گالری عمومی با دانلود تکی",
   linksT:"لینک‌های فعال", linksS:"همه لینک‌های ساخته‌شده — امکان ابطال فوری",
+  revokeAllLinks:"ابطال همه",
+  revokeAllConfirm:"آیا از ابطال تمام لینک‌های فعال مطمئن هستید؟ پس از این کار، تمام لینک‌های اشتراک عمومی بلافاصله منقضی می‌شوند.",
+  allLinksRevoked:"تمام لینک‌های فعال با موفقیت باطل شدند",
   trashT:"سطل بازیافت", trashS:"موارد تا ۷ روز قابل بازیابی‌اند، بعد خودکار حذف می‌شوند.",
   trashEmpty:"خالی کردن سطل", restore:"بازیابی", purge:"حذف قطعی",
   ftAll:"همه انواع", ftImage:"عکس", ftVideo:"ویدیو", ftAudio:"صدا",
@@ -1077,7 +1084,8 @@ const I18N={
   statBots:"Active Bots",
   statLastBk:"Last Backup",
   duplicateOk:"Copy created",
-  codeTruncated:"Showing first 1000 lines — download for full content",
+  codeTruncated:"Showing first 100 lines — file exceeds preview limit",
+  openFullPage:"Open full in new tab",
   quickShareLink:"Create & copy share link (24h)",
   shareLinkCreated:"24h secure share link copied to clipboard",
   copyFileT:"Duplicate file",
@@ -1153,6 +1161,9 @@ const I18N={
   shareSel:"Share selected", zipDl:"Download ZIP",
   albumOk:"Album link created", albumSub:"One link for all files — public gallery with per-file download",
   linksT:"Active links", linksS:"Every minted link — revoke instantly",
+  revokeAllLinks:"Revoke All",
+  revokeAllConfirm:"Are you sure you want to revoke all active share links? All existing public links will stop working immediately.",
+  allLinksRevoked:"All active share links have been revoked",
   trashT:"Trash", trashS:"Items stay restorable for 7 days, then purge automatically.",
   trashEmpty:"Empty trash", restore:"Restore", purge:"Delete forever",
   ftAll:"All types", ftImage:"Images", ftVideo:"Videos", ftAudio:"Audio",
@@ -2110,8 +2121,8 @@ async function openLinks(){
        :'<span class="tag mtproto lk-badge">'+humanTtl(L.exp-Math.floor(Date.now()/1000))+'</span>';
      // rebuild the share URL: pretty slug when present, else signed form
      let href;
-     if(L.slug&&!L.revoked)href=location.origin+"/f/"+encodeURIComponent(L.slug);
-     else href=location.origin+"/f/"+encodeURIComponent(L.obj_id)+"?sig="+L.sig+"&exp="+L.exp;
+     if(L.slug&&!L.revoked)href=location.origin+"/f/"+encodeURIComponent(L.slug)+"?sig="+(L.sig||"")+"&exp="+L.exp;
+     else href=location.origin+"/f/"+encodeURIComponent(L.obj_id)+"?sig="+(L.sig||"")+"&exp="+L.exp;
      d.innerHTML='<div class="lnk-main">'
        +'<div class="kn" style="direction:ltr;text-align:left;overflow:hidden;text-overflow:ellipsis">'
        +esc((L.filename||L.obj_id))+(L.pw?' 🔒':'')+(L.max_dl?' <span style="color:var(--tx3);font-size:10.5px">⬇'+esc(String(L.max_dl))+'</span>':'')
@@ -2144,6 +2155,17 @@ async function openLinks(){
 $("#linksBtn").onclick=openLinks;
 $("#linksClose").onclick=()=>$("#linksModal").classList.remove("on");
 $("#linksModal").onclick=e=>{if(e.target.id==="linksModal")$("#linksModal").classList.remove("on");};
+const revokeAllBtn=$("#revokeAllLinksBtn");
+if(revokeAllBtn){
+  revokeAllBtn.onclick=async()=>{
+    if(!confirm(t("revokeAllConfirm")))return;
+    try{
+      const r=await api("/api/v1/admin/links/revoke-all",{method:"POST"});
+      toast(t("allLinksRevoked"));
+      openLinks();
+    }catch(e){toast(e.message,"err");}
+  };
+}
 /* ── link manage modal (v0.10.4): edit one link in-place ── */
 let mgTarget=null;
 function openManage(L){
@@ -2274,7 +2296,7 @@ async function renameObj(o){
 function highlightCode(raw, ext) {
   const cleanExt = (ext || "").toLowerCase();
   const allLines = raw.split(/\r?\n/);
-  const MAX_LINES = 1000;
+  const MAX_LINES = 100;
   const isTruncated = allLines.length > MAX_LINES;
   const lines = isTruncated ? allLines.slice(0, MAX_LINES) : allLines;
   let rowsHtml = "";
@@ -2304,9 +2326,9 @@ function highlightCode(raw, ext) {
   }
 
   const truncBanner = isTruncated
-    ? '<div style="padding:8px 12px;background:var(--warn-soft);color:var(--warn);font-size:11.5px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.08);direction:rtl">'
+    ? '<div style="padding:8px 12px;background:var(--warn-soft);color:var(--warn);font-size:11.5px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.08);gap:8px;flex-wrap:wrap">'
       + '<span>⚠️ ' + t('codeTruncated') + '</span>'
-      + '<button class="btn btn-ghost" style="padding:2px 8px;font-size:11px;height:22px" onclick="$(\'#fmDl\').click()">↓ ' + t('download') + '</button>'
+      + '<button class="btn btn-ghost" type="button" style="padding:2px 8px;font-size:11px;height:22px" id="fmOpenFullBtn">↗ ' + t('openFullPage') + '</button>'
       + '</div>'
     : '';
 
@@ -2401,6 +2423,11 @@ async function openFileModal(o){
           }else{
             toast("Copy failed","err");
           }
+        };
+        const openFullBtn=pv.querySelector("#fmOpenFullBtn");
+        if(openFullBtn)openFullBtn.onclick=(e)=>{
+          e.stopPropagation();
+          window.open(url,"_blank");
         };
       }else{
         pv.innerHTML='<div class="fm-fallback">TEXT</div>';

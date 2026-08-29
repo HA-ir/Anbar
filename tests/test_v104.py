@@ -85,3 +85,25 @@ def test_gallery_html_has_audio_pdf_blocks(client):
     html = _render()
     assert 'class="gaudio"' in html and "<audio" in html
     assert 'class="gpdf"' in html
+
+
+def test_revoke_all_links(client):
+    """Test revoking all active share links at once."""
+    o1 = _upload(client, "doc1.txt", b"doc1")
+    o2 = _upload(client, "doc2.txt", b"doc2")
+    l1 = client.post(f"/f/{o1}/link?ttl=600", headers=ADMIN).json()
+    l2 = client.post(f"/f/{o2}/link?ttl=600", headers=ADMIN).json()
+
+    # Both links work
+    assert client.get(l1["url"]).status_code == 200
+    assert client.get(l2["url"]).status_code == 200
+
+    # Revoke all
+    r = client.post("/api/v1/admin/links/revoke-all", headers=ADMIN)
+    assert r.status_code == 200
+    assert r.json()["revoked"] is True
+    assert r.json()["count"] >= 2
+
+    # Now both return 410
+    assert client.get(l1["url"]).status_code == 410
+    assert client.get(l2["url"]).status_code == 410

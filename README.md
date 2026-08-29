@@ -27,7 +27,8 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 | F8 | Bilingual UI (fa/en), dark/light theme, runtime settings panel, speed-test docs, cache master-switch fix | ✅ `v0.8.1` |
 | v0.9.x | URL ingest · pw-protected links · QR · rename · multi-select · per-link download cap · gallery view · metadata export · PWA share target · folder upload · API-key mgmt UI · pretty link slugs (`/f/<name>`) · never-expiring links (`ttl=0`) · bulk share · selection UX polish | ✅ `v0.9.5` |
 | v0.10 | Link registry + instant revoke · Trash (soft delete / restore / auto-purge 7d) · streaming bulk ZIP · type filter · video poster frames | ✅ `v0.10.0` |
-| v0.10.x | Mobile responsive · pw unlock page (hidden sig+exp, eye toggle, keyed-HMAC fix) · link manager modal in-app · live-only links list + per-link download counters · shared albums (`/f/a/<token>`) · gallery audio/PDF previews | ✅ `v0.10.5` — live |
+| v0.10.x | Mobile responsive · pw unlock page (hidden sig+exp, eye toggle, keyed-HMAC fix) · link manager modal in-app · live-only links list + per-link download counters · shared albums (`/f/a/<token>`) · gallery audio/PDF previews | ✅ `v0.10.5` |
+| v0.14.x | Opaque zero-knowledge chunks · zero-overhead file/folder duplication · database backup/restore/import · system telemetry stats · mass link revocation · bounded code preview · Shamsi BiDi date formatting | ✅ `v0.14.3` — live |
 
 ## Why
 

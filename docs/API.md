@@ -270,6 +270,32 @@ returning `410 link revoked`. `200 {"revoked": true, …}`; `404` when the
 link was already revoked or never registered. When an object's last live
 link goes, its pw / download-cap / slug tags are dropped too.
 
+### `POST /api/v1/admin/links/revoke-all`  *(v0.14.3)*
+
+Immediately invalidate **all** currently active share links. Returns `200 {"revoked": true, "count": N}`.
+
+### `POST /api/v1/admin/objects/copy`  *(v0.14)*
+
+Duplicate an object with a new object ID and `<base> (copy).<ext>` filename without re-uploading chunks to Telegram (zero storage & bandwidth overhead).
+Body: `{"id": "<obj_id>", "filename": "<optional_custom_name>"}`. Returns `200 {"status": "copied", "object": {...}}`.
+
+### `GET /api/v1/admin/system-stats`  *(v0.14)*
+
+Retrieve live system telemetry and health metrics:
+`200 {"status": "healthy", "version": "...", "backend": "...", "total_objects": N, "total_bytes": N, "total_downloads": N, "bot_tokens_count": N, "encryption_enabled": true, "last_backup_time": 178799...}`.
+
+### `GET /api/v1/admin/backup`  *(v0.14)*
+
+Download consistent SQLite binary snapshot (`SQLite format 3`) of metadata, rate limits, and configuration.
+
+### `POST /api/v1/admin/backup/telegram`  *(v0.14)*
+
+Generate a fresh SQLite snapshot and store it directly in the Telegram storage channel.
+
+### `POST /api/v1/admin/backup/import`  *(v0.14)*
+
+Multipart file upload (`file`) to validate and restore an Anbar SQLite database snapshot. Re-applies WAL mode and pragmatic performance tunings.
+
 ### `GET /api/v1/admin/objects/{id}/link-info`  *(v0.10)*
 
 The same rows filtered to one object (used by the file-detail modal).

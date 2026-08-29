@@ -4,6 +4,20 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.14.3] — 2026-08-29
+
+### Added
+- **Revoke All Active Links** (`POST /api/v1/admin/links/revoke-all`): Added backend endpoint and UI button in Active Links modal to immediately revoke all existing share links.
+- **Zero-Knowledge Telegram Opaque Chunks**: All chunks stored on Telegram channels use randomized opaque filenames (`blob_<hex>_<idx>.bin`) and generic binary MIME types, eliminating metadata leakage in the storage channel.
+- **Zero-Overhead File & Folder Duplication** (`POST /api/v1/admin/objects/copy` & `POST /api/v1/admin/folders/copy`): Create instant duplicate files/directories by duplicating SQLite manifest metadata pointing to existing chunks with zero storage/bandwidth overhead.
+- **Disaster Recovery & Database Backup/Restore**:
+  - `GET /api/v1/admin/backup`: Download consistent SQLite database snapshot.
+  - `POST /api/v1/admin/backup/telegram`: Push backup directly to the configured Telegram channel.
+  - `POST /api/v1/admin/backup/import`: Atomic validation and restore of SQLite backup snapshots.
+- **System Telemetry & Health Dashboard** (`GET /api/v1/admin/system-stats`): Real-time metrics for total objects, total bytes, total downloads, active bot counts, encryption status, and last backup timestamp.
+- **Bounded Code & Text Preview with Highlighting**: Syntax highlighting and line numbers for code/text files capped at 100 lines with an "Open full in new tab" action to prevent browser DOM freezing.
+- **Persian (Shamsi) Date BiDi Formatting**: Strict Shamsi date and time formatting with BiDi isolation (`۷ شهریور ساعت ۰۰:۱۸`).
+
 ## [0.11.0] — 2026-08-24
 
 ### Added

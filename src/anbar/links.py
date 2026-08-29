@@ -29,6 +29,7 @@ def register_link(
     obj_id: str,
     exp: int,
     *,
+    sig: str | None = None,
     slug: str | None = None,
     password_protected: bool = False,
     max_dl: int = 0,
@@ -38,6 +39,7 @@ def register_link(
         f"{KV_PREFIX}{obj_id}:{exp}",
         json.dumps(
             {
+                "sig": sig or None,
                 "slug": slug or None,
                 "pw": bool(password_protected),
                 "max_dl": max_dl or None,
@@ -91,6 +93,25 @@ def revoke(db, obj_id: str, exp: int) -> bool:
     return True
 
 
+def revoke_all(db) -> int:
+    """Revoke all registered active links immediately. Returns count of revoked links."""
+    count = 0
+    for k, _ in list(db.kv_all()):
+        if not k.startswith(KV_PREFIX):
+            continue
+        try:
+            rest = k[len(KV_PREFIX) :]
+            obj_id, exp_s = rest.rsplit(":", 1)
+            exp = int(exp_s)
+        except ValueError:
+            continue
+        db.kv_delete(k)
+        db.kv_set(f"{REV_PREFIX}{obj_id}:{exp}", "1")
+        _cleanup_tags(db, obj_id)
+        count += 1
+    return count
+
+
 def list_links(db, limit: int = 200, *, include_dead: bool = False) -> list[dict]:
     """Registered links (newest-expiry first) with object names.
 
@@ -122,6 +143,16 @@ def list_links(db, limit: int = 200, *, include_dead: bool = False) -> list[dict
         if not include_dead and (is_rev or exp <= now):
             continue  # live view skips dead links entirely
         row = db.get_object(obj_id)
+        if "sig" not in meta or not meta["sig"]:
+            from .auth import effective_hmac_secret, sign
+            from .config import get_settings
+
+            cfg_s = get_settings()
+            cfg_secret = cfg_s.hmac_secret.get_secret_value() if cfg_s.hmac_secret else None
+            secret = effective_hmac_secret(db, cfg_secret)
+            if secret:
+                meta["sig"] = sign(obj_id, exp, secret)
+
         rows.append(
             {
                 "obj_id": obj_id,

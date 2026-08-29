@@ -208,6 +208,7 @@ def _authenticate_download(request: Request, obj_id: str) -> None:
             api_key and constant_time_equal(k, api_key)
         ) or _match_dynamic_key(k, db):
             return
+
     sig = request.query_params.get("sig")
     exp_raw = request.query_params.get("exp")
     if not sig or not exp_raw:
@@ -520,7 +521,13 @@ async def mint_link(
     sig = sign(obj_id, exp, secret)
     base = settings.base_url.rstrip("/")
     url = f"{base}/f/{obj_id}?sig={sig}&exp={exp}"
-    out: dict = {"url": url, "expires_at": exp, "ttl_seconds": ttl}
+    out: dict = {
+        "url": url,
+        "sig": sig,
+        "exp": exp,
+        "expires_at": exp,
+        "ttl_seconds": ttl,
+    }
     if slug:
         out["slug"] = slug
         out["pretty_url"] = f"{base}/f/{slug}"
@@ -528,7 +535,13 @@ async def mint_link(
     from .. import links as links_registry
 
     links_registry.register_link(
-        db, obj_id, exp, slug=slug or None, password_protected=bool(password.strip()), max_dl=max_dl
+        db,
+        obj_id,
+        exp,
+        sig=sig,
+        slug=slug or None,
+        password_protected=bool(password.strip()),
+        max_dl=max_dl,
     )
     if password.strip():
         pw_tag = hmac.new(

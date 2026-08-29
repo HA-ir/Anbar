@@ -579,6 +579,16 @@ async def telegram_config_update(request: Request):
     return {"status": "ok", "updated_keys": list(updates.keys())}
 
 
+@router.post("/admin/links/revoke-all")
+async def links_revoke_all(request: Request):
+    """Revoke all registered links immediately."""
+    require_admin(request)
+    from .. import links as links_registry
+
+    count = links_registry.revoke_all(request.app.state.db)
+    return {"revoked": True, "count": count}
+
+
 @router.post("/admin/links/{obj_id}/revoke/{exp}")
 async def link_revoke(request: Request, obj_id: str, exp: int):
     """Kill one link immediately (its URL starts returning 410)."""
