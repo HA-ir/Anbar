@@ -17,11 +17,11 @@ async def test_resume_flow(client, monkeypatch):
     calls = {"n": 0}
     original_store = type(backend).store
 
-    async def flaky_store(self, data, name, content_type=None):
+    async def flaky_store(self, data, name, content_type=None, caption=None):
         calls["n"] += 1
         if calls["n"] > 2:
             raise RuntimeError("boom")
-        return await original_store(self, data, name)
+        return await original_store(self, data, name, caption=caption)
 
     monkeypatch.setattr(type(backend), "store", flaky_store)
 

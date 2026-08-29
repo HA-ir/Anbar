@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from anbar.db import Database
+from anbar.objects import Manifest
 from anbar.self_healing import (
     decode_chunk_caption,
     decode_meta_event,
@@ -82,6 +83,14 @@ def test_meta_event_encode_decode():
     assert decoded_plain is not None
     assert decoded_plain["op"] == "rn_dir"
 
+    # Batched delete event
+    evt_batch = {"op": "del_batch", "ids": ["id1", "id2", "id3"], "ts": 1788000000}
+    enc_batch = encode_meta_event(evt_batch, secret=secret)
+    dec_batch = decode_meta_event(enc_batch, secret=secret)
+    assert dec_batch is not None
+    assert dec_batch["op"] == "del_batch"
+    assert dec_batch["ids"] == ["id1", "id2", "id3"]
+
 
 def test_decode_invalid_caption():
     assert decode_chunk_caption("random message in telegram channel", secret="sec") is None
@@ -89,8 +98,89 @@ def test_decode_invalid_caption():
     assert decode_chunk_caption("anbar:v2:unknown_version", secret="sec") is None
 
 
-def test_disaster_recovery_with_folder_rename_and_events(tmp_path):
+def test_disaster_recovery_rebuild_database(tmp_path):
     db = Database(tmp_path / "disaster_recovery_test.db")
+    secret = "hospital-master-encryption-key-777"
+
+    # File 1: Single chunk, unencrypted
+    cap1 = encode_chunk_caption(
+        obj_id="obj_img_1",
+        chunk_idx=0,
+        total_chunks=1,
+        filename="Photos/summer.jpg",
+        total_size=2048,
+        content_type="image/jpeg",
+        secret=None,
+    )
+    # File 2: Multi-chunk (2 chunks), encrypted
+    cap2_0 = encode_chunk_caption(
+        obj_id="obj_vid_2",
+        chunk_idx=0,
+        total_chunks=2,
+        filename="Videos/trip.mp4",
+        total_size=32000000,
+        content_type="video/mp4",
+        secret=secret,
+    )
+    cap2_1 = encode_chunk_caption(
+        obj_id="obj_vid_2",
+        chunk_idx=1,
+        total_chunks=2,
+        filename="Videos/trip.mp4",
+        total_size=32000000,
+        content_type="video/mp4",
+        secret=secret,
+    )
+
+    # Raw messages collected from Telegram channel
+    messages = [
+        {"caption": cap2_1, "file_id": "tg_fid_vid_part1", "message_id": 102, "size": 16000000},
+        {"caption": cap1, "file_id": "tg_fid_img", "message_id": 100, "size": 2048},
+        {"caption": "normal admin message", "file_id": "msg_plain", "message_id": 101, "size": 10},
+        {"caption": cap2_0, "file_id": "tg_fid_vid_part0", "message_id": 103, "size": 16000000},
+    ]
+
+    # Process and decode collected messages
+    collected_chunks: dict[str, list[dict]] = {}
+    for m in messages:
+        meta = decode_chunk_caption(m["caption"], secret=secret)
+        if not meta:
+            continue
+        obj_id = str(meta.get("id") or meta.get("fn") or "unk")
+        collected_chunks.setdefault(obj_id, []).append(
+            {
+                "meta": meta,
+                "file_id": m["file_id"],
+                "message_id": m["message_id"],
+                "size": m["size"],
+                "backend": "mtproto",
+            }
+        )
+
+    result = rebuild_from_manifests(collected_chunks, db)
+
+    assert result["recovered_objects"] == 2
+    assert result["total_chunks_scanned"] == 3
+
+    # Check recovered objects in DB
+    obj1 = db.get_object("obj_img_1")
+    assert obj1 is not None
+    assert obj1["filename"] == "Photos/summer.jpg"
+    assert obj1["content_type"] == "image/jpeg"
+    assert obj1["size"] == 2048
+
+    obj2 = db.get_object("obj_vid_2")
+    assert obj2 is not None
+    assert obj2["filename"] == "Videos/trip.mp4"
+    assert obj2["content_type"] == "video/mp4"
+    man2 = Manifest.from_json(obj2["manifest"])
+    assert len(man2.chunks) == 2
+    assert man2.chunks[0].file_id == "tg_fid_vid_part0"
+    assert man2.chunks[1].file_id == "tg_fid_vid_part1"
+
+
+def test_disaster_recovery_with_folder_rename_and_events(tmp_path):
+    db = Database(tmp_path / "disaster_recovery_test_events.db")
     secret = "hospital-master-encryption-key-777"
 
     # 1. Chunk captions
