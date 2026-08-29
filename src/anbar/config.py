@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     hybrid_enabled: bool = False
     hybrid_bot_timeout_s: float = Field(default=1.5, ge=0.2, le=30.0)
 
+    # auto daily database backup to telegram (v0.15.0)
+    auto_backup_enabled: bool = True
+
     @property
     def bot_tokens(self) -> list[str]:
         """List of all available bot tokens (pool)."""

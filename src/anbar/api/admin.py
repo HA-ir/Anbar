@@ -41,6 +41,7 @@ def _env_defaults(s) -> dict[str, int]:
         "hybrid_enabled": 1 if getattr(s, "hybrid_enabled", False) else 0,
         "hybrid_bot_timeout_ms": int(getattr(s, "hybrid_bot_timeout_s", 1.5) * 1000),
         "encryption_enabled": 0,
+        "auto_backup_enabled": 1 if getattr(s, "auto_backup_enabled", True) else 0,
     }
 
 
@@ -482,29 +483,36 @@ def _read_env_dict(path: Path) -> dict[str, str]:
     return res
 
 
-def _write_env_dict(path: Path, updates: dict[str, str]) -> None:
-    if not path.exists():
-        lines = []
-    else:
-        lines = path.read_text(encoding="utf-8").splitlines()
+def _write_env_dict(path: Path, updates: dict[str, str]) -> bool:
+    try:
+        if not path.exists():
+            lines = []
+        else:
+            lines = path.read_text(encoding="utf-8").splitlines()
 
-    seen = set()
-    new_lines = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped and not stripped.startswith("#") and "=" in stripped:
-            k = stripped.split("=", 1)[0].strip()
-            if k in updates:
-                new_lines.append(f"{k}={updates[k]}")
-                seen.add(k)
-                continue
-        new_lines.append(line)
+        seen = set()
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and "=" in stripped:
+                k = stripped.split("=", 1)[0].strip()
+                if k in updates:
+                    new_lines.append(f"{k}={updates[k]}")
+                    seen.add(k)
+                    continue
+            new_lines.append(line)
 
-    for k, v in updates.items():
-        if k not in seen and v is not None:
-            new_lines.append(f"{k}={v}")
+        for k, v in updates.items():
+            if k not in seen and v is not None:
+                new_lines.append(f"{k}={v}")
 
-    path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        return True
+    except OSError as exc:
+        import logging
+
+        logging.getLogger("anbar.admin").warning("Could not write .env file (%s): %s", path, exc)
+        return False
 
 
 @router.get("/admin/telegram-config")

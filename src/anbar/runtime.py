@@ -33,6 +33,8 @@ SPEC = {
     "hybrid_bot_timeout_ms": (200, 30_000),
     # zero-knowledge encryption: 0 = disabled (plain chunks), 1 = enabled (AES-256-GCM)
     "encryption_enabled": (0, 1),
+    # auto daily database backup to telegram: 0 = disabled, 1 = enabled
+    "auto_backup_enabled": (0, 1),
 }
 
 

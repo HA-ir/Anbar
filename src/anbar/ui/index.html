@@ -836,6 +836,11 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div id="storageDistLegend" style="display:flex;flex-wrap:wrap;gap:8px;font-size:10.5px;color:var(--tx3);margin-top:6px"></div>
       </div>
 
+      <div class="set-row">
+        <div class="lab"><span data-i18n="autoBackupLab">بکاپ روزانه خودکار به تلگرام</span><small data-i18n="autoBackupSub">ارسال روزانه یک نسخه پشتیبان از دیتابیس به کانال ذخیره‌سازی</small></div>
+        <div class="sw on" id="swAutoBackup" role="switch"><i></i></div>
+      </div>
+
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost" id="btnDownloadBackup" type="button" style="flex:1;min-width:130px;font-size:12px">
           💾 <span data-i18n="btnDlBackup">دانلود بکاپ</span>
@@ -1046,6 +1051,8 @@ const I18N={
   thName:"نام فایل", thSize:"حجم", thItems:"تعداد فایل‌ها", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
   secTgConfig:"پیکربندی تلگرام و متغیرها (.env)",
   secBackup:"پشتیبان‌گیری و سلامت سیستم",
+  autoBackupLab:"بکاپ روزانه خودکار به تلگرام",
+  autoBackupSub:"ارسال روزانه یک نسخه پشتیبان از دیتابیس به کانال ذخیره‌سازی",
   statStorage:"حجم کل ذخیره",
   statFiles:"تعداد فایل‌ها",
   statBots:"بات‌های فعال",
@@ -1168,6 +1175,8 @@ const I18N={
   thName:"File name", thSize:"Size", thItems:"Items", thDate:"Date", thDl:"Downloads", thAct:"Actions",
   secTgConfig:"Telegram & MTProto Config (.env)",
   secBackup:"System Backup & Health",
+  autoBackupLab:"Daily Auto-Backup to Telegram",
+  autoBackupSub:"Automatically send daily SQLite backup to storage channel",
   statStorage:"Total Stored",
   statFiles:"Total Files",
   statBots:"Active Bots",
@@ -3218,6 +3227,8 @@ async function loadSettings(){
     const v=k=>(s[k]&&s[k].value)??null;
     const swE=$("#swEnc");
     if(swE)swE.classList.toggle("on",!!v("encryption_enabled"));
+    const swAB=$("#swAutoBackup");
+    if(swAB)swAB.classList.toggle("on",v("auto_backup_enabled")!==0);
     $("#s_rate_download").value=v("rate_download")??"";
     $("#s_rate_upload").value=v("rate_upload");
     $("#s_rate_login").value=v("rate_login");
@@ -3420,6 +3431,17 @@ $("#swEnc").onclick=async()=>{
   }catch(e){toast(e.message,"err");}
   finally{sw.style.opacity="";}
 };
+$("#swAutoBackup").onclick=async()=>{
+  const sw=$("#swAutoBackup");sw.style.opacity=".5";
+  try{
+    const nextOn=!sw.classList.contains("on");
+    const r=await api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify({auto_backup_enabled:nextOn?1:0})});
+    curSettings=r.settings;
+    sw.classList.toggle("on",nextOn);
+    toast(t("saved"));
+  }catch(e){toast(e.message,"err");}
+  finally{sw.style.opacity="";}
+};
 $("#saveBtn").onclick=async()=>{
   const dv=$("#s_def_view");
   if(dv&&dv.value!==viewMode){
@@ -3438,7 +3460,8 @@ $("#saveBtn").onclick=async()=>{
     rate_login:+$("#s_rate_login").value,
     max_upload_mb:+$("#s_max_upload_mb").value,
     web_session_ttl:Math.round(+$("#s_session_ttl_h").value*3600),
-    cache_mb:+$("#s_cache_mb").value
+    cache_mb:+$("#s_cache_mb").value,
+    auto_backup_enabled:$("#swAutoBackup")?.classList.contains("on")?1:0
   };
   const tgBody={
     backend:$("#s_tg_backend")?.value,
@@ -3452,11 +3475,13 @@ $("#saveBtn").onclick=async()=>{
   const enteredHash=$("#s_tg_api_hash")?.value?.trim();
   if(enteredHash)tgBody.api_hash=enteredHash;
   try{
-    const [r1, r2]=await Promise.all([
-      api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify(body)}),
-      api("/api/v1/admin/telegram-config",{method:"POST",body:JSON.stringify(tgBody)})
-    ]);
+    const r1 = await api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify(body)});
     curSettings=r1.settings;
+    try {
+      await api("/api/v1/admin/telegram-config",{method:"POST",body:JSON.stringify(tgBody)});
+    } catch(err) {
+      console.warn("telegram-config update notice:", err);
+    }
     toast(t("saved"));
     refresh();
   }catch(e){toast(e.message,"err");}

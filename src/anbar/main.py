@@ -79,9 +79,19 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
 
         async def _auto_backup_loop() -> None:
             """Periodic database snapshot push to Telegram (every 24 hours)."""
+            from . import runtime
             while True:
                 await asyncio.sleep(86400)
                 try:
+                    is_enabled = bool(
+                        runtime.get_int(
+                            db,
+                            "auto_backup_enabled",
+                            1 if getattr(settings, "auto_backup_enabled", True) else 0,
+                        )
+                    )
+                    if not is_enabled:
+                        continue
                     last_bk = db.kv_get("last_backup_time")
                     now_ts = int(time.time())
                     if not last_bk or now_ts - int(last_bk) >= 86400:
