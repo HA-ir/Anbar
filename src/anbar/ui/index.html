@@ -351,7 +351,7 @@ html[dir="rtl"] .sw.on i{transform:translateX(-18px)}
 html[dir="rtl"] #toasts{transform:translateX(50%)}
 .toast{background:var(--bg2);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-lg);
   padding:11px 18px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:9px;pointer-events:auto;
-  animation:toastin .3s cubic-bezier(.2,.9,.3,1.2);max-width:90vw}
+  animation:toastin .3s cubic-bezier(.2,.9,.3,1.2);max-width:90vw;white-space:nowrap}
 .toast.ok{border-color:var(--ok)}
 .toast.err{border-color:var(--err)}
 .toast i{width:8px;height:8px;border-radius:50%;flex:none}
@@ -1154,6 +1154,8 @@ const I18N={
   zkEncrypting:"در حال رمزنگاری کلاینت...",
   zkOn:"ZK: روشن",
   zkOff:"ZK: خاموش",
+  clientZkOnToast:"رمزنگاری سمت کلاینت فعال شد",
+  clientZkOffToast:"رمزنگاری سمت کلاینت غیرفعال شد",
  download:"دانلود",
   secLimits:"سقف‌ها", secCache:"کش دانلود",
   authLab:"احراز هویت API", authSub:"با غیرفعال‌سازی، دانلود بدون کلید آزاد است",
@@ -1297,6 +1299,8 @@ const I18N={
   zkEncrypting:"Encrypting client-side...",
   zkOn:"ZK: ON",
   zkOff:"ZK: OFF",
+  clientZkOnToast:"Client-side encryption enabled",
+  clientZkOffToast:"Client-side encryption disabled",
   download:"Download",
   secLimits:"Limits", secCache:"Download cache",
   authLab:"API authentication", authSub:"When off, downloads are open without a key",
@@ -3742,7 +3746,7 @@ if (swZk) {
     clientZkOn = !clientZkOn;
     localStorage.setItem("anbar-client-zk", clientZkOn ? "1" : "0");
     syncClientZkUI();
-    toast(clientZkOn ? "Client-Side ZK ON 🔐" : "Client-Side ZK OFF 🔓");
+    toast((clientZkOn ? "🔐 " : "🔓 ") + (clientZkOn ? t("clientZkOnToast") : t("clientZkOffToast")));
   };
 }
 const dropBtnZk = $("#btnDropZkToggle");
@@ -3752,7 +3756,7 @@ if (dropBtnZk) {
     clientZkOn = !clientZkOn;
     localStorage.setItem("anbar-client-zk", clientZkOn ? "1" : "0");
     syncClientZkUI();
-    toast(clientZkOn ? "Client-Side ZK ON 🔐" : "Client-Side ZK OFF 🔓");
+    toast((clientZkOn ? "🔐 " : "🔓 ") + (clientZkOn ? t("clientZkOnToast") : t("clientZkOffToast")));
   };
 }
 const toggleVisZk = $("#btnToggleClientZkVis");

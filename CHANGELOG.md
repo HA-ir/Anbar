@@ -4,6 +4,11 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.7] — 2026-08-29
+
+### Fixed
+- **Toast Single-Line Formatting & Localization**: Fixed multi-line break issue on Client-Side ZK toggle notification by enforcing `white-space: nowrap` on `.toast` and properly localizing the toggle status messages with leading icons.
+
 ## [0.15.6] — 2026-08-29
 
 ### Added
