@@ -1782,7 +1782,7 @@ function renderRows(){
       '<td data-th="'+t("thName")+'"><div class="fname">'
       +('<input type="checkbox" class="selbox" data-id="'+o.id+'" style="margin-inline-end:8px;vertical-align:-2px">')
       +'<span class="fic" style="'+(isDir ? 'background:rgba(47,107,255,.15);cursor:pointer' : '')+'">'+iconSvg+'</span>'
-      +'<span class="fn" style="cursor:'+(isDir ? 'pointer;color:var(--brand);font-weight:700' : 'default')+'" title="'+esc(fullName)+'">'+esc(nameToShow)+(isDir ? '/' : '')+'</span></div></td>'
+      +'<span class="fn" style="cursor:'+(isDir ? 'pointer;color:var(--brand);font-weight:700' : 'default')+'" title="'+esc(fullName)+'">'+esc(nameToShow)+'</span></div></td>'
       +'<td class="num" data-th="'+(isDir ? t("thItems") : t("thSize"))+'">'+(isDir ? (o.itemCount + ' ' + t("nItems")) : humanSize(o.size))+'</td>'
       +'<td class="date-cell" data-th="'+t("thDate")+'" data-ts="'+(o.created_at||"")+'">'+humanDate(o.created_at)+'</td>'
       +'<td class="num" data-th="'+t("thDl")+'">'+(isDir ? '—' : (o.downloaded??0))+'</td>'
@@ -2047,7 +2047,7 @@ function renderGallery(list){
     const nameToShow = isDir ? baseName(o.filename) : baseName(o.filename || o.displayName || o.id);
     const fullName = o.filename || o.displayName || o.id;
     cell.innerHTML='<div class="gthumb">'+inner+'</div>'
-      +'<div class="gname" title="'+esc(fullName)+'">'+esc(nameToShow)+(isDir?'/':'')+'</div>'
+      +'<div class="gname" title="'+esc(fullName)+'">'+esc(nameToShow)+'</div>'
       +'<div class="gsub"><span class="num">'+(isDir?(o.itemCount+' '+t("nItems")):humanSize(o.size))+'</span>'+(isDir?'':' · <span class="num">'+(o.downloaded??0)+' ↓')+'</span></div>'
       +'<input type="checkbox" class="selbox" data-id="'+o.id+'">'
       +'<div class="gacts">'+acts+'</div>';
