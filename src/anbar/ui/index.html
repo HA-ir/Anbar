@@ -237,6 +237,18 @@ tbody tr.selected .fname .fn{color:var(--brand)}
   border-radius:50%;background:var(--brand);color:#fff;font-size:12px;font-weight:700;
   display:flex;align-items:center;justify-content:center;z-index:2}
 .gcell.drag-over, tbody tr.drag-over td{background:var(--brand-soft) !important;outline:2px dashed var(--brand)}
+/* ============ breadcrumb bar ============ */
+.bc-wrap{display:flex;align-items:center;gap:6px;padding:6px 2px 10px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.bc-wrap::-webkit-scrollbar{display:none}
+.bc-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:12.5px;font-weight:600;background:var(--bg2);color:var(--tx2);border:1px solid var(--line);cursor:pointer;transition:all .15s ease;text-decoration:none;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,0.03)}
+.bc-pill:hover{background:var(--hover);color:var(--brand);border-color:var(--line2)}
+.bc-pill.active{background:var(--brand-soft);color:var(--brand);border-color:rgba(47,107,255,.3);font-weight:700}
+.bc-sep{color:var(--tx3);font-size:12px;display:inline-flex;align-items:center;user-select:none;opacity:.7}
+.bc-back-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--bg2);border:1px solid var(--line);color:var(--tx2);cursor:pointer;transition:.15s;flex:none;box-shadow:0 1px 2px rgba(0,0,0,0.04)}
+.bc-back-btn:hover{background:var(--hover);color:var(--brand);border-color:var(--brand)}
+.bc-back-btn svg{width:15px;height:15px;stroke-width:2.2}
+html[dir="rtl"] .bc-back-btn svg{transform:rotate(180deg)}
+
 .fname{display:flex;align-items:center;gap:11px;min-width:0}
 .fic{width:34px;height:34px;flex:none;border-radius:9px;background:var(--brand-soft);display:flex;
   align-items:center;justify-content:center}
@@ -574,12 +586,15 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     </div>
 
     <!-- Breadcrumb Bar for Folders -->
-    <div id="breadcrumbBar" style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:6px 2px 10px;color:var(--tx2);overflow-x:auto;white-space:nowrap">
-      <span id="bcRoot" style="cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--brand)">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <div class="bc-wrap" id="breadcrumbBar">
+      <button class="bc-back-btn" id="bcBackBtn" title="بازگشت به پوشه قبلی" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+      <div class="bc-pill active" id="bcRoot">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         <span data-i18n="home">خانه</span>
-      </span>
-      <div id="bcTrail" style="display:flex;align-items:center;gap:6px"></div>
+      </div>
+      <div id="bcTrail" style="display:inline-flex;align-items:center;gap:6px"></div>
     </div>
 
     <div class="tbl-wrap" id="tblWrap">
@@ -1348,6 +1363,11 @@ async function boot(){
 function showLogin(){$("#loginWrap").style.display="flex";$("#app").classList.remove("on");}
 function showApp(){
   $("#loginWrap").style.display="none";$("#app").classList.add("on");
+  const initFolder = getFolderFromHash();
+  if (initFolder) {
+    curFolderPrefix = initFolder.endsWith("/") ? initFolder : initFolder + "/";
+    updateBreadcrumb();
+  }
   refresh();
   // consume a PWA-shared URL: prefill + auto-submit the ingest form
   const shared=sessionStorage.getItem("anbar-shared");
@@ -1392,25 +1412,78 @@ let fQuery="";
 let fType="";
 let fSortMode=localStorage.getItem("anbar-sort")||"new";
 
+function getFolderFromHash() {
+  const hash = location.hash.replace(/^#/, "");
+  if (!hash) return "";
+  const params = new URLSearchParams(hash);
+  const f = params.get("folder");
+  if (f) return decodeURIComponent(f).trim();
+  if (!hash.startsWith("key=") && hash.includes("/")) return decodeURIComponent(hash).trim();
+  return "";
+}
+
+function navigateToFolder(prefix, push = true) {
+  let norm = (prefix || "").trim();
+  if (norm && !norm.endsWith("/")) norm += "/";
+  if (norm === "/") norm = "";
+
+  const changed = norm !== curFolderPrefix;
+  curFolderPrefix = norm;
+  updateBreadcrumb();
+  renderRows();
+
+  if (push && changed) {
+    const hash = norm ? "#folder=" + encodeURIComponent(norm.replace(/\/$/, "")) : "";
+    if (location.hash !== hash) {
+      if (!hash) {
+        history.pushState({ folder: "" }, "", location.pathname + location.search);
+      } else {
+        history.pushState({ folder: norm }, "", hash);
+      }
+    }
+  }
+}
+
 function updateBreadcrumb() {
   const trail = $("#bcTrail");
+  const backBtn = $("#bcBackBtn");
+  const rootBtn = $("#bcRoot");
+  if (!trail) return;
   trail.innerHTML = "";
-  if (!curFolderPrefix) return;
+
+  if (!curFolderPrefix) {
+    if (backBtn) backBtn.style.display = "none";
+    if (rootBtn) rootBtn.classList.add("active");
+    return;
+  }
+
+  if (backBtn) backBtn.style.display = "inline-flex";
+  if (rootBtn) rootBtn.classList.remove("active");
+
   const parts = curFolderPrefix.split("/").filter(Boolean);
   let accumulated = "";
   parts.forEach((p, idx) => {
     accumulated += p + "/";
+    const isLast = idx === parts.length - 1;
     const span = document.createElement("span");
-    span.style.cssText = "display:flex;align-items:center;gap:6px";
-    span.innerHTML = '<span style="color:var(--tx3)">/</span><span class="bc-link" style="cursor:pointer;color:' + (idx === parts.length - 1 ? 'var(--tx)' : 'var(--brand)') + '">' + esc(p) + '</span>';
+    span.style.cssText = "display:inline-flex;align-items:center;gap:6px";
+    span.innerHTML = '<span class="bc-sep">/</span>'
+      + '<span class="bc-pill' + (isLast ? ' active' : '') + '">'
+      + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
+      + esc(p) + '</span>';
     const acc = accumulated;
-    span.querySelector(".bc-link").onclick = () => {
-      curFolderPrefix = acc;
-      updateBreadcrumb();
-      renderRows();
+    span.querySelector(".bc-pill").onclick = () => {
+      navigateToFolder(acc);
     };
     trail.appendChild(span);
   });
+
+  const bar = $("#breadcrumbBar");
+  if (bar) {
+    setTimeout(() => {
+      bar.scrollTo({ left: document.dir === "rtl" ? -bar.scrollWidth : bar.scrollWidth, behavior: "smooth" });
+    }, 40);
+  }
 }
 $("#newFolderBtn").onclick = async () => {
   const name = prompt(t("newFolderPrompt"));
@@ -1509,10 +1582,55 @@ function visibleFiles() {
   return by ? [...res].sort(by) : res;
 }
   $("#bcRoot").onclick = () => {
-    curFolderPrefix = "";
-    updateBreadcrumb();
-    renderRows();
+    navigateToFolder("");
   };
+  const bcBack = $("#bcBackBtn");
+  if (bcBack) {
+    bcBack.onclick = () => {
+      if (!curFolderPrefix) return;
+      const parts = curFolderPrefix.split("/").filter(Boolean);
+      parts.pop();
+      const parent = parts.length ? parts.join("/") + "/" : "";
+      navigateToFolder(parent, true);
+    };
+  }
+
+  window.addEventListener("popstate", (e) => {
+    const target = (e.state && e.state.folder !== undefined) ? e.state.folder : getFolderFromHash();
+    navigateToFolder(target, false);
+  });
+
+  /* ================= Touch Gesture: Swipe to Back ================= */
+  let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+  document.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+  }, { passive: true });
+
+  document.addEventListener("touchend", (e) => {
+    if (!touchStartX || !curFolderPrefix) return;
+    if (document.querySelector(".modal.on") || document.querySelector("#drawer.on")) return;
+
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const dx = touchEndX - touchStartX;
+    const dy = touchEndY - touchStartY;
+    const dt = Date.now() - touchStartTime;
+
+    if (dt < 450 && Math.abs(dx) > 70 && Math.abs(dy) < 50) {
+      const isRtl = document.documentElement.dir === "rtl";
+      if ((isRtl && dx < -60) || (!isRtl && dx > 60)) {
+        const parts = curFolderPrefix.split("/").filter(Boolean);
+        parts.pop();
+        const parent = parts.length ? parts.join("/") + "/" : "";
+        navigateToFolder(parent, true);
+      }
+    }
+    touchStartX = 0;
+    touchStartY = 0;
+  }, { passive: true });
   let searchDebounceTimer=null;
   $("#fSearch").oninput=e=>{
     fQuery=e.target.value.trim();
@@ -1645,9 +1763,7 @@ function renderRows(){
       };
       const enter = (e) => {
         e.stopPropagation();
-        curFolderPrefix = o.fullPrefix;
-        updateBreadcrumb();
-        renderRows();
+        navigateToFolder(o.fullPrefix);
       };
       tr.querySelector(".fn").onclick = enter;
       const fic = tr.querySelector(".fic");
@@ -1743,30 +1859,18 @@ function renderRows(){
     // click anywhere on the row toggles selection (in selectMode) or opens/navigates
     tr.onclick=e=>{
       if(e.target.closest(".selbox,.acts,a,button"))return;
-      if(e.target.closest(".fn,.fic")){
-        if(isDir){
-          curFolderPrefix = o.fullPrefix;
-          updateBreadcrumb();
-          renderRows();
-          return;
-        }
-        if(selectMode){
-          toggleSel(o.id);
-          const sb=tr.querySelector(".selbox");
-          if(sb)sb.checked=selSet.has(o.id);
-          tr.classList.toggle("selected",selSet.has(o.id));
-          return;
-        }
-        openFileModal(o);return;
+      if(isDir){
+        navigateToFolder(o.fullPrefix);
+        return;
       }
-      if(!selectMode){
-        if(isDir){curFolderPrefix=o.fullPrefix;updateBreadcrumb();renderRows();return;}
-        openFileModal(o);return;
+      if(selectMode){
+        toggleSel(o.id);
+        const sb=tr.querySelector(".selbox");
+        if(sb)sb.checked=selSet.has(o.id);
+        tr.classList.toggle("selected",selSet.has(o.id));
+        return;
       }
-      toggleSel(o.id);
-      const sb=tr.querySelector(".selbox");
-      if(sb)sb.checked=selSet.has(o.id);
-      tr.classList.toggle("selected",selSet.has(o.id));
+      openFileModal(o);
     };
     tr.querySelector(".fname").style.cursor="pointer";
     const sb=tr.querySelector(".selbox");
@@ -1951,9 +2055,7 @@ function renderGallery(list){
     }
     const enter = (e) => {
       e.stopPropagation();
-      curFolderPrefix=o.fullPrefix;
-      updateBreadcrumb();
-      renderRows();
+      navigateToFolder(o.fullPrefix);
     };
     if(isDir){
       const fn = cell.querySelector(".gname");
@@ -1961,24 +2063,9 @@ function renderGallery(list){
     }
     // whole card click: toggle sel in selectMode, otherwise open/navigate
     cell.onclick=e=>{
-      if(e.target.closest(".gacts,.selbox,a,button"))return;
-      if(isDir && e.target.closest(".gname")){return;}
-      if(!selectMode){
-        if(isDir){curFolderPrefix=o.fullPrefix;updateBreadcrumb();renderRows();return;}
-        openFileModal(o);return;
-      }
-      toggleSel(o.id);
-      cell.classList.toggle("selected",selSet.has(o.id));
-      const sb=cell.querySelector(".selbox");
-      if(sb)sb.checked=selSet.has(o.id);
-    };
-    cell.querySelector(".gthumb").addEventListener("click",e=>{
-      if(e.target.closest(".selbox,.gacts,audio"))return;
-      e.stopPropagation();
+      if(e.target.closest(".gacts,.selbox,a,button,audio,video"))return;
       if(isDir){
-        curFolderPrefix=o.fullPrefix;
-        updateBreadcrumb();
-        renderRows();
+        navigateToFolder(o.fullPrefix);
         return;
       }
       if(selectMode){
@@ -1989,7 +2076,7 @@ function renderGallery(list){
         return;
       }
       openFileModal(o);
-    });
+    };
     cell.querySelector(".gthumb").style.cursor="pointer";
     cell.querySelector(".selbox").onchange=e=>{
       e.stopPropagation();
