@@ -220,8 +220,11 @@ html[dir="ltr"] .date-cell{direction:ltr;text-align:left}
 .gacts{position:absolute;top:6px;inset-inline-end:6px;display:flex;align-items:center;gap:4px;z-index:20}
 .gmenu-btn{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:var(--bg2);box-shadow:var(--shadow);border:1px solid var(--line);cursor:pointer;color:var(--tx);transition:all .15s}
 .gmenu-btn:hover{color:var(--brand);border-color:var(--brand);background:var(--bg3)}
-.gmenu-pop{position:absolute;top:34px;inset-inline-end:0;background:var(--bg2);color:var(--tx);border:1.5px solid var(--line2);border-radius:12px;box-shadow:var(--shadow-lg);padding:6px;display:none;flex-direction:column;gap:3px;min-width:150px;z-index:99}
+.gmenu-pop{position:absolute;top:34px;inset-inline-end:0;background:var(--bg2);color:var(--tx);border:1.5px solid var(--line2);border-radius:12px;box-shadow:var(--shadow-lg);padding:6px;display:none;flex-direction:column;gap:3px;min-width:145px;z-index:99}
 .gmenu-pop.on{display:flex}
+.gmenu-pop.open-up{top:auto !important;bottom:34px !important}
+.gmenu-pop.open-left{inset-inline-end:auto !important;inset-inline-start:0 !important}
+.gmenu-pop.open-right{inset-inline-start:auto !important;inset-inline-end:0 !important}
 .gmenu-item{display:flex;align-items:center;gap:9px;padding:7px 11px;border-radius:8px;font-size:12.5px;font-weight:500;color:var(--tx);background:transparent;border:none;width:100%;text-align:start;cursor:pointer;transition:background .12s, color .12s}
 .gmenu-item:hover{background:var(--hover);color:var(--brand)}
 .gmenu-item.del{color:var(--err)}
@@ -1049,9 +1052,9 @@ const I18N={
   duplicateOk:"نسخه کپی ایجاد شد",
   codeTruncated:"نمایش ۱۰۰ خط اول — برای مشاهده کامل دانلود کنید",
   openFullPage:"مشاهده کامل در صفحه جدید",
-  quickShareLink:"ساخت و کپی لینک اشتراک (۲۴ ساعته)",
+  quickShareLink:"لینک ۲۴ ساعته",
   shareLinkCreated:"لینک اشتراک امن ۲۴ ساعته در کلیپ‌بورد کپی شد",
-  copyFileT:"ایجاد نسخه کپی (Duplicate)",
+  copyFileT:"کپی",
   btnDlBackup:"دانلود بکاپ",
   btnImportBackup:"بازیابی و ایمپورت",
   importBackupConfirm:"هشدار: تمام متادیتای فعلی با فایل پشتیبان جایگزین خواهد شد. آیا مطمئن هستید؟",
@@ -1125,31 +1128,31 @@ const I18N={
   linkOptT:"گزینه‌های اشتراک", linkTtl:"انقضا", linkPwLab:"رمز عبور (اختیاری)",
   mkLink:"ساخت لینک", linkPw:"لینک رمزدار شد — رمز:",
   linkNameLab:"نام لینک (اختیاری)", ttlNever:"هرگز (بدون انقضا)",
-  shareSel:"اشتراک انتخاب‌شده‌ها", zipDl:"دانلود ZIP",
+  shareSel:"اشتراک", zipDl:"دانلود ZIP",
   albumOk:"لینک آلبوم ساخته شد", albumSub:"یک لینک برای همه فایل‌ها — گالری عمومی با دانلود تکی",
   linksT:"لینک‌های فعال", linksS:"همه لینک‌های ساخته‌شده — امکان ابطال فوری",
   revokeAllLinks:"ابطال همه",
   revokeAllConfirm:"آیا از ابطال تمام لینک‌های فعال مطمئن هستید؟ پس از این کار، تمام لینک‌های اشتراک عمومی بلافاصله منقضی می‌شوند.",
   allLinksRevoked:"تمام لینک‌های فعال با موفقیت باطل شدند",
   trashT:"سطل بازیافت", trashS:"موارد تا ۷ روز قابل بازیابی‌اند، بعد خودکار حذف می‌شوند.",
-  trashEmpty:"خالی کردن سطل", restore:"بازیابی", purge:"حذف قطعی",
+  trashEmpty:"خالی کردن سطل", restore:"بازیابی", purge:"حذف",
   ftAll:"همه انواع", ftImage:"عکس", ftVideo:"ویدیو", ftAudio:"صدا",
   ftPdf:"PDF", ftOther:"سایر", noLinks:"هنوز لینکی نساخته‌ای",
   noTrash:"سطل خالی است", revoked:"ابطال شد", expired:"منقضی",
-  linkRevoked:"لینک ابطال شد", restored:"بازیابی شد", purged:"برای همیشه حذف شد",
+  linkRevoked:"لینک ابطال شد", restored:"بازیابی شد", purged:"حذف شد",
   zipStart:"در حال ساخت ZIP…", open:"باز کردن", revokeB:"ابطال لینک",
-  manageB:"مدیریت لینک", manageT:"مدیریت لینک",
+  manageB:"مدیریت لینک", manageT:"مدیریت لینک", linkT:"اشتراک‌گذاری",
   mgSaveB:"ذخیره و ساخت لینک جدید", mgDone:"لینک جدید ساخته شد — لینک قبلی ابطال شد:",
   mgPwWarn:"این لینک بدون رمز و بدون سقف دانلود برای همه باز می‌شود — تأیید؟ برای ادامه رمز بگذار یا دوباره ذخیره کن.",
   renameT:"تغییر نام", renameOk:"نام تغییر کرد", selAll:"همه", selNone:"هیچ",
-  delSel:"حذف انتخاب‌شده‌ها", nSelected:"انتخاب‌شده",
-  moveSel:"انتقال انتخاب‌شده‌ها", movePrompt:"مسیر پوشهٔ مقصد را وارد کنید (خالی = ریشه):",
+  delSel:"حذف", nSelected:"انتخاب‌شده",
+  moveSel:"انتقال", movePrompt:"مسیر پوشهٔ مقصد را وارد کنید (خالی = ریشه):",
   movedOk:"انتقال شد", skippedOk:"به‌خاطر تداخل نام رد شد", moveFileQ:"انتقال فایل به کجا؟",
-  moveTitle:"انتقال به پوشه", moveToLab:"مسیر مقصد (پوشه)", moveDo:"انتقال",
+  moveTitle:"انتقال", moveToLab:"مسیر مقصد (پوشه)", moveDo:"انتقال",
   quickPick:"انتخاب سریع پوشهٔ مقصد:", rootFolder:"🏠 خانه (ریشه)", emptyFolder:"📂 این پوشه خالی است",
-  nItems:"مورد", renameFile:"تغییر نام فایل", foldRenameT:"تغییر نام پوشه", foldMoveT:"انتقال پوشه",
-  foldCopyT:"کپی پوشه", foldDelT:"حذف پوشه",
-  home:"خانه", select:"انتخاب", selectCancel:"لغو انتخاب",
+  nItems:"مورد", renameFile:"تغییر نام", foldRenameT:"تغییر نام", foldMoveT:"انتقال",
+  foldCopyT:"کپی", foldDelT:"حذف", del:"حذف", delQ:"حذف",
+  home:"خانه", select:"انتخاب", selectCancel:"لغو",
   secUI:"تنظیمات ظاهر و رابط کاربری", defView:"نمای پیش‌فرض", vGallery:"گالری", vTable:"جدول",
   themeLab:"پوسته", thDark:"تاریک", thLight:"روشن",
   previewToggleLab:"پیش‌نمایش مدیا و فایل‌ها", previewToggleSub:"بارگذاری تصاویر و فایل‌ها در گالری و مودال (برای کاهش مصرف اینترنت)",
@@ -1171,9 +1174,9 @@ const I18N={
   duplicateOk:"Copy created",
   codeTruncated:"Showing first 100 lines — file exceeds preview limit",
   openFullPage:"Open full in new tab",
-  quickShareLink:"Create & copy share link (24h)",
+  quickShareLink:"24h Link",
   shareLinkCreated:"24h secure share link copied to clipboard",
-  copyFileT:"Duplicate file",
+  copyFileT:"Copy",
   btnDlBackup:"Download Backup",
   btnImportBackup:"Import & Restore",
   importBackupConfirm:"Warning: All current metadata will be replaced with this backup. Are you sure you want to proceed?",
@@ -1247,30 +1250,30 @@ const I18N={
   linkOptT:"Share options", linkTtl:"Expiry", linkPwLab:"Password (optional)",
   mkLink:"Create link", linkPw:"Password-protected link — password:",
   linkNameLab:"Link name (optional)", ttlNever:"Never (no expiry)",
-  shareSel:"Share selected", zipDl:"Download ZIP",
+  shareSel:"Share", zipDl:"Download ZIP",
   albumOk:"Album link created", albumSub:"One link for all files — public gallery with per-file download",
   linksT:"Active links", linksS:"Every minted link — revoke instantly",
   revokeAllLinks:"Revoke All",
   revokeAllConfirm:"Are you sure you want to revoke all active share links? All existing public links will stop working immediately.",
   allLinksRevoked:"All active share links have been revoked",
   trashT:"Trash", trashS:"Items stay restorable for 7 days, then purge automatically.",
-  trashEmpty:"Empty trash", restore:"Restore", purge:"Delete forever",
+  trashEmpty:"Empty trash", restore:"Restore", purge:"Delete",
   ftAll:"All types", ftImage:"Images", ftVideo:"Videos", ftAudio:"Audio",
   ftPdf:"PDF", ftOther:"Other", noLinks:"No links yet",
   noTrash:"Trash is empty", revoked:"Revoked", expired:"Expired",
-  linkRevoked:"Link revoked", restored:"Restored", purged:"Deleted forever",
+  linkRevoked:"Link revoked", restored:"Restored", purged:"Deleted",
   zipStart:"Building ZIP…", open:"Open", revokeB:"Revoke link",
-  manageB:"Manage link", manageT:"Manage link",
+  manageB:"Manage link", manageT:"Manage link", linkT:"Share",
   mgSaveB:"Save & mint new link", mgDone:"New link created — previous one revoked:",
   mgPwWarn:"This link will be open to everyone with no password and no download cap. Set a password or save again to confirm.",
   renameT:"Rename", renameOk:"Renamed", selAll:"All", selNone:"None",
-  delSel:"Delete selected", nSelected:"selected",
-  moveSel:"Move selected", movePrompt:"Destination folder path (empty = root):",
+  delSel:"Delete", nSelected:"selected",
+  moveSel:"Move", movePrompt:"Destination folder path (empty = root):",
   movedOk:"moved", skippedOk:"skipped (name clash)", moveFileQ:"Move file to…",
-  moveTitle:"Move to folder", moveToLab:"Destination path (folder)", moveDo:"Move",
+  moveTitle:"Move", moveToLab:"Destination path (folder)", moveDo:"Move",
   quickPick:"Quick pick destination:", rootFolder:"🏠 Root (Home)", emptyFolder:"📂 This folder is empty",
-  nItems:"items", renameFile:"Rename file", foldRenameT:"Rename folder", foldMoveT:"Move folder",
-  foldCopyT:"Copy folder", foldDelT:"Delete folder",
+  nItems:"items", renameFile:"Rename", foldRenameT:"Rename", foldMoveT:"Move",
+  foldCopyT:"Copy", foldDelT:"Delete", del:"Delete", delQ:"Delete",
   home:"Home", select:"Select", selectCancel:"Done",
   secUI:"UI & Preferences", defView:"Default view", vGallery:"Gallery", vTable:"Table",
   themeLab:"Theme", thDark:"Dark", thLight:"Light",
@@ -2025,20 +2028,20 @@ function renderGallery(list){
     const acts = isDir
       ? '<button class="gmenu-btn" data-a="menu-toggle" title="'+esc(t("manageB")||"گزینه‌ها")+'" aria-label="options"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="19" r="2.2"/></svg></button>'
         +'<div class="gmenu-pop">'
-        +'<button class="gmenu-item" data-a="fold-rename">'+RN_ICON+' <span>'+esc(t("foldRenameT"))+'</span></button>'
-        +'<button class="gmenu-item" data-a="fold-move">'+MV_ICON+' <span>'+esc(t("foldMoveT"))+'</span></button>'
-        +'<button class="gmenu-item" data-a="fold-copy">'+CP_ICON+' <span>'+esc(t("foldCopyT")||"کپی پوشه")+'</span></button>'
-        +'<button class="gmenu-item del" data-a="del"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg> <span>'+esc(t("foldDelT"))+'</span></button>'
+        +'<button class="gmenu-item" data-a="fold-rename">'+RN_ICON+' <span>'+esc(t("renameT"))+'</span></button>'
+        +'<button class="gmenu-item" data-a="fold-move">'+MV_ICON+' <span>'+esc(t("moveTitle"))+'</span></button>'
+        +'<button class="gmenu-item" data-a="fold-copy">'+CP_ICON+' <span>'+esc(t("copyFileT"))+'</span></button>'
+        +'<button class="gmenu-item del" data-a="del"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg> <span>'+esc(t("del"))+'</span></button>'
         +'</div>'
       : '<button class="gmenu-btn" data-a="menu-toggle" title="'+esc(t("manageB")||"گزینه‌ها")+'" aria-label="options"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="19" r="2.2"/></svg></button>'
         +'<div class="gmenu-pop">'
         +'<button class="gmenu-item" data-a="dl"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg> <span>'+esc(t("download"))+'</span></button>'
-        +'<button class="gmenu-item" data-a="cp"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg> <span>'+esc(t("quickShareLink")||"کپی لینک")+'</span></button>'
+        +'<button class="gmenu-item" data-a="cp"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg> <span>'+esc(t("quickShareLink"))+'</span></button>'
         +'<button class="gmenu-item" data-a="ln"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg> <span>'+esc(t("linkT"))+'</span></button>'
-        +'<button class="gmenu-item" data-a="cp-file">'+CP_ICON+' <span>'+esc(t("copyFileT")||"تکثیر فایل")+'</span></button>'
+        +'<button class="gmenu-item" data-a="cp-file">'+CP_ICON+' <span>'+esc(t("copyFileT"))+'</span></button>'
         +'<button class="gmenu-item" data-a="rn">'+RN_ICON+' <span>'+esc(t("renameT"))+'</span></button>'
         +'<button class="gmenu-item" data-a="mv">'+MV_ICON+' <span>'+esc(t("moveTitle"))+'</span></button>'
-        +'<button class="gmenu-item del" data-a="del"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg> <span>'+esc(t("delQ"))+'</span></button>'
+        +'<button class="gmenu-item del" data-a="del"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg> <span>'+esc(t("del"))+'</span></button>'
         +'</div>';
     const nameToShow = isDir ? baseName(o.filename) : baseName(o.filename || o.displayName || o.id);
     const fullName = o.filename || o.displayName || o.id;
@@ -2057,8 +2060,17 @@ function renderGallery(list){
         document.querySelectorAll(".gmenu-pop.on").forEach(p => p.classList.remove("on"));
         document.querySelectorAll(".gcell.menu-open").forEach(c => c.classList.remove("menu-open"));
         if(!wasOpen){
+          menuPop.classList.remove("open-up", "open-left", "open-right");
           menuPop.classList.add("on");
           cell.classList.add("menu-open");
+
+          // Smart screen boundary collision detection
+          const r = menuPop.getBoundingClientRect();
+          const vh = window.innerHeight || document.documentElement.clientHeight;
+          const vw = window.innerWidth || document.documentElement.clientWidth;
+          if(r.bottom > vh - 20) menuPop.classList.add("open-up");
+          if(r.left < 10) menuPop.classList.add("open-left");
+          if(r.right > vw - 10) menuPop.classList.add("open-right");
         }
       };
     }
