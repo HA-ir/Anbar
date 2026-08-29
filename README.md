@@ -327,11 +327,11 @@ src/anbar/
     ├── base.py       # StorageBackend interface + FakeBackend (test contract)
     ├── bot_backend.py# F2: Bot API via httpx (no bot framework)
     └── mtproto_backend.py  # F5: Telethon (dedicated account, 2 GB)
-tests/                # 162 passing — API golden tests, CLI round-trip,
-                      #   storage contract, hardening
+tests/                # 208 passing — API golden tests, CLI round-trip,
+                      #   storage contract, self-healing, Client ZK, hardening
 docker/               # Dockerfile (non-root, healthcheck), compose.yaml
 nginx/anbar.conf.example
-docs/                 # ARCHITECTURE, API, DEPLOY, ROADMAP
+docs/                 # ARCHITECTURE, API, DEPLOY, ROADMAP, DISASTER_RECOVERY
 .env.example
 ```
 
@@ -339,8 +339,8 @@ docs/                 # ARCHITECTURE, API, DEPLOY, ROADMAP
 
 ```bash
 uv sync --extra dev
-uv run pytest -q          # 162 passing
-uv run anbarctl version   # anbar 0.10.5
+uv run pytest -q          # 208 passing
+uv run anbarctl version   # anbar 0.15.7
 ```
 
 Run a local instance with the in-memory backend (no Telegram needed):
