@@ -346,11 +346,11 @@ html[dir="rtl"] .sw.on i{transform:translateX(-18px)}
 .keyrow .kn{flex:1;font-size:13px;font-weight:600;font-family:ui-monospace,Menlo,Consolas,monospace;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:start}
 /* toast */
-#toasts{position:fixed;bottom:22px;inset-inline-start:50%;transform:translateX(-50%);z-index:200;
+#toasts{position:fixed;bottom:22px;inset-inline-start:50%;transform:translateX(-50%);z-index:99999 !important;pointer-events:none;
   display:flex;flex-direction:column;gap:9px;align-items:center}
 html[dir="rtl"] #toasts{transform:translateX(50%)}
 .toast{background:var(--bg2);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-lg);
-  padding:11px 18px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:9px;
+  padding:11px 18px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:9px;pointer-events:auto;
   animation:toastin .3s cubic-bezier(.2,.9,.3,1.2);max-width:90vw}
 .toast.ok{border-color:var(--ok)}
 .toast.err{border-color:var(--err)}
@@ -709,6 +709,17 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       <div class="set-row">
         <div class="lab"><span data-i18n="encLab">رمزنگاری سرتاسری (AES-256-GCM)</span><small data-i18n="encSub">رمزنگاری چانک‌ها قبل از ارسال به تلگرام (Zero-Knowledge)</small></div>
         <div class="sw" id="swEnc" role="switch"><i></i></div>
+      </div>
+      <div class="set-row col" style="gap:8px">
+        <div class="lab"><span data-i18n="secretKeyLab">کلید مخفی اشتقاق رمزنگاری و امضا (Secret)</span><small data-i18n="secretKeySub">کلید اصلی جهت مشتق‌سازی کلید AES-256 و اعتبارسنجی لینک‌های موقت</small></div>
+        <div style="display:flex;gap:8px;width:100%;box-sizing:border-box">
+          <input type="password" id="s_enc_secret" placeholder="HMAC / Master Secret..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
+          <button type="button" class="btn btn-ghost" id="btnToggleSecretVis" style="width:auto;padding:8px 11px;font-size:12px">👁️</button>
+        </div>
+        <div style="display:flex;gap:8px;width:100%">
+          <button type="button" class="btn btn-ghost" id="btnSetCustomSecret" style="flex:1;font-size:12px" data-i18n="btnSetSecret">تنظیم کلید</button>
+          <button type="button" class="btn btn-warn" id="btnRotateSecret" style="flex:1;font-size:12px" data-i18n="btnRotateSecret">چرخش تصادفی</button>
+        </div>
       </div>
     </div>
     <div class="sec">
@@ -1104,6 +1115,10 @@ const I18N={
   setT:"تنظیمات ادمین", secAuth:"احراز هویت", secRate:"محدودیت سرعت (در دقیقه)",
  secS3:"سرویس S3 و تلگرام", s3Endpoint:"اندپوینت S3", tgAppEndpoint:"مینی‌اپ تلگرام",
  secCrypto:"امنیت و رمزنگاری", encLab:"رمزنگاری سرتاسری (AES-256-GCM)", encSub:"رمزنگاری چانک‌ها قبل از ارسال به تلگرام (Zero-Knowledge)",
+  secretKeyLab:"کلید مخفی اشتقاق رمزنگاری و امضا (Secret)", secretKeySub:"کلید اصلی جهت مشتق‌سازی کلید AES-256 و اعتبارسنجی لینک‌های موقت",
+  btnSetSecret:"تنظیم کلید", btnRotateSecret:"چرخش تصادفی",
+  secretRotated:"کلید جدید ایجاد و فعال شد", secretUpdated:"کلید مخفی با موفقیت به‌روزرسانی شد",
+  rotateSecretConfirm:"هشدار: با تغییر یا چرخش کلید، تمام لینک‌های امضاشده قبلی منقضی خواهند شد. آیا ادامه می‌دهید؟",
  download:"دانلود",
   secLimits:"سقف‌ها", secCache:"کش دانلود",
   authLab:"احراز هویت API", authSub:"با غیرفعال‌سازی، دانلود بدون کلید آزاد است",
@@ -1228,6 +1243,10 @@ const I18N={
   setT:"Admin settings", secAuth:"Authentication", secRate:"Rate limits (per minute)",
   secS3:"S3 Service & Telegram", s3Endpoint:"S3 Endpoint", tgAppEndpoint:"Telegram Mini App",
   secCrypto:"Security & Encryption", encLab:"Zero-Knowledge Encryption (AES-256-GCM)", encSub:"Encrypt chunks before storing on Telegram",
+  secretKeyLab:"Master Encryption & HMAC Secret", secretKeySub:"Master key used to derive AES-256 keys and validate signed links",
+  btnSetSecret:"Set Secret", btnRotateSecret:"Random Rotate",
+  secretRotated:"Secret rotated successfully", secretUpdated:"Secret updated successfully",
+  rotateSecretConfirm:"Warning: Changing or rotating the secret will invalidate all previously signed links. Proceed?",
   download:"Download",
   secLimits:"Limits", secCache:"Download cache",
   authLab:"API authentication", authSub:"When off, downloads are open without a key",
@@ -3235,6 +3254,10 @@ async function loadSettings(){
     $("#s_max_upload_mb").value=v("max_upload_mb");
     $("#s_session_ttl_h").value=Math.round(v("web_session_ttl")/3600);
     $("#s_cache_mb").value=v("cache_mb");
+    try {
+      const sc = await api("/api/v1/admin/auth/secret");
+      if($("#s_enc_secret")) $("#s_enc_secret").value = sc.secret || "";
+    } catch(e){}
     await loadTelegramConfig();
     await loadSystemStats();
   }catch(e){toast(e.message,"err");}
@@ -3441,6 +3464,34 @@ $("#swAutoBackup").onclick=async()=>{
     toast(t("saved"));
   }catch(e){toast(e.message,"err");}
   finally{sw.style.opacity="";}
+};
+$("#btnToggleSecretVis").onclick=()=>{
+  const inp=$("#s_enc_secret");
+  if(inp)inp.type=inp.type==="password"?"text":"password";
+};
+$("#btnSetCustomSecret").onclick=async()=>{
+  const sec=$("#s_enc_secret")?.value?.trim();
+  if(!sec){toast(t("keyPh"),"err");return;}
+  if(sec.length<8){toast("Secret must be at least 8 characters","err");return;}
+  if(!confirm(t("rotateSecretConfirm")))return;
+  try{
+    const r=await api("/api/v1/admin/auth/rotate-secret",{
+      method:"POST",
+      body:JSON.stringify({secret:sec})
+    });
+    toast(t("secretUpdated"));
+  }catch(e){toast(e.message,"err");}
+};
+$("#btnRotateSecret").onclick=async()=>{
+  if(!confirm(t("rotateSecretConfirm")))return;
+  try{
+    const r=await api("/api/v1/admin/auth/rotate-secret",{
+      method:"POST",
+      body:JSON.stringify({})
+    });
+    if($("#s_enc_secret"))$("#s_enc_secret").value=r.hmac_secret||"";
+    toast(t("secretRotated"));
+  }catch(e){toast(e.message,"err");}
 };
 $("#saveBtn").onclick=async()=>{
   const dv=$("#s_def_view");

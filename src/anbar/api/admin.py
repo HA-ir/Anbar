@@ -19,6 +19,7 @@ from ..auth import (
     KV_HMAC_SECRET,
     add_api_key,
     effective_auth_enabled,
+    effective_hmac_secret,
     list_api_keys,
     new_secret,
     require_admin,
@@ -184,16 +185,34 @@ async def auth_toggle(request: Request):
     return JSONResponse({"auth_enabled": not current})
 
 
+@router.get("/admin/auth/secret")
+async def secret_get(request: Request):
+    """Retrieve current HMAC / encryption secret (admin only)."""
+    require_admin(request)
+    db = request.app.state.db
+    s = request.app.state.settings
+    env_secret = s.hmac_secret.get_secret_value() if s.hmac_secret else None
+    secret = effective_hmac_secret(db, env_secret)
+    return {"secret": secret}
+
+
 @router.post("/admin/auth/rotate-secret")
 async def rotate_secret(request: Request):
-    """Generate a fresh HMAC signing secret. Old signed links become invalid
-    (410) immediately; callers must mint new links. Admin key required.
+    """Generate or set a fresh HMAC signing secret and encryption master key.
+    Old signed links become invalid (410) immediately. Admin key required.
     """
     require_admin(request)
     db = request.app.state.db
-    secret = new_secret()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    custom = body.get("secret", "").strip() if isinstance(body, dict) else ""
+    if custom and len(custom) < 8:
+        raise HTTPException(422, "Secret key must be at least 8 characters long")
+    secret = custom or new_secret()
     db.kv_set(KV_HMAC_SECRET, secret)
-    db.log_audit("secret.rotate", actor="admin")
+    db.log_audit("secret.rotate", actor="admin", details={"custom": bool(custom)})
     return {"hmac_secret": secret, "note": "previously minted links are now invalid"}
 
 
