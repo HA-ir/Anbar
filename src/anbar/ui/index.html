@@ -354,7 +354,8 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
 .stat-box{background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:9px 11px;display:flex;flex-direction:column}
 .stat-box .title{font-size:11px;color:var(--tx3);margin-bottom:3px}
-.stat-box .val{font-size:13.5px;font-weight:700;color:var(--tx);direction:ltr}
+.stat-box .val{font-size:13.5px;font-weight:700;color:var(--tx);direction:ltr;text-align:start}
+html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;text-align:start}
 .fm-preview.audio{flex-direction:column;gap:10px;padding:22px 16px}
 .fm-preview.audio svg{width:34px;height:34px;fill:none;stroke:var(--brand);stroke-width:1.7;stroke-linecap:round}
 .fm-preview.audio audio{width:100%}
@@ -961,6 +962,11 @@ const I18N={
   statFiles:"تعداد فایل‌ها",
   statBots:"بات‌های فعال",
   statLastBk:"آخرین پشتیبان",
+  duplicateOk:"نسخه کپی ایجاد شد",
+  codeTruncated:"نمایش ۱۰۰۰ خط اول — برای مشاهده کامل دانلود کنید",
+  quickShareLink:"ساخت و کپی لینک اشتراک (۲۴ ساعته)",
+  shareLinkCreated:"لینک اشتراک امن ۲۴ ساعته در کلیپ‌بورد کپی شد",
+  copyFileT:"ایجاد نسخه کپی (Duplicate)",
   btnDlBackup:"دانلود بکاپ",
   btnImportBackup:"بازیابی و ایمپورت",
   importBackupConfirm:"هشدار: تمام متادیتای فعلی با فایل پشتیبان جایگزین خواهد شد. آیا مطمئن هستید؟",
@@ -1070,6 +1076,11 @@ const I18N={
   statFiles:"Total Files",
   statBots:"Active Bots",
   statLastBk:"Last Backup",
+  duplicateOk:"Copy created",
+  codeTruncated:"Showing first 1000 lines — download for full content",
+  quickShareLink:"Create & copy share link (24h)",
+  shareLinkCreated:"24h secure share link copied to clipboard",
+  copyFileT:"Duplicate file",
   btnDlBackup:"Download Backup",
   btnImportBackup:"Import & Restore",
   importBackupConfirm:"Warning: All current metadata will be replaced with this backup. Are you sure you want to proceed?",
@@ -1576,6 +1587,7 @@ function renderRows(){
   if(selBar)updateSelBar();
   const MV_ICON='<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg>';
   const RN_ICON='<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  const CP_ICON='<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   list.forEach(o=>{
     const tr=document.createElement("tr");
     const isDir = o.isFolder;
@@ -1596,13 +1608,14 @@ function renderRows(){
       +(isDir
         ? '<button class="act" data-a="fold-rename" title="'+esc(t("foldRenameT"))+'">'+RN_ICON+'</button>'
           +'<button class="act" data-a="fold-move" title="'+esc(t("foldMoveT"))+'">'+MV_ICON+'</button>'
-          +'<button class="act" data-a="fold-copy" title="'+esc(t("foldCopyT"))+'"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+          +'<button class="act" data-a="fold-copy" title="'+esc(t("foldCopyT"))+'">'+CP_ICON+'</button>'
           +'<button class="act del" data-a="fold-del" title="'+esc(t("foldDelT"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
         : '<button class="act" data-a="dl" title="'+esc(t("download"))+'"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
-          +'<button class="act" data-a="cp" title="'+esc(t("quickCopyLink"))+'"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+          +'<button class="act" data-a="cp" title="'+esc(t("quickShareLink"))+'"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>'
+          +'<button class="act" data-a="cp-file" title="'+esc(t("copyFileT"))+'">'+CP_ICON+'</button>'
           +'<button class="act" data-a="rn" title="'+esc(t("renameT"))+'">'+RN_ICON+'</button>'
           +'<button class="act" data-a="mv" title="'+esc(t("moveTitle"))+'">'+MV_ICON+'</button>'
-          +'<button class="act" data-a="ln" title="'+esc(t("linkT"))+'"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>'
+          +'<button class="act" data-a="ln" title="'+esc(t("linkT"))+'"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>'
           +'<button class="act del" data-a="del" title="'+esc(t("delQ"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>')
       +'</div></td>';
 
@@ -1647,14 +1660,19 @@ function renderRows(){
       };
       tr.querySelector('[data-a="fold-copy"]').onclick = async (e) => {
         e.stopPropagation();
-        const p = prompt(t("foldCopyT"), o.filename + "_copy");
+        const base = o.filename.replace(/\/$/, "");
+        const p = prompt(t("foldCopyT") || t("newFolderPrompt"), base + "_copy");
         if (!p) return;
+        const clean = p.trim().replace(/[\\/?%*:|"<>]/g, "");
+        if (!clean) return;
+        const parent = curFolderPrefix || "";
+        const dst = parent + clean;
         try {
           await api("/api/v1/admin/folders/copy", {
             method: "POST",
-            body: JSON.stringify({ src_path: o.fullPrefix, dst_path: p })
+            body: JSON.stringify({ src_path: o.fullPrefix, dst_path: dst })
           });
-          toast(t("saved"));
+          toast(t("duplicateOk"));
           refresh();
         } catch(err) { toast(err.message, "err"); }
       };
@@ -1682,9 +1700,23 @@ function renderRows(){
       const cpBtn=tr.querySelector('[data-a=cp]');
       if(cpBtn)cpBtn.onclick=async(e)=>{
         e.stopPropagation();
-        const link=location.origin+"/f/"+encodeURIComponent(o.id)+(_apiKey?"?k="+encodeURIComponent(_apiKey):"");
-        await copyText(link);
-        toast(t("copied"));
+        try{
+          const r=await api("/f/"+encodeURIComponent(o.id)+"/link?ttl=86400",{method:"POST"});
+          await copyText(r.pretty_url||r.url);
+          toast(t("shareLinkCreated"));
+        }catch(err){
+          await copyText(location.origin+"/f/"+encodeURIComponent(o.id));
+          toast(t("copied"));
+        }
+      };
+      const cpFileBtn=tr.querySelector('[data-a=cp-file]');
+      if(cpFileBtn)cpFileBtn.onclick=async(e)=>{
+        e.stopPropagation();
+        try{
+          await api("/api/v1/admin/objects/copy",{method:"POST",body:JSON.stringify({id:o.id})});
+          toast(t("duplicateOk"));
+          refresh();
+        }catch(err){toast(err.message,"err");}
       };
       tr.querySelector('[data-a=rn]').onclick=(e)=>{
         e.stopPropagation();
@@ -1809,6 +1841,7 @@ function renderGallery(list){
   g.className="gallery";
   const MV_ICON='<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg>';
   const RN_ICON='<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  const CP_ICON='<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   list.forEach(o=>{
     const isDir=!!o.isFolder;
     const kind=isDir?null:mediaKind(o);
@@ -1826,10 +1859,11 @@ function renderGallery(list){
     const acts = isDir
       ? '<button class="act" data-a="fold-rename" title="'+esc(t("foldRenameT"))+'">'+RN_ICON+'</button>'
         +'<button class="act" data-a="fold-move" title="'+esc(t("foldMoveT"))+'">'+MV_ICON+'</button>'
-        +'<button class="act" data-a="fold-copy" title="'+esc(t("foldCopyT"))+'"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+        +'<button class="act" data-a="fold-copy" title="'+esc(t("foldCopyT"))+'">'+CP_ICON+'</button>'
         +'<button class="act del" data-a="del" title="'+esc(t("foldDelT"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
       : '<button class="act" data-a="dl" title="'+esc(t("download"))+'"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
-        +'<button class="act" data-a="cp" title="'+esc(t("quickCopyLink"))+'"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+        +'<button class="act" data-a="cp" title="'+esc(t("quickShareLink"))+'"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>'
+        +'<button class="act" data-a="cp-file" title="'+esc(t("copyFileT"))+'">'+CP_ICON+'</button>'
         +'<button class="act" data-a="rn" title="'+esc(t("renameT"))+'">'+RN_ICON+'</button>'
         +'<button class="act" data-a="mv" title="'+esc(t("moveTitle"))+'">'+MV_ICON+'</button>'
         +'<button class="act" data-a="ln" title="'+esc(t("linkT"))+'"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>'
@@ -1846,9 +1880,23 @@ function renderGallery(list){
       const cpBtn=cell.querySelector('[data-a=cp]');
       if(cpBtn)cpBtn.onclick=async(e)=>{
         e.stopPropagation();
-        const link=location.origin+"/f/"+encodeURIComponent(o.id)+(_apiKey?"?k="+encodeURIComponent(_apiKey):"");
-        await copyText(link);
-        toast(t("copied"));
+        try{
+          const r=await api("/f/"+encodeURIComponent(o.id)+"/link?ttl=86400",{method:"POST"});
+          await copyText(r.pretty_url||r.url);
+          toast(t("shareLinkCreated"));
+        }catch(err){
+          await copyText(location.origin+"/f/"+encodeURIComponent(o.id));
+          toast(t("copied"));
+        }
+      };
+      const cpFileBtn=cell.querySelector('[data-a=cp-file]');
+      if(cpFileBtn)cpFileBtn.onclick=async(e)=>{
+        e.stopPropagation();
+        try{
+          await api("/api/v1/admin/objects/copy",{method:"POST",body:JSON.stringify({id:o.id})});
+          toast(t("duplicateOk"));
+          refresh();
+        }catch(err){toast(err.message,"err");}
       };
       cell.querySelector('[data-a=rn]').onclick=(e)=>{e.stopPropagation();renameObj(o);};
       cell.querySelector('[data-a=mv]').onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename||o.id);};
@@ -1870,7 +1918,24 @@ function renderGallery(list){
       };
       cell.querySelector('[data-a="fold-rename"]').onclick=(e)=>{e.stopPropagation();const p=prompt(t("foldRenameT"),o.fullPrefix.replace(/\/$/,""));if(!p)return;api("/api/v1/admin/folders/rename",{method:"POST",body:JSON.stringify({old_path:o.fullPrefix,new_path:p})}).then(()=>{toast(t("saved"));refresh();}).catch(err=>toast(err.message,"err"));};
       cell.querySelector('[data-a="fold-move"]').onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename);};
-      cell.querySelector('[data-a="fold-copy"]').onclick=(e)=>{e.stopPropagation();const p=prompt(t("foldCopyT"),o.filename+"_copy");if(!p)return;api("/api/v1/admin/folders/copy",{method:"POST",body:JSON.stringify({src_path:o.fullPrefix,dst_path:p})}).then(()=>{toast(t("saved"));refresh();}).catch(err=>toast(err.message,"err"));};
+      cell.querySelector('[data-a="fold-copy"]').onclick=async(e)=>{
+        e.stopPropagation();
+        const base = o.filename.replace(/\/$/, "");
+        const p = prompt(t("foldCopyT") || t("newFolderPrompt"), base + "_copy");
+        if (!p) return;
+        const clean = p.trim().replace(/[\\/?%*:|"<>]/g, "");
+        if (!clean) return;
+        const parent = curFolderPrefix || "";
+        const dst = parent + clean;
+        try {
+          await api("/api/v1/admin/folders/copy", {
+            method: "POST",
+            body: JSON.stringify({ src_path: o.fullPrefix, dst_path: dst })
+          });
+          toast(t("duplicateOk"));
+          refresh();
+        } catch(err) { toast(err.message, "err"); }
+      };
       cell.querySelector('[data-a=del]').onclick=(e)=>{e.stopPropagation();if(!confirm(t("foldDelT")+" — "+o.filename+"؟"))return;api("/api/v1/admin/folders/delete",{method:"POST",body:JSON.stringify({path:o.fullPrefix})}).then(()=>{toast(t("delOk"));refresh();}).catch(err=>toast(err.message,"err"));};
     }
     const enter = (e) => {
@@ -2208,7 +2273,10 @@ async function renameObj(o){
 }
 function highlightCode(raw, ext) {
   const cleanExt = (ext || "").toLowerCase();
-  const lines = raw.split(/\r?\n/);
+  const allLines = raw.split(/\r?\n/);
+  const MAX_LINES = 1000;
+  const isTruncated = allLines.length > MAX_LINES;
+  const lines = isTruncated ? allLines.slice(0, MAX_LINES) : allLines;
   let rowsHtml = "";
 
   for (let i = 0; i < lines.length; i++) {
@@ -2235,12 +2303,20 @@ function highlightCode(raw, ext) {
       + '</div>';
   }
 
+  const truncBanner = isTruncated
+    ? '<div style="padding:8px 12px;background:var(--warn-soft);color:var(--warn);font-size:11.5px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.08);direction:rtl">'
+      + '<span>⚠️ ' + t('codeTruncated') + '</span>'
+      + '<button class="btn btn-ghost" style="padding:2px 8px;font-size:11px;height:22px" onclick="$(\'#fmDl\').click()">↓ ' + t('download') + '</button>'
+      + '</div>'
+    : '';
+
   return '<div class="code-wrap">'
     + '<div class="code-header">'
-    + '<span>' + esc((cleanExt || "code").toUpperCase()) + ' (' + lines.length + ' lines)</span>'
+    + '<span>' + esc((cleanExt || "code").toUpperCase()) + ' (' + allLines.length + ' lines)</span>'
     + '<button class="btn btn-ghost" type="button" style="padding:2px 10px;font-size:11.5px;height:24px" id="copyCodeBtn">' + t('copyCode') + '</button>'
     + '</div>'
     + '<div class="code-body">' + rowsHtml + '</div>'
+    + truncBanner
     + '</div>';
 }
 
@@ -2306,7 +2382,7 @@ async function openFileModal(o){
       const res=await fetch(url,{headers:_apiKey?{"Authorization":"Bearer "+_apiKey}:{}});
       if(res.ok){
         const txt=await res.text();
-        pv.innerHTML=highlightCode(txt.slice(0, 15000), extOf(o.filename));
+        pv.innerHTML=highlightCode(txt, extOf(o.filename));
         const btn=pv.querySelector("#copyCodeBtn");
         if(btn)btn.onclick=async(e)=>{
           e.stopPropagation();

@@ -906,6 +906,25 @@ async def objects_move(request: Request):
     }
 
 
+@router.post("/admin/objects/copy")
+async def object_copy(request: Request):
+    """Duplicate an object's metadata pointing to the same storage chunks with a new ID."""
+    require_admin(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "expected JSON {id, filename?}") from None
+    obj_id = body.get("id")
+    new_filename = body.get("filename")
+    if not obj_id:
+        raise HTTPException(400, "id is required")
+    db = request.app.state.db
+    res = db.copy_object(str(obj_id), new_filename)
+    if not res:
+        raise HTTPException(404, "object not found")
+    return {"status": "copied", "object": res}
+
+
 @router.delete("/admin/trash/{obj_id}")
 async def trash_purge_one(request: Request, obj_id: str):
     """Permanently destroy one trashed object (blobs + metadata) now."""

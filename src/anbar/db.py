@@ -234,6 +234,53 @@ class Database:
         self._conn.commit()
         return count
 
+    def copy_object(self, obj_id: str, new_filename: str | None = None) -> dict[str, Any] | None:
+        """Duplicate an object's metadata pointing to the same storage chunks with a new ID."""
+        row = self._conn.execute(
+            "SELECT * FROM objects WHERE id = ? AND deleted_at IS NULL",
+            (obj_id,),
+        ).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        import uuid
+
+        new_id = uuid.uuid4().hex[:12]
+        if not new_filename:
+            fn = d["filename"]
+            if "." in fn and not fn.startswith("."):
+                base, ext = fn.rsplit(".", 1)
+                new_filename = f"{base} (copy).{ext}"
+            else:
+                new_filename = f"{fn} (copy)"
+
+        now = int(time.time())
+        self._conn.execute(
+            """INSERT INTO objects
+               (id, file_id, backend, filename, size, content_type, sha256,
+                manifest, uploader_key, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                new_id,
+                d["file_id"],
+                d["backend"],
+                new_filename,
+                d["size"],
+                d.get("content_type"),
+                d.get("sha256"),
+                d.get("manifest"),
+                d.get("uploader_key"),
+                now,
+            ),
+        )
+        self._conn.commit()
+        return {
+            "id": new_id,
+            "filename": new_filename,
+            "size": d["size"],
+            "created_at": now,
+        }
+
     def soft_delete_folder(self, prefix: str) -> int:
         """Soft-delete all files under a prefix."""
         prefix = prefix.rstrip("/") + "/"
