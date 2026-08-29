@@ -242,6 +242,13 @@ class BotBackend(StorageBackend):
             finally:
                 self._last_send_at = asyncio.get_running_loop().time()
 
+    async def send_text_event(self, text: str) -> dict:
+        """Send a meta event text message to the storage channel."""
+        fields: dict = {"chat_id": self._channel, "text": text}
+        if self._thread_id is not None:
+            fields["message_thread_id"] = str(self._thread_id)
+        return await self._call("sendMessage", **fields)
+
     async def open(self, ref: ObjectRef, max_retries: int = 5) -> bytes:
         """Fetch full blob bytes via getFile + CDN (bounded by chunk size).
 

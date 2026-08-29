@@ -681,6 +681,18 @@ async def rename(request: Request, obj_id: str):
     target_filename = prefix + name
     if not db.rename_object(obj_id, target_filename):
         raise HTTPException(404, "object not found")
+
+    from ..self_healing import emit_meta_event
+    configured_sec = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
+    sec = effective_hmac_secret(db, configured_sec)
+    asyncio.create_task(
+        emit_meta_event(
+            request.app.state.backend,
+            {"op": "rn_obj", "id": obj_id, "new": target_filename},
+            secret=sec,
+        )
+    )
+
     return {"renamed": True, "id": obj_id, "filename": target_filename}
 
 

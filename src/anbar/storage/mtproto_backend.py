@@ -240,6 +240,11 @@ class MTProtoBackend(StorageBackend):
         except Exception:
             return False
 
+    async def send_text_event(self, text: str) -> dict | None:
+        """Send a meta event text message to the storage channel."""
+        msg = await self._run_healed(self._client.send_message, self._peer, text)
+        return {"message_id": getattr(msg, "id", None)}
+
     async def close(self) -> None:
         try:
             await self._client.disconnect()

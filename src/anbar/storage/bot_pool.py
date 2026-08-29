@@ -80,6 +80,12 @@ class BotPool:
 
         return await backend.store(data, name, content_type=content_type, caption=caption)
 
+    async def send_text_event(self, text: str) -> dict | None:
+        """Send a meta event text message to the storage channel."""
+        if self._backends:
+            return await self._backends[0].send_text_event(text)
+        return None
+
     async def close(self) -> None:
         for b in self._backends:
             try:

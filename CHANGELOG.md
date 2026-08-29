@@ -4,6 +4,11 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.3] — 2026-08-29
+
+### Added
+- **Channel Meta Event Journaling (Tombstones & Replay)**: Automated encryption and emission of metadata lifecycle events (`anbar:v1:evt:e:...` / `anbar:v1:evt:p:...`) on folder rename, object rename, object move, and hard purge, allowing exact directory hierarchy replay during zero-database disaster recovery.
+
 ## [0.15.2] — 2026-08-29
 
 ### Added

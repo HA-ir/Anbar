@@ -53,6 +53,10 @@ class StorageBackend(abc.ABC):
     async def health(self) -> bool:
         return True
 
+    async def send_text_event(self, text: str) -> dict | None:
+        """Send a meta event text message to the storage channel (optional)."""
+        return None
+
     async def connect(self) -> None:  # pragma: no cover - default no-op
         """Establish any backend connection (mtproto loads its session)."""
         return None

@@ -6,6 +6,7 @@ budget) and a cache purge.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from pathlib import Path
@@ -367,22 +368,33 @@ async def channel_rebuild(request: Request):
     env_secret = s.hmac_secret.get_secret_value() if s.hmac_secret else None
     active_secret = custom_secret or effective_hmac_secret(db, env_secret)
 
-    from ..self_healing import decode_chunk_caption, rebuild_from_manifests
+    from ..self_healing import decode_chunk_caption, decode_meta_event, rebuild_from_manifests
 
     collected_chunks: dict[str, list[dict]] = {}
+    collected_events: list[dict] = []
 
     if hasattr(backend, "_client") and hasattr(backend, "_peer") and hasattr(backend, "_connected"):
         try:
             if not backend._connected:
                 await backend.connect()
             async for msg in backend._client.iter_messages(backend._peer, limit=limit):
-                if not msg or not msg.media or not getattr(msg.media, "document", None):
+                if not msg:
                     continue
-                caption = msg.text or msg.message or ""
+                text = msg.text or msg.message or ""
+                # 1. Check for journal meta event
+                evt = decode_meta_event(text, secret=active_secret)
+                if evt:
+                    collected_events.append(evt)
+                    continue
+
+                # 2. Check for chunk document
+                if not msg.media or not getattr(msg.media, "document", None):
+                    continue
+                caption = text or getattr(msg, "caption", "") or ""
                 meta = decode_chunk_caption(caption, secret=active_secret)
                 if not meta:
                     continue
-                obj_id = meta.get("id") or meta.get("fn")
+                obj_id = str(meta.get("id") or meta.get("fn") or "unk")
                 doc = msg.media.document
                 collected_chunks.setdefault(obj_id, []).append(
                     {
@@ -396,7 +408,7 @@ async def channel_rebuild(request: Request):
         except Exception as e:
             raise HTTPException(502, f"Failed scanning MTProto channel history: {e}") from e
 
-    res = rebuild_from_manifests(collected_chunks, db)
+    res = rebuild_from_manifests(collected_chunks, db, events=collected_events)
     db.log_audit("channel.rebuild", actor="admin", details=res)
     return {"status": "ok", **res}
 
@@ -994,8 +1006,19 @@ async def folder_rename(request: Request):
     if new_path == old_path or new_path.startswith(old_path + "/"):
         raise HTTPException(400, "cannot move a folder into itself")
     db = request.app.state.db
+    backend = request.app.state.backend
+    s = request.app.state.settings
     moved_count = db.rename_folder(old_path, new_path)
     db.log_audit("folder.rename", actor="admin", target=f"{old_path} -> {new_path}")
+
+    # Emit background event to Telegram channel
+    from ..self_healing import emit_meta_event
+    env_sec = s.hmac_secret.get_secret_value() if s.hmac_secret else None
+    sec = effective_hmac_secret(db, env_sec)
+    asyncio.create_task(
+        emit_meta_event(backend, {"op": "rn_dir", "old": old_path, "new": new_path}, secret=sec)
+    )
+
     return {"status": "renamed", "moved_count": moved_count, "new_path": new_path}
 
 
@@ -1046,8 +1069,21 @@ async def objects_move(request: Request):
     if "/" not in dest and any(ch in dest for ch in '?%*|"<>\\'):
         raise HTTPException(400, "invalid destination path")
     db = request.app.state.db
+    backend = request.app.state.backend
+    s = request.app.state.settings
     res = db.move_objects_to_prefix([str(i) for i in ids], dest)
     db.log_audit("file.move", actor="admin", target=f"{len(ids)} items -> {dest}")
+
+    # Emit background event to Telegram channel
+    from ..self_healing import emit_meta_event
+    env_sec = s.hmac_secret.get_secret_value() if s.hmac_secret else None
+    sec = effective_hmac_secret(db, env_sec)
+    asyncio.create_task(
+        emit_meta_event(
+            backend, {"op": "mv_obj", "ids": [str(i) for i in ids], "dest": dest}, secret=sec
+        )
+    )
+
     return {
         "status": "moved",
         "moved": res["moved"],
@@ -1088,5 +1124,15 @@ async def trash_purge_one(request: Request, obj_id: str):
         raise HTTPException(404, "object not found")
     removed = await _purge_object_blobs(request.app.state.backend, db, row)
     db.log_audit("file.purge", actor="admin", target=obj_id)
+
+    # Emit background delete event
+    from ..self_healing import emit_meta_event
+    s = request.app.state.settings
+    env_sec = s.hmac_secret.get_secret_value() if s.hmac_secret else None
+    sec = effective_hmac_secret(db, env_sec)
+    asyncio.create_task(
+        emit_meta_event(request.app.state.backend, {"op": "del_obj", "id": obj_id}, secret=sec)
+    )
+
     return {"purged": obj_id, "blobs_removed": removed}
 
