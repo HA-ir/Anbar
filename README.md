@@ -29,6 +29,7 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 | v0.10 | Link registry + instant revoke · Trash (soft delete / restore / auto-purge 7d) · streaming bulk ZIP · type filter · video poster frames | ✅ `v0.10.0` |
 | v0.10.x | Mobile responsive · pw unlock page (hidden sig+exp, eye toggle, keyed-HMAC fix) · link manager modal in-app · live-only links list + per-link download counters · shared albums (`/f/a/<token>`) · gallery audio/PDF previews | ✅ `v0.10.5` |
 | v0.14.x | Opaque zero-knowledge chunks · zero-overhead file/folder duplication · database backup/restore/import · system telemetry stats · mass link revocation · bounded code preview · Shamsi BiDi date formatting | ✅ `v0.14.3` — live |
+| v0.15.x | Self-Healing Disaster Recovery (DB-free channel reconstruction) · Client-Side True ZK (WebCrypto `ANBAR_ZK1`) · Metadata LRU cache & Lookahead 2-chunk prefetching · S3 protocol · BotPool · Conditional tombstone batched events | ✅ `v0.15.7` — live |
 
 ## Why
 
@@ -444,8 +445,27 @@ O(one chunk) memory, nothing buffered on disk. Entries keep filenames
 capped at 100 files / 8 GB per request. The selection bar's «دانلود ZIP»
 button drives it from the browser.
 
+## Self-Healing & Disaster Recovery (v0.15+)
+
+Anbar guarantees **zero local retention**: Telegram channels hold 100% of the self-describing metadata in chunk captions (`anbar:v1:e:...` / `anbar:v1:p:...`) and meta-event journal entries (`anbar:v1:evt:...`).
+
+- **Instant DB Rebuild**: If your server is completely wiped, start a new container with the same `ANBAR_HMAC_SECRET` and click **«اسکن و بازسازی دیتابیس از کانال تلگرام»** in the UI or `POST /api/v1/admin/channel/rebuild`.
+- **Standalone Offline Recovery (No Anbar Needed)**: Recover directly on any PC/Mac with [scripts/recover.py](scripts/recover.py).
+- See the full [Disaster Recovery & Reconstruction Guide](docs/DISASTER_RECOVERY.md).
+
+## Client-Side True Zero-Knowledge Encryption (v0.15.6+)
+
+- **WebCrypto API in Browser**: Encrypts files in client RAM with `PBKDF2-HMAC-SHA256` (100,000 rounds) + `AES-256-GCM` before sending.
+- **Binary Standard `ANBAR_ZK1`**: 9-byte header + 16B Salt + 12B IV + 16B Tag + Ciphertext.
+- **Offline CLI Tooling**:
+  ```bash
+  anbarctl encrypt secret.pdf -p "Password" -o secret.pdf.enc
+  anbarctl decrypt secret.pdf.enc -p "Password" -o secret.pdf
+  ```
+
 ## Documentation
 
+- [Disaster Recovery & Standalone Reconstruction](docs/DISASTER_RECOVERY.md) — complete zero-server recovery manual
 - [Architecture](docs/ARCHITECTURE.md) — layers, data flow, chunking, storage locations
 - [API reference](docs/API.md) — every endpoint, auth matrix, error codes, **anbarctl CLI reference**
 - [Deployment guide](docs/DEPLOY.md) — Docker, Caddy/Nginx, secrets, ops runbook
