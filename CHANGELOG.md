@@ -4,6 +4,12 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.6] — 2026-08-29
+
+### Added
+- **Client-Side True Zero-Knowledge Encryption (WebCrypto API)**: In-browser optional client-side encryption (`ANBAR_ZK1` binary format with PBKDF2-HMAC-SHA256 and AES-256-GCM) protecting files before they ever leave the client's device, with transparent on-the-fly decryption during downloads.
+- **CLI Client ZK Tooling**: Added `anbarctl encrypt` and `anbarctl decrypt` commands for offline local encryption and decryption with custom passwords.
+
 ## [0.15.5] — 2026-08-29
 
 ### Fixed

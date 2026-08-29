@@ -499,7 +499,80 @@ def _build_parser() -> argparse.ArgumentParser:
     p_s3_rm.add_argument("--key", default=os.environ.get("ANBAR_API_KEY"), help="API key")
     p_s3_rm.set_defaults(func=_cmd_s3)
 
+    # ── client-side zk encryption tools ─────────────────────────────
+    p_cdec = sub.add_parser("decrypt", help="decrypt client-side ANBAR_ZK1 encrypted file")
+    p_cdec.add_argument("file", help="encrypted file (.enc)")
+    p_cdec.add_argument("-p", "--password", help="decryption password (or prompts if omitted)")
+    p_cdec.add_argument("-o", "--out", help="output decrypted file path")
+    p_cdec.set_defaults(func=_cmd_client_decrypt)
+
+    p_cenc = sub.add_parser("encrypt", help="encrypt file using client-side ANBAR_ZK1 format")
+    p_cenc.add_argument("file", help="input file")
+    p_cenc.add_argument("-p", "--password", help="encryption password (or prompts if omitted)")
+    p_cenc.add_argument("-o", "--out", help="output encrypted file path (.enc)")
+    p_cenc.set_defaults(func=_cmd_client_encrypt)
+
     return parser
+
+
+def _cmd_client_decrypt(args: argparse.Namespace) -> int:
+    """Decrypt an ANBAR_ZK1 client-side encrypted file."""
+    from .crypto import client_zk_decrypt
+
+    in_path = args.file
+    if not os.path.isfile(in_path):
+        print(f"error: no such file: {in_path}", file=sys.stderr)
+        return 1
+    password = args.password
+    if not password:
+        import getpass
+
+        password = getpass.getpass("Enter decryption password: ")
+
+    with open(in_path, "rb") as f:
+        data = f.read()
+
+    try:
+        dec = client_zk_decrypt(data, password)
+    except Exception as e:
+        print(f"error: decryption failed: {e}", file=sys.stderr)
+        return 1
+
+    out_path = args.out
+    if not out_path:
+        out_path = in_path.removesuffix(".enc") if in_path.endswith(".enc") else in_path + ".dec"
+
+    with open(out_path, "wb") as f:
+        f.write(dec)
+
+    print(f"Decrypted successfully -> {out_path} ({len(dec)} bytes)")
+    return 0
+
+
+def _cmd_client_encrypt(args: argparse.Namespace) -> int:
+    """Encrypt a local file using client-side ANBAR_ZK1 format."""
+    from .crypto import client_zk_encrypt
+
+    in_path = args.file
+    if not os.path.isfile(in_path):
+        print(f"error: no such file: {in_path}", file=sys.stderr)
+        return 1
+    password = args.password
+    if not password:
+        import getpass
+
+        password = getpass.getpass("Enter encryption password: ")
+
+    with open(in_path, "rb") as f:
+        data = f.read()
+
+    enc = client_zk_encrypt(data, password)
+    out_path = args.out or (in_path + ".enc")
+    with open(out_path, "wb") as f:
+        f.write(enc)
+
+    print(f"Encrypted successfully -> {out_path} ({len(enc)} bytes)")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

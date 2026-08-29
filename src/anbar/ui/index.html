@@ -531,6 +531,11 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg></div>
         <b data-i18n="dropT">فایل‌ها را اینجا رها کن یا کلیک کن</b>
         <small data-i18n="dropS">چند فایلی · بدون ذخیره روی دیسک سرور — مستقیم در تلگرام</small>
+        <div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost" id="btnDropZkToggle" type="button" style="padding:4px 9px;font-size:11px;border-radius:6px;height:auto">
+            🔐 <span id="dropZkLabel">ZK: خاموش</span>
+          </button>
+        </div>
         <span class="lim" id="limTag"></span>
         <input type="file" id="fileInput" multiple hidden>
         <input type="file" id="dirInput" webkitdirectory multiple hidden>
@@ -719,6 +724,18 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div style="display:flex;gap:8px;width:100%">
           <button type="button" class="btn btn-ghost" id="btnSetCustomSecret" style="flex:1;font-size:12px" data-i18n="btnSetSecret">تنظیم کلید</button>
           <button type="button" class="btn btn-warn" id="btnRotateSecret" style="flex:1;font-size:12px" data-i18n="btnRotateSecret">چرخش تصادفی</button>
+        </div>
+      </div>
+      <!-- Client-Side True ZK (v0.15.6) -->
+      <div class="set-row">
+        <div class="lab"><span data-i18n="clientZkLab">رمزنگاری سمت مرورگر (Client-Side True ZK)</span><small data-i18n="clientZkSub">رمزنگاری بایت‌ها در حافظه مرورگر با WebCrypto API قبل از ارسال به سرور</small></div>
+        <div class="sw" id="swClientZk" role="switch"><i></i></div>
+      </div>
+      <div id="clientZkPassRow" style="display:none;margin-top:6px;gap:8px;flex-direction:column">
+        <div class="lab"><span data-i18n="clientZkPassLab">رمز عبور اختصاصی کلاینت (اختیاری)</span><small data-i18n="clientZkPassSub">در صورت خالی بودن، از کلید ورود نشست استفاده می‌شود</small></div>
+        <div style="display:flex;gap:8px;width:100%">
+          <input type="password" id="s_client_zk_pass" placeholder="Client passphrase..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
+          <button type="button" class="btn btn-ghost" id="btnToggleClientZkVis" style="width:auto;padding:8px 11px;font-size:12px">👁️</button>
         </div>
       </div>
     </div>
@@ -1126,6 +1143,17 @@ const I18N={
   btnSetSecret:"تنظیم کلید", btnRotateSecret:"چرخش تصادفی",
   secretRotated:"کلید جدید ایجاد و فعال شد", secretUpdated:"کلید مخفی با موفقیت به‌روزرسانی شد",
   rotateSecretConfirm:"هشدار: با تغییر یا چرخش کلید، تمام لینک‌های امضاشده قبلی منقضی خواهند شد. آیا ادامه می‌دهید؟",
+  clientZkLab:"رمزنگاری سمت مرورگر (Client-Side True ZK)",
+  clientZkSub:"رمزنگاری بایت‌ها در حافظه مرورگر با WebCrypto API قبل از ارسال به سرور",
+  clientZkPassLab:"رمز عبور اختصاصی کلاینت (اختیاری):",
+  clientZkPassSub:"در صورت خالی بودن، از کلید ورود نشست استفاده می‌شود",
+  zkEncryptedBadge:"رمزنگاری کلاینت",
+  zkDecrypting:"در حال رمزگشایی در مرورگر...",
+  zkDecryptFail:"رمزگشایی ناموفق بود — رمز عبور نادرست است",
+  zkPromptPass:"لطفاً رمز عبور رمزگشایی فایل را وارد کنید:",
+  zkEncrypting:"در حال رمزنگاری کلاینت...",
+  zkOn:"ZK: روشن",
+  zkOff:"ZK: خاموش",
  download:"دانلود",
   secLimits:"سقف‌ها", secCache:"کش دانلود",
   authLab:"احراز هویت API", authSub:"با غیرفعال‌سازی، دانلود بدون کلید آزاد است",
@@ -1258,6 +1286,17 @@ const I18N={
   btnSetSecret:"Set Secret", btnRotateSecret:"Random Rotate",
   secretRotated:"Secret rotated successfully", secretUpdated:"Secret updated successfully",
   rotateSecretConfirm:"Warning: Changing or rotating the secret will invalidate all previously signed links. Proceed?",
+  clientZkLab:"Client-Side Zero-Knowledge (True ZK)",
+  clientZkSub:"Encrypt file bytes in browser RAM with WebCrypto API before sending",
+  clientZkPassLab:"Client encryption passphrase (optional):",
+  clientZkPassSub:"If left blank, current session key is used",
+  zkEncryptedBadge:"Client Encrypted",
+  zkDecrypting:"Decrypting in browser...",
+  zkDecryptFail:"Decryption failed — incorrect passphrase",
+  zkPromptPass:"Enter passphrase to decrypt file:",
+  zkEncrypting:"Encrypting client-side...",
+  zkOn:"ZK: ON",
+  zkOff:"ZK: OFF",
   download:"Download",
   secLimits:"Limits", secCache:"Download cache",
   authLab:"API authentication", authSub:"When off, downloads are open without a key",
@@ -1490,6 +1529,7 @@ function showApp(){
     curFolderPrefix = initFolder.endsWith("/") ? initFolder : initFolder + "/";
     updateBreadcrumb();
   }
+  syncClientZkUI();
   refresh();
   // consume a PWA-shared URL: prefill + auto-submit the ingest form
   const shared=sessionStorage.getItem("anbar-shared");
@@ -1911,12 +1951,9 @@ function renderRows(){
     if(!isDir){
       tr.draggable=true;
       tr.ondragstart=e=>{e.dataTransfer.setData("text/plain",o.id);};
-      tr.querySelector('[data-a=dl]').onclick=()=>{
-        toast(t("dlStart"));
-        const a=document.createElement("a");
-        a.href=mediaUrl(o);
-        a.download=baseName(o.filename || o.id);
-        document.body.appendChild(a);a.click();a.remove();
+      tr.querySelector('[data-a=dl]').onclick=(e)=>{
+        e.stopPropagation();
+        downloadFileWithZk(o);
       };
       const cpBtn=tr.querySelector('[data-a=cp]');
       if(cpBtn)cpBtn.onclick=async(e)=>{
@@ -2118,7 +2155,11 @@ function renderGallery(list){
     if(!isDir){
       cell.draggable=true;
       cell.ondragstart=e=>{e.dataTransfer.setData("text/plain",o.id);};
-      cell.querySelector('[data-a=dl]').onclick=(e)=>{e.stopPropagation();if(menuPop)menuPop.classList.remove("on");toast(t("dlStart"));const a=document.createElement("a");a.href=url;a.download=baseName(o.filename||o.id);document.body.appendChild(a);a.click();a.remove();};
+      cell.querySelector('[data-a=dl]').onclick=(e)=>{
+        e.stopPropagation();
+        if(menuPop)menuPop.classList.remove("on");
+        downloadFileWithZk(o);
+      };
       const cpBtn=cell.querySelector('[data-a=cp]');
       if(cpBtn)cpBtn.onclick=async(e)=>{
         e.stopPropagation();
@@ -2739,11 +2780,7 @@ $("#fmNext").onclick=(e)=>{e.stopPropagation();navModalFile(1);};
 $("#fileModal").onclick=e=>{if(e.target.id==="fileModal")$("#fmClose").onclick();};
 $("#fmDl").onclick=()=>{
   if(!fmObj)return;
-  toast(t("dlStart"));
-  const a=document.createElement("a");
-  a.href=mediaUrl(fmObj);
-  a.download=baseName(fmObj.filename || fmObj.id);
-  document.body.appendChild(a);a.click();a.remove();
+  downloadFileWithZk(fmObj);
 };
 $("#fmShare").onclick=async()=>{
   if(!fmObj)return;
@@ -3193,9 +3230,191 @@ async function pump(){
   const next=queue.find(q=>q.state==="wait");
   if(next)pump();
 }
-function uploadOne(it){
+/* ================= Client-Side True ZK WebCrypto Module ================= */
+const ClientZK = {
+  MAGIC: new Uint8Array([65, 78, 66, 65, 82, 95, 90, 75, 49]), // "ANBAR_ZK1"
+
+  async isEncrypted(bufferOrBlob) {
+    let buf;
+    if (bufferOrBlob instanceof Blob) {
+      buf = await bufferOrBlob.slice(0, 9).arrayBuffer();
+    } else {
+      buf = bufferOrBlob.slice(0, 9);
+    }
+    const view = new Uint8Array(buf);
+    if (view.length < 9) return false;
+    for (let i = 0; i < 9; i++) {
+      if (view[i] !== this.MAGIC[i]) return false;
+    }
+    return true;
+  },
+
+  async deriveKey(password, salt) {
+    const enc = new TextEncoder();
+    const keyMaterial = await window.crypto.subtle.importKey(
+      "raw",
+      enc.encode(password),
+      { name: "PBKDF2" },
+      false,
+      ["deriveKey"]
+    );
+    return await window.crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: salt,
+        iterations: 100000,
+        hash: "SHA-256"
+      },
+      keyMaterial,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  },
+
+  async encrypt(dataBuffer, password) {
+    const salt = window.crypto.getRandomValues(new Uint8Array(16));
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const key = await this.deriveKey(password, salt);
+
+    const ciphertextWithTag = new Uint8Array(
+      await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, dataBuffer)
+    );
+
+    const ciphertext = ciphertextWithTag.slice(0, ciphertextWithTag.length - 16);
+    const tag = ciphertextWithTag.slice(ciphertextWithTag.length - 16);
+
+    const combined = new Uint8Array(9 + 16 + 12 + 16 + ciphertext.length);
+    combined.set(this.MAGIC, 0);
+    combined.set(salt, 9);
+    combined.set(iv, 25);
+    combined.set(tag, 37);
+    combined.set(ciphertext, 53);
+    return combined.buffer;
+  },
+
+  async decrypt(encryptedBuffer, password) {
+    const view = new Uint8Array(encryptedBuffer);
+    if (view.length < 9 + 16 + 12 + 16) {
+      throw new Error("Invalid encrypted payload size");
+    }
+    for (let i = 0; i < 9; i++) {
+      if (view[i] !== this.MAGIC[i]) throw new Error("Not a valid ANBAR_ZK1 encrypted file");
+    }
+    const salt = view.slice(9, 25);
+    const iv = view.slice(25, 37);
+    const tag = view.slice(37, 53);
+    const ciphertext = view.slice(53);
+
+    const ctWithTag = new Uint8Array(ciphertext.length + 16);
+    ctWithTag.set(ciphertext, 0);
+    ctWithTag.set(tag, ciphertext.length);
+
+    const key = await this.deriveKey(password, salt);
+    try {
+      return await window.crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, ctWithTag);
+    } catch (e) {
+      throw new Error(t("zkDecryptFail"));
+    }
+  }
+};
+
+let clientZkOn = localStorage.getItem("anbar-client-zk") === "1";
+let clientZkPass = sessionStorage.getItem("anbar-client-zk-pass") || "";
+
+function getClientZkPassword(forcePrompt = false) {
+  if (clientZkPass && !forcePrompt) return clientZkPass;
+  const inputPass = $("#s_client_zk_pass")?.value?.trim();
+  if (inputPass) {
+    clientZkPass = inputPass;
+    sessionStorage.setItem("anbar-client-zk-pass", clientZkPass);
+    return clientZkPass;
+  }
+  if (!forcePrompt && _apiKey) {
+    return _apiKey;
+  }
+  const entered = prompt(t("zkPromptPass"), clientZkPass || _apiKey || "");
+  if (entered) {
+    clientZkPass = entered.trim();
+    sessionStorage.setItem("anbar-client-zk-pass", clientZkPass);
+    if ($("#s_client_zk_pass")) $("#s_client_zk_pass").value = clientZkPass;
+    return clientZkPass;
+  }
+  return null;
+}
+
+function syncClientZkUI() {
+  const sw = $("#swClientZk");
+  if (sw) sw.classList.toggle("on", clientZkOn);
+  const row = $("#clientZkPassRow");
+  if (row) row.style.display = clientZkOn ? "flex" : "none";
+  const dropBtn = $("#btnDropZkToggle");
+  const dropLbl = $("#dropZkLabel");
+  if (dropBtn && dropLbl) {
+    dropBtn.classList.toggle("btn-primary", clientZkOn);
+    dropBtn.classList.toggle("btn-ghost", !clientZkOn);
+    dropLbl.textContent = clientZkOn ? t("zkOn") : t("zkOff");
+  }
+}
+
+async function downloadFileWithZk(o) {
+  toast(t("dlStart"));
+  const url = mediaUrl(o);
+  const isZk = (o.filename || "").endsWith(".enc");
+  if (!isZk) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = baseName(o.filename || o.id);
+    document.body.appendChild(a); a.click(); a.remove();
+    return;
+  }
+  try {
+    toast(t("zkDecrypting"));
+    const res = await fetch(url, { headers: _apiKey ? { "Authorization": "Bearer " + _apiKey } : {} });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const blob = await res.blob();
+    const isEnc = await ClientZK.isEncrypted(blob);
+    if (!isEnc) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = baseName(o.filename || o.id);
+      document.body.appendChild(a); a.click(); a.remove();
+      return;
+    }
+    const pass = getClientZkPassword(true);
+    if (!pass) return;
+    const buf = await blob.arrayBuffer();
+    const decBuf = await ClientZK.decrypt(buf, pass);
+    const cleanName = (o.filename || o.id).replace(/\.enc$/i, "");
+    const cleanBlob = new Blob([decBuf]);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(cleanBlob);
+    a.download = baseName(cleanName);
+    document.body.appendChild(a); a.click(); a.remove();
+    toast(t("tDone"));
+  } catch(e) {
+    toast(e.message, "err");
+  }
+}
+
+async function uploadOne(it){
+  let fileToSend = it.file;
+  if (clientZkOn && !it._zkEncrypted) {
+    const pass = getClientZkPassword(false);
+    if (!pass) throw new Error("Client ZK passphrase required");
+    const el = document.querySelector('.qitem[data-id="'+it.id+'"]');
+    if (el) {
+      const st = el.querySelector(".qstat span:first-child");
+      if (st) st.textContent = t("zkEncrypting");
+    }
+    const rawBuf = await it.file.arrayBuffer();
+    const encBuf = await ClientZK.encrypt(rawBuf, pass);
+    const encName = it.file.name.endsWith(".enc") ? it.file.name : (it.file.name + ".enc");
+    fileToSend = new File([encBuf], encName, { type: "application/octet-stream" });
+    it._zkEncrypted = true;
+  }
   return new Promise((res,rej)=>{
-    const fd=new FormData();fd.append("file",it.file,it.file.name);
+    const fd=new FormData();fd.append("file",fileToSend,fileToSend.name);
     const xhr=new XMLHttpRequest();
     xhr.open("POST","/api/v1/upload");
     xhr.withCredentials=true;
@@ -3517,6 +3736,40 @@ $("#btnRotateSecret").onclick=async()=>{
     toast(t("secretRotated"));
   }catch(e){toast(e.message,"err");}
 };
+const swZk = $("#swClientZk");
+if (swZk) {
+  swZk.onclick = () => {
+    clientZkOn = !clientZkOn;
+    localStorage.setItem("anbar-client-zk", clientZkOn ? "1" : "0");
+    syncClientZkUI();
+    toast(clientZkOn ? "Client-Side ZK ON 🔐" : "Client-Side ZK OFF 🔓");
+  };
+}
+const dropBtnZk = $("#btnDropZkToggle");
+if (dropBtnZk) {
+  dropBtnZk.onclick = (e) => {
+    e.stopPropagation();
+    clientZkOn = !clientZkOn;
+    localStorage.setItem("anbar-client-zk", clientZkOn ? "1" : "0");
+    syncClientZkUI();
+    toast(clientZkOn ? "Client-Side ZK ON 🔐" : "Client-Side ZK OFF 🔓");
+  };
+}
+const toggleVisZk = $("#btnToggleClientZkVis");
+if (toggleVisZk) {
+  toggleVisZk.onclick = () => {
+    const inp = $("#s_client_zk_pass");
+    if (inp) inp.type = inp.type === "password" ? "text" : "password";
+  };
+}
+const passInputZk = $("#s_client_zk_pass");
+if (passInputZk) {
+  passInputZk.value = clientZkPass;
+  passInputZk.oninput = (e) => {
+    clientZkPass = e.target.value.trim();
+    sessionStorage.setItem("anbar-client-zk-pass", clientZkPass);
+  };
+}
 $("#saveBtn").onclick=async()=>{
   const dv=$("#s_def_view");
   if(dv&&dv.value!==viewMode){

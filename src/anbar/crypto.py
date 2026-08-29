@@ -184,3 +184,25 @@ def decrypt_gcm(encrypted_data: bytes, key: bytes) -> bytes:
         return out.raw[: out_len.value]
     finally:
         _libcrypto.EVP_CIPHER_CTX_free(ctx)
+
+
+MAGIC_CLIENT_ZK = b"ANBAR_ZK1"
+
+
+def client_zk_encrypt(data: bytes, password: str) -> bytes:
+    """Encrypt data client-side compatible format with PBKDF2 and AES-256-GCM."""
+    salt = os.urandom(16)
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100_000, 32)
+    # encrypt_gcm returns: nonce (12B) + tag (16B) + ciphertext
+    enc_payload = encrypt_gcm(data, key)
+    return MAGIC_CLIENT_ZK + salt + enc_payload
+
+
+def client_zk_decrypt(data: bytes, password: str) -> bytes:
+    """Decrypt client-side encrypted format."""
+    if not data.startswith(MAGIC_CLIENT_ZK) or len(data) < len(MAGIC_CLIENT_ZK) + 16 + 12 + 16:
+        raise ValueError("Invalid or corrupted client ZK payload")
+    salt = data[len(MAGIC_CLIENT_ZK) : len(MAGIC_CLIENT_ZK) + 16]
+    enc_payload = data[len(MAGIC_CLIENT_ZK) + 16 :]
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100_000, 32)
+    return decrypt_gcm(enc_payload, key)
