@@ -246,14 +246,29 @@ upload+download wall times are separate measurements):
 | `mtproto` | 16 MB | **729 s — 14.04 MB/s** | 1965 s — 5.21 MB/s | n/a | OK |
 | `bot` (single) | 16 MB | 1985 s — 5.16 MB/s (43× flood-wait) | ~31.5 MB/s (stream truncates without retry) | n/a | n/a |
 
-**Hybrid mode speed ladder (dual-bot pool @ 16 MB chunks):**
+**Hybrid mode speed ladder (v0.15.7 with Lookahead Prefetching & LRU Cache):**
 
-| Size | Upload (MTProto) | Download (Dual-Bot CDN) | Total Wall Time | SHA-256 |
-|------|-------------------|--------------------------|-----------------|---------|
-| 10 MB | 1.07 s — 9.33 MB/s | 1.24 s — 8.05 MB/s | 2.31 s | OK |
-| 100 MB | 8.44 s — 11.85 MB/s | 8.38 s — 11.93 MB/s | 16.82 s | OK |
-| 500 MB | 39.93 s — 12.52 MB/s | 59.16 s — 8.45 MB/s | 99.09 s | OK |
-| **10 GB** | **806.2 s — 12.70 MB/s** | **1204.9 s — 8.50 MB/s** | **2011.1 s (~33.5m)** | **OK** |
+Measured **2026-08-29** on running production deployment with [scripts/bench_hybrid_all.py](scripts/bench_hybrid_all.py) (Cache OFF, zero-disk streaming memory pipeline). Every row is SHA-256 verified end-to-end:
+
+| Size | Upload (MTProto) | Download (Hybrid Bot CDN + Prefetch) | Total Wall Time | SHA-256 |
+|------|-------------------|---------------------------------------|-----------------|---------|
+| 1 MB | 0.27 s — 3.69 MB/s | 0.62 s — 1.63 MB/s | 0.89 s | OK |
+| 8 MB | 0.73 s — 10.95 MB/s | 0.99 s — 8.11 MB/s | 1.72 s | OK |
+| 45 MB | 2.09 s — 21.52 MB/s | 3.62 s — 12.42 MB/s | 5.71 s | OK |
+| 100 MB | 6.80 s — 14.71 MB/s | 16.41 s — 6.09 MB/s | 23.21 s | OK |
+| 500 MB | 30.17 s — 16.57 MB/s | 59.82 s — 8.36 MB/s | 89.99 s | OK |
+| 1 GB | 62.21 s — 16.46 MB/s | 115.59 s — 8.86 MB/s | 177.80 s | OK |
+| 5 GB | 316.36 s — 16.18 MB/s | 556.60 s — 9.20 MB/s | 872.96 s (~14.5m) | OK |
+| **10 GB** | **627.16 s — 16.33 MB/s** | **1043.21 s — 9.82 MB/s** | **1670.36 s (~27.8m)** | **OK** |
+
+**Historical Performance Comparison (10 GB):**
+
+| Release / Backend | Upload Time & Speed | Download Time & Speed | Total 10 GB Time | Improvement vs Baseline |
+| :--- | :--- | :--- | :--- | :--- |
+| `v0.10.8 (Single Bot)` | 1950.5 s — 5.2 MB/s | 138.8 s (truncated stream) | ~2156 s (failed) | Baseline (FloodWaits) |
+| `v0.11.0 (MTProto Only)`| 909.0 s — 11.26 MB/s | 2626.0 s — 3.90 MB/s | 3535.0 s (58.9m) | +116% Upload, RTT-bound DL |
+| `v0.12.0 (Early Hybrid)`| 806.2 s — 12.70 MB/s | 1204.9 s — 8.50 MB/s | 2011.1 s (33.5m) | +144% Upload, +118% DL |
+| **`v0.15.7 (Optimized Hybrid)`** | **627.16 s — 16.33 MB/s** | **1043.21 s — 9.82 MB/s** | **1670.36 s (27.8m)** | **🚀 +214% Upload, +152% DL** |
 
 Take-away: **hybrid mode** combines the fast flood-free upload of MTProto (~12.7–14.0 MB/s) with real-time `BotHarvester` document harvesting (100% of chunks tagged with Bot API `file_id`s) and resilient multi-bot token pool CDN streaming. Adding a 2nd bot token instantly boosted 10 GB sustained download throughput from **4.54 MB/s to 8.50 MB/s** (cutting download time from 37.6m down to **20.1m**). The entire mechanism is dynamically toggleable via `POST /api/v1/admin/settings` with `{"hybrid_enabled": 1}`.
 
