@@ -38,3 +38,25 @@ def test_backup_and_system_stats(client: TestClient):
     assert data["status"] == "healthy"
     assert data["total_objects"] >= 1
     assert data["last_backup_time"] is not None
+
+    # 6. Test backup import / restore
+    backup_data = r_bk.content
+    r_imp = client.post(
+        "/api/v1/admin/backup/import",
+        files={"file": ("restore_test.db", io.BytesIO(backup_data), "application/vnd.sqlite3")},
+        headers=ADMIN,
+    )
+    assert r_imp.status_code == 200
+    imp_json = r_imp.json()
+    assert imp_json["status"] == "ok"
+    assert imp_json["restored"] is True
+    assert imp_json["objects_count"] >= 1
+
+    # 7. Test invalid backup import error handling
+    r_bad = client.post(
+        "/api/v1/admin/backup/import",
+        files={"file": ("corrupt.db", io.BytesIO(b"Not an sqlite db"), "application/octet-stream")},
+        headers=ADMIN,
+    )
+    assert r_bad.status_code == 400
+

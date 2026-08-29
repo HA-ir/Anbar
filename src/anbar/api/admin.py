@@ -10,7 +10,7 @@ import json
 import time
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .. import runtime
@@ -301,6 +301,25 @@ async def backup_push_telegram(request: Request):
         "file_id": ref.file_id,
         "message_id": ref.message_id,
     }
+
+
+@router.post("/admin/backup/import")
+async def backup_import(request: Request, file: UploadFile):
+    """Import and restore a binary SQLite database backup file (admin only)."""
+    require_admin(request)
+    db = request.app.state.db
+    content = await file.read()
+    try:
+        res = db.restore_bytes(content)
+        return {
+            "status": "ok",
+            "message": "Database restored successfully",
+            **res,
+        }
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(500, detail=f"Database restore failed: {e}") from e
 
 
 @router.get("/admin/system-stats")

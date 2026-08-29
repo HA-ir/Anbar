@@ -759,10 +759,14 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
         <div class="stat-box"><span class="title" data-i18n="statLastBk">آخرین پشتیبان</span><span class="val" id="statLastBkVal">-</span></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-ghost" id="btnDownloadBackup" type="button" style="flex:1;min-width:140px;font-size:12px">
-          💾 <span data-i18n="btnDlBackup">دانلود بکاپ دیتابیس</span>
+        <button class="btn btn-ghost" id="btnDownloadBackup" type="button" style="flex:1;min-width:130px;font-size:12px">
+          💾 <span data-i18n="btnDlBackup">دانلود بکاپ</span>
         </button>
-        <button class="btn btn-ghost" id="btnPushTgBackup" type="button" style="flex:1;min-width:140px;font-size:12px">
+        <button class="btn btn-ghost" id="btnImportBackup" type="button" style="flex:1;min-width:130px;font-size:12px">
+          📥 <span data-i18n="btnImportBackup">بازیابی و ایمپورت</span>
+        </button>
+        <input type="file" id="backupFileInput" accept=".db,application/vnd.sqlite3,application/octet-stream" style="display:none">
+        <button class="btn btn-ghost" id="btnPushTgBackup" type="button" style="width:100%;font-size:12px">
           ☁️ <span data-i18n="btnTgBackup">ارسال بکاپ به تلگرام</span>
         </button>
       </div>
@@ -954,7 +958,11 @@ const I18N={
   statFiles:"تعداد فایل‌ها",
   statBots:"بات‌های فعال",
   statLastBk:"آخرین پشتیبان",
-  btnDlBackup:"دانلود بکاپ دیتابیس",
+  btnDlBackup:"دانلود بکاپ",
+  btnImportBackup:"بازیابی و ایمپورت",
+  importBackupConfirm:"هشدار: تمام متادیتای فعلی با فایل پشتیبان جایگزین خواهد شد. آیا مطمئن هستید؟",
+  backupRestoredOk:"دیتابیس با موفقیت بازیابی شد",
+  importBackupBad:"فایل پشتیبان نامعتبر است",
   btnTgBackup:"ارسال بکاپ به تلگرام",
   backupSentOk:"نسخه پشتیبان با موفقیت در تلگرام ذخیره شد",
   quickCopyLink:"کپی لینک مستقیم",
@@ -1059,7 +1067,11 @@ const I18N={
   statFiles:"Total Files",
   statBots:"Active Bots",
   statLastBk:"Last Backup",
-  btnDlBackup:"Download DB Backup",
+  btnDlBackup:"Download Backup",
+  btnImportBackup:"Import & Restore",
+  importBackupConfirm:"Warning: All current metadata will be replaced with this backup. Are you sure you want to proceed?",
+  backupRestoredOk:"Database restored successfully",
+  importBackupBad:"Invalid backup database file",
   btnTgBackup:"Push Backup to Telegram",
   backupSentOk:"Database backup pushed to Telegram successfully",
   quickCopyLink:"Copy direct link",
@@ -2810,6 +2822,36 @@ $("#btnDownloadBackup").onclick=async()=>{
     URL.revokeObjectURL(url);
     toast(t("saved"));
   }catch(e){toast(e.message,"err");}
+};
+$("#btnImportBackup").onclick=()=>{
+  $("#backupFileInput").click();
+};
+$("#backupFileInput").onchange=async(e)=>{
+  const file=e.target.files&&e.target.files[0];
+  if(!file)return;
+  if(!confirm(t("importBackupConfirm"))) {
+    $("#backupFileInput").value="";
+    return;
+  }
+  toast(t("loading"));
+  const fd=new FormData();
+  fd.append("file", file, file.name);
+  try{
+    const res=await fetch("/api/v1/admin/backup/import",{
+      method:"POST",
+      headers:_apiKey?{"Authorization":"Bearer "+_apiKey}:{},
+      body:fd
+    });
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.detail||("HTTP "+res.status));
+    toast(t("backupRestoredOk"));
+    await loadSystemStats();
+    refresh();
+  }catch(err){
+    toast(err.message,"err");
+  }finally{
+    $("#backupFileInput").value="";
+  }
 };
 $("#btnPushTgBackup").onclick=async()=>{
   const btn=$("#btnPushTgBackup");

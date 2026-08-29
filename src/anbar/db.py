@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -403,6 +405,52 @@ class Database:
         data = mem_conn.serialize()
         mem_conn.close()
         return data
+
+    def restore_bytes(self, data: bytes) -> dict:
+        """Restore database from a binary SQLite backup snapshot atomically."""
+        if not data.startswith(b"SQLite format 3\x00"):
+            raise ValueError("Invalid backup file: header is not a valid SQLite database.")
+
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tf:
+            tf.write(data)
+            tmp_path = tf.name
+
+        try:
+            src_conn = sqlite3.connect(tmp_path)
+            check = src_conn.execute("PRAGMA integrity_check").fetchone()
+            if not check or check[0] != "ok":
+                raise ValueError(f"Corrupted backup database: {check}")
+
+            tables = {
+                row[0]
+                for row in src_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            required = {"objects", "kv"}
+            if not required.issubset(tables):
+                raise ValueError(f"Missing required tables in backup: {required - tables}")
+
+            n_objs = src_conn.execute("SELECT count(*) FROM objects").fetchone()[0]
+
+            # Atomic copy to active live database
+            src_conn.backup(self._conn)
+            src_conn.close()
+
+            # Re-apply WAL & performance pragmas
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA busy_timeout=5000")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA mmap_size=268435456")
+            self._conn.execute("PRAGMA cache_size=-64000")
+            self._conn.execute("PRAGMA temp_store=MEMORY")
+            return {
+                "restored": True,
+                "objects_count": n_objs,
+            }
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
 
     def close(self) -> None:
         self._conn.close()
