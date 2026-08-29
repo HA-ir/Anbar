@@ -396,5 +396,13 @@ class Database:
     def vacuum(self) -> None:
         self._conn.execute("VACUUM")
 
+    def backup_bytes(self) -> bytes:
+        """Create a consistent, point-in-time binary snapshot of the SQLite WAL database."""
+        mem_conn = sqlite3.connect(":memory:")
+        self._conn.backup(mem_conn)
+        data = mem_conn.serialize()
+        mem_conn.close()
+        return data
+
     def close(self) -> None:
         self._conn.close()

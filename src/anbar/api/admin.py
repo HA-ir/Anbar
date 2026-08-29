@@ -10,7 +10,7 @@ import json
 import time
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .. import runtime
@@ -265,6 +265,73 @@ async def export_metadata(request: Request, format: str = "json"):
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="anbar-objects.json"'},
     )
+
+
+@router.get("/admin/backup")
+async def backup_download(request: Request):
+    """Download consistent SQLite database binary backup (admin only)."""
+    require_admin(request)
+    db = request.app.state.db
+    data = db.backup_bytes()
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    filename = f"anbar_backup_{ts}.db"
+    return Response(
+        content=data,
+        media_type="application/vnd.sqlite3",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/admin/backup/telegram")
+async def backup_push_telegram(request: Request):
+    """Push consistent SQLite database backup directly to Telegram storage channel."""
+    require_admin(request)
+    db = request.app.state.db
+    backend = request.app.state.backend
+    data = db.backup_bytes()
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    name = f"backup_{ts}.db"
+    ref = await backend.store(data, name)
+    db.kv_set("last_backup_time", str(int(time.time())))
+    db.kv_set("last_backup_ref", ref.file_id)
+    return {
+        "status": "ok",
+        "backup_time": int(time.time()),
+        "size": len(data),
+        "file_id": ref.file_id,
+        "message_id": ref.message_id,
+    }
+
+
+@router.get("/admin/system-stats")
+async def system_stats_get(request: Request):
+    """Comprehensive telemetry and health stats for Admin Dashboard."""
+    require_admin(request)
+    db = request.app.state.db
+    s = request.app.state.settings
+    rows = db.list_objects(limit=1000)
+    total_bytes = sum(r.get("size", 0) for r in rows)
+    total_dl = sum(r.get("downloaded", 0) for r in rows)
+    backend_str = s.backend.value if hasattr(s.backend, "value") else str(s.backend)
+    tokens_count = len(getattr(s, "bot_tokens", []))
+    last_backup_ts = db.kv_get("last_backup_time")
+    enc_default = 1 if getattr(s, "encryption_enabled", True) else 0
+    hyb_default = 1 if getattr(s, "hybrid_enabled", False) else 0
+    encryption_on = bool(runtime.get_int(db, "encryption_enabled", enc_default))
+    hybrid_on = bool(runtime.get_int(db, "hybrid_enabled", hyb_default))
+
+    return {
+        "status": "healthy",
+        "version": getattr(request.app, "version", "0.14.2"),
+        "backend": "hybrid" if (backend_str == "mtproto" and hybrid_on) else backend_str,
+        "total_objects": len(rows),
+        "total_bytes": total_bytes,
+        "total_downloads": total_dl,
+        "bot_tokens_count": tokens_count,
+        "encryption_enabled": encryption_on,
+        "hybrid_enabled": hybrid_on,
+        "last_backup_time": int(last_backup_ts) if last_backup_ts else None,
+    }
 
 
 # ── API key management (v0.8.7) ──────────────────────────────────────────────

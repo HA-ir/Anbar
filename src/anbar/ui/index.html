@@ -334,6 +334,24 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 .fm-preview pre{width:100%;max-height:360px;overflow:auto;padding:14px;margin:0;font-size:12px;
   font-family:ui-monospace,Menlo,Consolas,monospace;direction:ltr;text-align:left;white-space:pre-wrap;
   word-break:break-all;color:var(--tx);background:transparent}
+/* Code syntax highlighting & line numbers */
+.code-wrap{width:100%;position:relative;background:#1e1e2e;border-radius:10px;border:1px solid rgba(255,255,255,0.1);max-height:380px;display:flex;flex-direction:column;overflow:hidden;direction:ltr;text-align:left;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5}
+.code-header{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#181825;border-bottom:1px solid rgba(255,255,255,0.08);color:#a6adc8;font-size:11px}
+.code-body{padding:10px 12px;display:flex;overflow:auto;flex:1}
+.code-lines{user-select:none;color:#585b70;text-align:right;padding-right:12px;margin-right:12px;border-right:1px solid #313244;flex:none}
+.code-content{flex:1;white-space:pre;color:#cdd6f4;tab-size:2}
+.token-kw{color:#cba6f7;font-weight:600}
+.token-str{color:#a6e3a1}
+.token-num{color:#fab387}
+.token-cmt{color:#6c7086;font-style:italic}
+.token-fn{color:#89b4fa}
+.token-key{color:#f38ba8;font-weight:600}
+.token-bool{color:#f9e2af;font-weight:600}
+/* System stats telemetry card */
+.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+.stat-box{background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:9px 11px;display:flex;flex-direction:column}
+.stat-box .title{font-size:11px;color:var(--tx3);margin-bottom:3px}
+.stat-box .val{font-size:13.5px;font-weight:700;color:var(--tx);direction:ltr}
 .fm-preview.audio{flex-direction:column;gap:10px;padding:22px 16px}
 .fm-preview.audio svg{width:34px;height:34px;fill:none;stroke:var(--brand);stroke-width:1.7;stroke-linecap:round}
 .fm-preview.audio audio{width:100%}
@@ -730,6 +748,25 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
         <input type="number" min="1" max="49" id="s_tg_chunk_size" style="direction:ltr;width:80px">
       </div>
     </div>
+
+    <!-- Backup & System Health (v0.15.0) -->
+    <div class="sec">
+      <h3 data-i18n="secBackup">پشتیبان‌گیری و سلامت سیستم</h3>
+      <div class="stat-grid">
+        <div class="stat-box"><span class="title" data-i18n="statStorage">حجم کل ذخیره</span><span class="val" id="statStorageVal">-</span></div>
+        <div class="stat-box"><span class="title" data-i18n="statFiles">تعداد فایل‌ها</span><span class="val" id="statFilesVal">-</span></div>
+        <div class="stat-box"><span class="title" data-i18n="statBots">بات‌های فعال</span><span class="val" id="statBotsVal">-</span></div>
+        <div class="stat-box"><span class="title" data-i18n="statLastBk">آخرین پشتیبان</span><span class="val" id="statLastBkVal">-</span></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost" id="btnDownloadBackup" type="button" style="flex:1;min-width:140px;font-size:12px">
+          💾 <span data-i18n="btnDlBackup">دانلود بکاپ دیتابیس</span>
+        </button>
+        <button class="btn btn-ghost" id="btnPushTgBackup" type="button" style="flex:1;min-width:140px;font-size:12px">
+          ☁️ <span data-i18n="btnTgBackup">ارسال بکاپ به تلگرام</span>
+        </button>
+      </div>
+    </div>
   </div>
   <div class="drawer-foot">
     <button class="btn btn-primary" style="width:auto" id="saveBtn" data-i18n="save">ذخیره</button>
@@ -912,6 +949,16 @@ const I18N={
   files:"فایل‌ها", refresh:"به‌روزرسانی",
   thName:"نام فایل", thSize:"حجم", thItems:"تعداد فایل‌ها", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
   secTgConfig:"پیکربندی تلگرام و متغیرها (.env)",
+  secBackup:"پشتیبان‌گیری و سلامت سیستم",
+  statStorage:"حجم کل ذخیره",
+  statFiles:"تعداد فایل‌ها",
+  statBots:"بات‌های فعال",
+  statLastBk:"آخرین پشتیبان",
+  btnDlBackup:"دانلود بکاپ دیتابیس",
+  btnTgBackup:"ارسال بکاپ به تلگرام",
+  backupSentOk:"نسخه پشتیبان با موفقیت در تلگرام ذخیره شد",
+  quickCopyLink:"کپی لینک مستقیم",
+  copyCode:"کپی کد",
   openTgApp:"باز کردن ↗",
   newFolder:"پوشه جدید",
   newFolderPrompt:"نام پوشه جدید را وارد کنید:",
@@ -1007,6 +1054,16 @@ const I18N={
   files:"Files", refresh:"Refresh",
   thName:"File name", thSize:"Size", thItems:"Items", thDate:"Date", thDl:"Downloads", thAct:"Actions",
   secTgConfig:"Telegram & MTProto Config (.env)",
+  secBackup:"System Backup & Health",
+  statStorage:"Total Stored",
+  statFiles:"Total Files",
+  statBots:"Active Bots",
+  statLastBk:"Last Backup",
+  btnDlBackup:"Download DB Backup",
+  btnTgBackup:"Push Backup to Telegram",
+  backupSentOk:"Database backup pushed to Telegram successfully",
+  quickCopyLink:"Copy direct link",
+  copyCode:"Copy code",
   openTgApp:"Open ↗",
   newFolder:"New folder",
   newFolderPrompt:"Enter new folder name:",
@@ -1498,6 +1555,7 @@ function renderRows(){
           +'<button class="act" data-a="fold-copy" title="'+esc(t("foldCopyT"))+'"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
           +'<button class="act del" data-a="fold-del" title="'+esc(t("foldDelT"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
         : '<button class="act" data-a="dl" title="'+esc(t("download"))+'"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
+          +'<button class="act" data-a="cp" title="'+esc(t("quickCopyLink"))+'"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
           +'<button class="act" data-a="rn" title="'+esc(t("renameT"))+'">'+RN_ICON+'</button>'
           +'<button class="act" data-a="mv" title="'+esc(t("moveTitle"))+'">'+MV_ICON+'</button>'
           +'<button class="act" data-a="ln" title="'+esc(t("linkT"))+'"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>'
@@ -1576,6 +1634,12 @@ function renderRows(){
         toast(t("dlStart"));
         const a=document.createElement("a");
         a.href="/f/"+o.id;document.body.appendChild(a);a.click();a.remove();
+      };
+      const cpBtn=tr.querySelector('[data-a=cp]');
+      if(cpBtn)cpBtn.onclick=(e)=>{
+        e.stopPropagation();
+        copyText(location.origin+"/f/"+o.id);
+        toast(t("copied"));
       };
       tr.querySelector('[data-a=rn]').onclick=(e)=>{
         e.stopPropagation();
@@ -1720,6 +1784,7 @@ function renderGallery(list){
         +'<button class="act" data-a="fold-copy" title="'+esc(t("foldCopyT"))+'"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
         +'<button class="act del" data-a="del" title="'+esc(t("foldDelT"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
       : '<button class="act" data-a="dl" title="'+esc(t("download"))+'"><svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg></button>'
+        +'<button class="act" data-a="cp" title="'+esc(t("quickCopyLink"))+'"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
         +'<button class="act" data-a="rn" title="'+esc(t("renameT"))+'">'+RN_ICON+'</button>'
         +'<button class="act" data-a="mv" title="'+esc(t("moveTitle"))+'">'+MV_ICON+'</button>'
         +'<button class="act" data-a="ln" title="'+esc(t("linkT"))+'"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>'
@@ -1733,6 +1798,8 @@ function renderGallery(list){
       cell.draggable=true;
       cell.ondragstart=e=>{e.dataTransfer.setData("text/plain",o.id);};
       cell.querySelector('[data-a=dl]').onclick=()=>{toast(t("dlStart"));const a=document.createElement("a");a.href=url;document.body.appendChild(a);a.click();a.remove();};
+      const cpBtn=cell.querySelector('[data-a=cp]');
+      if(cpBtn)cpBtn.onclick=(e)=>{e.stopPropagation();copyText(location.origin+"/f/"+o.id);toast(t("copied"));};
       cell.querySelector('[data-a=rn]').onclick=(e)=>{e.stopPropagation();renameObj(o);};
       cell.querySelector('[data-a=mv]').onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename||o.id);};
       cell.querySelector('[data-a=ln]').onclick=()=>openShareOpts(o);
@@ -2089,6 +2156,38 @@ async function renameObj(o){
     toast(t("renameOk"));refresh();
   }catch(e){toast(e.message,"err");}
 }
+function highlightCode(raw, ext) {
+  const cleanExt = (ext || "").toLowerCase();
+  const lines = raw.split(/\r?\n/);
+  const lineNums = lines.map((_, i) => i + 1).join("\n");
+  let formatted = esc(raw);
+
+  if (cleanExt === "json") {
+    formatted = formatted
+      .replace(/(&quot;.*?&quot;)(?=\s*:)/g, '<span class="token-key">$1</span>')
+      .replace(/(:\s*)(&quot;.*?&quot;)/g, '$1<span class="token-str">$2</span>')
+      .replace(/\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b/g, '<span class="token-num">$1</span>')
+      .replace(/\b(true|false|null)\b/g, '<span class="token-bool">$1</span>');
+  } else {
+    formatted = formatted.replace(/(#[^\n]*|\/\/[^\n]*|\/\*[\s\S]*?\*\/)/g, '<span class="token-cmt">$1</span>');
+    formatted = formatted.replace(/(&quot;.*?&quot;|&#39;.*?&#39;|`.*?`)/g, '<span class="token-str">$1</span>');
+    formatted = formatted.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="token-num">$1</span>');
+    const kwRegex = /\b(def|class|return|import|from|as|async|await|try|except|finally|raise|if|elif|else|for|while|in|not|and|or|is|lambda|with|yield|function|const|let|var|switch|case|break|continue|throw|catch|interface|type|extends|implements|public|private|static|select|insert|update|delete|where|group|order|by|table|database|true|false|null|None|True|False)\b/g;
+    formatted = formatted.replace(kwRegex, '<span class="token-kw">$1</span>');
+  }
+
+  return '<div class="code-wrap">'
+    + '<div class="code-header">'
+    + '<span>' + esc((cleanExt || "code").toUpperCase()) + ' (' + lines.length + ' lines)</span>'
+    + '<button class="btn btn-ghost" type="button" style="padding:2px 8px;font-size:11px;height:24px" id="copyCodeBtn">' + t('copyCode') + '</button>'
+    + '</div>'
+    + '<div class="code-body">'
+    + '<div class="code-lines">' + lineNums + '</div>'
+    + '<div class="code-content">' + formatted + '</div>'
+    + '</div>'
+    + '</div>';
+}
+
 /* file detail modal */
 function extOf(name){const m=/\.([a-z0-9]{1,5})$/i.exec(name||"");return m?m[1].toLowerCase():"";}
 function mediaKind(o){
@@ -2151,7 +2250,9 @@ async function openFileModal(o){
       const res=await fetch(url,{headers:_apiKey?{"Authorization":"Bearer "+_apiKey}:{}});
       if(res.ok){
         const txt=await res.text();
-        pv.innerHTML='<pre>'+esc(txt.slice(0, 10000))+(txt.length>10000?'\n... [truncated]':'')+'</pre>';
+        pv.innerHTML=highlightCode(txt.slice(0, 15000), extOf(o.filename));
+        const btn=pv.querySelector("#copyCodeBtn");
+        if(btn)btn.onclick=()=>{copyText(txt);toast(t("copied"));};
       }else{
         pv.innerHTML='<div class="fm-fallback">TEXT</div>';
       }
@@ -2681,8 +2782,45 @@ async function loadSettings(){
     $("#s_session_ttl_h").value=Math.round(v("web_session_ttl")/3600);
     $("#s_cache_mb").value=v("cache_mb");
     await loadTelegramConfig();
+    await loadSystemStats();
   }catch(e){toast(e.message,"err");}
 }
+async function loadSystemStats(){
+  try{
+    const st=await api("/api/v1/admin/system-stats");
+    if($("#statStorageVal"))$("#statStorageVal").textContent=humanSize(st.total_bytes);
+    if($("#statFilesVal"))$("#statFilesVal").textContent=st.total_objects;
+    if($("#statBotsVal"))$("#statBotsVal").textContent=st.bot_tokens_count;
+    if($("#statLastBkVal")){
+      $("#statLastBkVal").textContent=st.last_backup_time ? humanDate(new Date(st.last_backup_time*1000).toISOString()) : "—";
+    }
+  }catch(e){}
+}
+$("#btnDownloadBackup").onclick=async()=>{
+  toast(t("loading"));
+  try{
+    const res=await fetch("/api/v1/admin/backup",{headers:_apiKey?{"Authorization":"Bearer "+_apiKey}:{}});
+    if(!res.ok)throw new Error("HTTP "+res.status);
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download="anbar_backup_"+new Date().toISOString().slice(0,10)+".db";
+    document.body.appendChild(a);a.click();a.remove();
+    URL.revokeObjectURL(url);
+    toast(t("saved"));
+  }catch(e){toast(e.message,"err");}
+};
+$("#btnPushTgBackup").onclick=async()=>{
+  const btn=$("#btnPushTgBackup");
+  btn.disabled=true;btn.style.opacity=".5";
+  try{
+    await api("/api/v1/admin/backup/telegram",{method:"POST"});
+    toast(t("backupSentOk"));
+    loadSystemStats();
+  }catch(e){toast(e.message,"err");}
+  finally{btn.disabled=false;btn.style.opacity="";}
+};
 function syncHashToggleBtn(){
   const btn=$("#s_tg_hash_toggle");
   const inp=$("#s_tg_api_hash");

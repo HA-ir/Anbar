@@ -1,0 +1,40 @@
+from __future__ import annotations
+
+import io
+
+from starlette.testclient import TestClient
+
+ADMIN = {"Authorization": "Bearer test-admin-key"}
+
+
+def test_backup_and_system_stats(client: TestClient):
+    # 1. Login
+    client.post("/ui/login", json={"key": "test-admin-key"})
+
+    # 2. Upload a sample file
+    r_up = client.post(
+        "/api/v1/upload",
+        files={"file": ("test_doc.txt", io.BytesIO(b"Hello world"), "text/plain")},
+        headers=ADMIN,
+    )
+    assert r_up.status_code == 200
+
+    # 3. Test backup download
+    r_bk = client.get("/api/v1/admin/backup", headers=ADMIN)
+    assert r_bk.status_code == 200
+    assert len(r_bk.content) > 0
+    assert "attachment; filename=\"anbar_backup_" in r_bk.headers.get("content-disposition", "")
+
+    # 4. Test backup push to telegram
+    r_tg = client.post("/api/v1/admin/backup/telegram", headers=ADMIN)
+    assert r_tg.status_code == 200
+    assert r_tg.json()["status"] == "ok"
+    assert "file_id" in r_tg.json()
+
+    # 5. Test system stats
+    r_st = client.get("/api/v1/admin/system-stats", headers=ADMIN)
+    assert r_st.status_code == 200
+    data = r_st.json()
+    assert data["status"] == "healthy"
+    assert data["total_objects"] >= 1
+    assert data["last_backup_time"] is not None
