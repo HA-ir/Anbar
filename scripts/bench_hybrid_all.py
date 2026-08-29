@@ -129,10 +129,8 @@ def benchmark_size(size_bytes: int, key: str, client: httpx.Client) -> dict:
                 pct = (dl_bytes / size_bytes) * 100
                 mb_so_far = dl_bytes / MB
                 el = now - t0_dl
-                print(
-                    f"[{tag}] Progress: {pct:5.1f}% ({mb_so_far:.1f} MB in {el:.1f}s — {cur_s:.1f} MB/s)",
-                    flush=True,
-                )
+                prg_msg = f"[{tag}] Progress: {pct:5.1f}% ({mb_so_far:.1f} MB in {el:.1f}s — {cur_s:.1f} MB/s)"
+                print(prg_msg, flush=True)
                 last_log = now
 
     t_dl = time.monotonic() - t0_dl
