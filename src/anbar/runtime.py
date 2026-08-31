@@ -35,6 +35,8 @@ SPEC = {
     "encryption_enabled": (0, 1),
     # auto daily database backup to telegram: 0 = disabled, 1 = enabled
     "auto_backup_enabled": (0, 1),
+    # PERF-01: RAM budget (MB) for the per-chunk seek micro cache; 0 = off
+    "seek_cache_mb": (0, 512),
 }
 
 

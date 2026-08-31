@@ -48,6 +48,15 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
             await app.state.backend.connect()
         app.state.cache = _build_cache(settings, db)
 
+        # PERF-01: RAM-only micro cache for chunk re-fetches during seeking
+        from . import runtime
+        from .cache import ChunkMicroCache
+
+        seek_mb = runtime.get_int(db, "seek_cache_mb", settings.seek_cache_mb)
+        app.state.chunk_cache = (
+            ChunkMicroCache(seek_mb * 1024 * 1024) if seek_mb > 0 else None
+        )
+
         # ARCH-02: durable job queue (jobs table in the same SQLite DB)
         from .jobqueue import JobQueue
 
@@ -170,6 +179,9 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
             await app.state.bot_pool.close()
         if app.state.cache is not None:
             app.state.cache.close()
+        cc = getattr(app.state, "chunk_cache", None)
+        if cc is not None:
+            cc.close()
         db.close()
         if not injected:
             await app.state.backend.close()

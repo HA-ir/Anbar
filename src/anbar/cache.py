@@ -141,3 +141,85 @@ async def iter_range(path: str, start: int, n: int):
         yield await asyncio.to_thread(_read, pos, take)
         pos += take
         n -= take
+
+
+# ── PERF-01: per-chunk micro cache (seek accelerator) ─────────────────────
+
+
+class ChunkMicroCache:
+    """Tiny in-RAM LRU of the most recently fetched chunks (PERF-01).
+
+    Media players seek constantly; without this every seek into an already-
+    visited chunk re-downloads the whole 16MB blob from Telegram. This cache
+    holds the last few chunks as raw bytes so repeated seeks within a
+    playback window are served from memory.
+
+    Deliberately separate from :class:`DiskLRU` (the whole-object cache):
+    - keyed by (object_id, chunk_index), holding ONE chunk (~16MB max)
+    - short TTL (default 120s) — pure seek accelerator, not a retention layer
+    - RAM-only, bounded by a small budget (default 32MB ≈ 2 chunks)
+    - a chunk bigger than the whole budget is never admitted
+    - zero disk writes: the zero-retention promise is untouched
+    """
+
+    def __init__(self, max_bytes: int, ttl_s: float = 120.0) -> None:
+        self._max_bytes = max(0, max_bytes)
+        self._ttl_s = ttl_s
+        self._entries: OrderedDict[tuple[str, int], tuple[bytes, float]] = OrderedDict()
+        self._bytes = 0
+        # stats (cumulative, for /admin/status observability)
+        self.hits = 0
+        self.misses = 0
+
+    def enabled(self) -> bool:
+        return self._max_bytes > 0
+
+    def get(self, obj_id: int | str, index: int) -> bytes | None:
+        """Return the cached chunk bytes, or None on miss/expiry."""
+        key = (obj_id, index)
+        e = self._entries.get(key)
+        if e is None:
+            self.misses += 1
+            return None
+        data, at = e
+        if (time.time() - at) > self._ttl_s:  # expired — treat as a miss
+            self._entries.pop(key, None)
+            self._bytes -= len(data)
+            self.misses += 1
+            return None
+        self._entries.move_to_end(key)  # LRU touch
+        self.hits += 1
+        return data
+
+    def put(self, obj_id: int | str, index: int, data: bytes) -> None:
+        """Admit a fetched chunk. Oversized chunks are silently dropped."""
+        if not self.enabled() or len(data) > self._max_bytes:
+            return
+        key = (obj_id, index)
+        old = self._entries.pop(key, None)
+        if old is not None:
+            self._bytes -= len(old[0])
+        self._evict_for(len(data))
+        self._entries[key] = (data, time.time())
+        self._bytes += len(data)
+
+    def remove_object(self, obj_id: str) -> None:
+        """Drop every chunk of one object (delete/purge path)."""
+        for key in [k for k in self._entries if k[0] == obj_id]:
+            data, _at = self._entries.pop(key)
+            self._bytes -= len(data)
+
+    def size(self) -> int:
+        return self._bytes
+
+    def count(self) -> int:
+        return len(self._entries)
+
+    def close(self) -> None:
+        self._entries.clear()
+        self._bytes = 0
+
+    def _evict_for(self, need: int) -> None:
+        while self._entries and self._bytes + need > self._max_bytes:
+            _key, (data, _at) = self._entries.popitem(last=False)
+            self._bytes -= len(data)

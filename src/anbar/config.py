@@ -88,6 +88,9 @@ class Settings(BaseSettings):
     # auto daily database backup to telegram (v0.15.0)
     auto_backup_enabled: bool = True
 
+    # PERF-01: RAM budget (MB) for the per-chunk seek micro cache; 0 = off
+    seek_cache_mb: int = Field(default=32, ge=0)
+
     @property
     def bot_tokens(self) -> list[str]:
         """List of all available bot tokens (pool)."""

@@ -45,6 +45,7 @@ def _env_defaults(s) -> dict[str, int]:
         "hybrid_bot_timeout_ms": int(getattr(s, "hybrid_bot_timeout_s", 1.5) * 1000),
         "encryption_enabled": 0,
         "auto_backup_enabled": 1 if getattr(s, "auto_backup_enabled", True) else 0,
+        "seek_cache_mb": getattr(s, "seek_cache_mb", 32),
     }
 
 
@@ -55,6 +56,7 @@ async def status(request: Request):
     backend = request.app.state.backend
     cache = getattr(request.app.state, "cache", None)
     cache_mb = runtime.get_int(db, "cache_mb", s.cache_max_mb)
+    cc = getattr(request.app.state, "chunk_cache", None)
     return {
         "status": "ok",
         "backend": getattr(backend, "name", s.backend.value),
@@ -68,6 +70,18 @@ async def status(request: Request):
                 "entries": cache.count(),
                 "bytes": cache.size(),
                 "max_bytes": cache_mb * 1024 * 1024,
+            }
+        ),
+        # PERF-01: seek micro cache observability (hits/misses since boot)
+        "chunk_cache": (
+            {"enabled": False}
+            if cc is None
+            else {
+                "enabled": True,
+                "entries": cc.count(),
+                "bytes": cc.size(),
+                "hits": cc.hits,
+                "misses": cc.misses,
             }
         ),
         # master switch from .env — UI shows "disabled" when false
@@ -113,6 +127,8 @@ async def settings_update(request: Request):
             raise HTTPException(422, str(e)) from None
     if "cache_mb" in changed:
         _sync_cache(request.app, db)
+    if "seek_cache_mb" in changed:
+        _sync_chunk_cache(request.app, db)
     if "mtproto_export_conns" in changed:
         backend = request.app.state.backend
         if hasattr(backend, "set_export_conns"):
@@ -136,6 +152,21 @@ def _sync_cache(app, db) -> None:
     app.state.cache = (
         DiskLRU(s.cache_dir, cache_mb * 1024 * 1024) if s.cache_enabled and cache_mb else None
     )
+
+
+def _sync_chunk_cache(app, db) -> None:
+    """PERF-01: (re)build or tear down the RAM chunk micro cache live.
+
+    Mirrors the ``seek_cache_mb`` runtime override without a restart.
+    """
+    from ..cache import ChunkMicroCache
+
+    s = app.state.settings
+    seek_mb = runtime.get_int(db, "seek_cache_mb", getattr(s, "seek_cache_mb", 32))
+    old = getattr(app.state, "chunk_cache", None)
+    if old is not None:
+        old.close()
+    app.state.chunk_cache = ChunkMicroCache(seek_mb * 1024 * 1024) if seek_mb > 0 else None
 
 
 @router.post("/admin/settings/reset")

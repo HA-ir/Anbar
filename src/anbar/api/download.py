@@ -435,7 +435,20 @@ async def download(request: Request, obj_id: str):
     )
     bot_timeout_s = max(0.2, bot_timeout_ms / 1000.0)
 
-    async def _fetch_chunk_bytes(chunk_obj) -> bytes:
+    chunk_cache = getattr(request.app.state, "chunk_cache", None)
+
+    async def _fetch_chunk_bytes(chunk_obj, cache_key: tuple[str, int] | None = None) -> bytes:
+        # PERF-01: serve repeated chunk fetches (media seeking) from RAM
+        if chunk_cache is not None and cache_key is not None:
+            hit = chunk_cache.get(cache_key[0], cache_key[1])
+            if hit is not None:
+                return hit
+        data = await _fetch_chunk_bytes_uncached(chunk_obj)
+        if chunk_cache is not None and cache_key is not None:
+            chunk_cache.put(cache_key[0], cache_key[1], data)
+        return data
+
+    async def _fetch_chunk_bytes_uncached(chunk_obj) -> bytes:
         # If hybrid mode is active and we have a bot_file_id and bot_provider, try Bot CDN first
         if hybrid_on and bot_provider is not None and chunk_obj.bot_file_id:
             try:
@@ -476,7 +489,9 @@ async def download(request: Request, obj_id: str):
             try:
                 with open(tmp, "wb") as out:
                     for idx, off, n in segments:
-                        chunk = await _fetch_chunk_bytes(manifest.chunks[idx])
+                        chunk = await _fetch_chunk_bytes(
+                            manifest.chunks[idx], (obj_id, idx)
+                        )
                         part = chunk[off : off + n]
                         out.write(part)
                         size += len(part)
@@ -497,7 +512,7 @@ async def download(request: Request, obj_id: str):
         SLICE = 128 * 1024
         if len(segments) <= 1:
             for idx, off, n in segments:
-                chunk = await _fetch_chunk_bytes(manifest.chunks[idx])
+                chunk = await _fetch_chunk_bytes(manifest.chunks[idx], (obj_id, idx))
                 mv = memoryview(chunk)[off : off + n]
                 for i in range(0, len(mv), SLICE):
                     yield bytes(mv[i : i + SLICE])
@@ -512,7 +527,9 @@ async def download(request: Request, obj_id: str):
                     if target_i < len(segments) and target_i not in tasks:
                         t_idx = segments[target_i][0]
                         tasks[target_i] = asyncio.create_task(
-                            _fetch_chunk_bytes(manifest.chunks[t_idx])
+                            _fetch_chunk_bytes(
+                                manifest.chunks[t_idx], (obj_id, t_idx)
+                            )
                         )
 
             try:
@@ -521,7 +538,9 @@ async def download(request: Request, obj_id: str):
                     if seg_i in tasks:
                         chunk = await tasks.pop(seg_i)
                     else:
-                        chunk = await _fetch_chunk_bytes(manifest.chunks[idx])
+                        chunk = await _fetch_chunk_bytes(
+                            manifest.chunks[idx], (obj_id, idx)
+                        )
 
                     _ensure_prefetch(seg_i)
 
@@ -709,6 +728,9 @@ async def delete(request: Request, obj_id: str, purge: bool = False):
             cache = getattr(request.app.state, "cache", None)
             if cache is not None:
                 cache.remove(obj_id)
+            cc = getattr(request.app.state, "chunk_cache", None)
+            if cc is not None:
+                cc.remove_object(obj_id)
             return {"trashed": True, "id": obj_id, "restore_within_s": Database.TRASH_TTL_S}
         # already trashed → fall through to a real purge (idempotent UI)
 
@@ -720,6 +742,9 @@ async def delete(request: Request, obj_id: str, purge: bool = False):
     cache = getattr(request.app.state, "cache", None)
     if cache is not None:
         cache.remove(obj_id)
+    cc = getattr(request.app.state, "chunk_cache", None)
+    if cc is not None:
+        cc.remove_object(obj_id)
     # PERF-03: the derived thumbnail is garbage once the object is gone
     from .. import thumbs
 
