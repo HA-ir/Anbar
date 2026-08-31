@@ -69,7 +69,13 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
             await app.state.harvester.start()
 
         async def _prune_rate_loop() -> None:
-            """Drop finished rate windows so the table doesn't grow forever."""
+            """Drop finished rate windows + stale resume checkpoints.
+
+            - rate windows: table grows forever if this loop dies (v0.15.16)
+            - upres:* resume checkpoints: cleaned on commit since v0.15.20,
+              but uploads abandoned mid-flight leave orphans behind — drop
+              any older than 24h (the documented checkpoint lifetime).
+            """
             while True:
                 await asyncio.sleep(600)
                 try:
@@ -79,6 +85,18 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
                 except Exception:
                     # transient errors (e.g. db busy) must not kill the loop —
                     # a dead prune loop lets the rate_windows table grow forever
+                    continue
+                try:
+                    db.kv_prune_prefix("upres:", max_age_s=86400)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    continue
+                try:
+                    db.audit_prune()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
                     continue
 
         async def _auto_backup_loop() -> None:
@@ -134,6 +152,23 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
 
     app = FastAPI(title="anbar", version=__version__, lifespan=lifespan)
     app.state.settings = settings
+
+    # PERF-02 (v0.15.20): compress text responses > 1KB (the 210KB dashboard
+    # is ~52KB gzipped). Object downloads (/f/, /s3/) are excluded: they are
+    # already-compressed binary media streamed with Content-Length, and
+    # gzipping them strips the header the range/player logic relies on.
+    from fastapi.middleware.gzip import GZipMiddleware
+
+    class _SelectiveGZip(GZipMiddleware):
+        async def __call__(self, scope, receive, send):
+            if scope["type"] == "http":
+                path = scope.get("path", "")
+                if path.startswith("/f/") or path.startswith("/s3/"):
+                    await self.app(scope, receive, send)
+                    return
+            await super().__call__(scope, receive, send)
+
+    app.add_middleware(_SelectiveGZip, minimum_size=1000)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():

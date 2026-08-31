@@ -712,7 +712,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     <div class="sec">
       <h3 data-i18n="secCrypto">امنیت و رمزنگاری</h3>
       <div class="set-row">
-        <div class="lab"><span data-i18n="encLab">رمزنگاری سرتاسری (AES-256-GCM)</span><small data-i18n="encSub">رمزنگاری چانک‌ها قبل از ارسال به تلگرام (Zero-Knowledge)</small></div>
+        <div class="lab"><span data-i18n="encLab">رمزنگاری caption و متادیتا (AES-256-GCM)</span><small data-i18n="encSub">رمزنگاری کپشن چانک‌ها روی تلگرام — خود فایل‌ها رمز نمی‌شوند؛ برای رمز واقعی، Client ZK را فعال کنید</small></div>
         <div class="sw" id="swEnc" role="switch"><i></i></div>
       </div>
       <div class="set-row col" style="gap:8px">
@@ -1172,7 +1172,7 @@ const I18N={
   empty:"هنوز فایلی آپلود نکرده‌ای",
   setT:"تنظیمات ادمین", secAuth:"احراز هویت", secRate:"محدودیت سرعت (در دقیقه)",
  secS3:"سرویس S3 و تلگرام", s3Endpoint:"اندپوینت S3", tgAppEndpoint:"مینی‌اپ تلگرام",
- secCrypto:"امنیت و رمزنگاری", encLab:"رمزنگاری سرتاسری (AES-256-GCM)", encSub:"رمزنگاری چانک‌ها قبل از ارسال به تلگرام (Zero-Knowledge)",
+ secCrypto:"امنیت و رمزنگاری", encLab:"رمزنگاری caption و متادیتا (AES-256-GCM)", encSub:"رمزنگاری کپشن چانک‌ها روی تلگرام — خود فایل‌ها رمز نمی‌شوند؛ برای رمز واقعی، Client ZK را فعال کنید",
   secretKeyLab:"کلید مخفی اشتقاق رمزنگاری و امضا (Secret)", secretKeySub:"کلید اصلی جهت مشتق‌سازی کلید AES-256 و اعتبارسنجی لینک‌های موقت",
   btnSetSecret:"تنظیم کلید", btnRotateSecret:"چرخش تصادفی",
   secretRotated:"کلید جدید ایجاد و فعال شد", secretUpdated:"کلید مخفی با موفقیت به‌روزرسانی شد",
@@ -1205,7 +1205,7 @@ const I18N={
   copy:"کپی", copied:"کپی شد", close:"بستن",
   tUp:"آپلود…", tDone:"آپلود شد", tFail:"خطا",
   saved:"تنظیمات ذخیره شد", purgeOk:"کش پاک شد", purgeFail:"پاک‌شدن کش خطا داشت",
-  delQ:"این فایل برای همیشه حذف شود؟", delOk:"حذف شد", delFail:"حذف خطا داشت",
+  delQ:"این فایل برای همیشه حذف شود؟", delOk:"حذف شد", delFail:"حذف خطا داشت", ok:"تأیید", cancel:"انصراف",
   dlStart:"دانلود شروع شد", sizeOver:"بزرگ‌تر از سقف مجاز است", uploading:"در صف…",
   logoutOk:"خارج شد", youUp:"آپلود به تلگرام در حال انجام است…",
   loading:"در حال بارگیری…", limit:"سقف: ",
@@ -1215,7 +1215,7 @@ const I18N={
   urlDone:"از لینک ذخیره شد", urlFail:"دریافت از لینک خطا داشت", urlPulling:"در حال دانلود از مبدا…",
   searchPh:"جستجو در نام فایل…", sNew:"جدیدترین", sOld:"قدیمی‌ترین",
   sBig:"حجم: بیشتر", sSmall:"حجم: کمتر", sDl:"پردانلودترین", sName:"نام",
-  noMatch:"فایلی مطابق جستجو نیست", retry:"تلاش مجدد",
+  noMatch:"فایلی مطابق جستجو نیست", retry:"تلاش مجدد", netErr:"ارتباط برقرار نشد؛ دوباره تلاش کنید",
   secKeys:"کلیدهای API", keyNamePh:"نام کلید (مثلاً ci-bot)", mkKey:"ساخت کلید",
   keyOnce:"این کلید را الان کپی کن — دوباره نمایش داده نمیشود", revoke:"لغو",
   revOk:"کلید لغو شد", noKeys:"هنوز کلیدی نساخته‌ای", pasteT:"چسباندن از کلیپ‌بورد",
@@ -1317,7 +1317,7 @@ const I18N={
   empty:"No files yet",
   setT:"Admin settings", secAuth:"Authentication", secRate:"Rate limits (per minute)",
   secS3:"S3 Service & Telegram", s3Endpoint:"S3 Endpoint", tgAppEndpoint:"Telegram Mini App",
-  secCrypto:"Security & Encryption", encLab:"Zero-Knowledge Encryption (AES-256-GCM)", encSub:"Encrypt chunks before storing on Telegram",
+  secCrypto:"Security & Encryption", encLab:"Caption/metadata encryption (AES-256-GCM)", encSub:"Encrypts chunk captions stored on Telegram — file payloads stay plain; enable Client ZK for true content encryption",
   secretKeyLab:"Master Encryption & HMAC Secret", secretKeySub:"Master key used to derive AES-256 keys and validate signed links",
   btnSetSecret:"Set Secret", btnRotateSecret:"Random Rotate",
   secretRotated:"Secret rotated successfully", secretUpdated:"Secret updated successfully",
@@ -1350,7 +1350,7 @@ const I18N={
   copy:"Copy", copied:"Copied", close:"Close",
   tUp:"Uploading…", tDone:"Uploaded", tFail:"Error",
   saved:"Settings saved", purgeOk:"Cache purged", purgeFail:"Purge failed",
-  delQ:"Delete this file permanently?", delOk:"Deleted", delFail:"Delete failed",
+  delQ:"Delete this file permanently?", delOk:"Deleted", delFail:"Delete failed", ok:"OK", cancel:"Cancel",
   dlStart:"Download started", sizeOver:"exceeds the size limit", uploading:"Queued…",
   logoutOk:"Signed out", youUp:"Uploading to Telegram…",
   loading:"Loading…", limit:"Limit: ",
@@ -1360,7 +1360,7 @@ const I18N={
   urlDone:"Saved from link", urlFail:"Fetch failed", urlPulling:"Downloading from origin…",
   searchPh:"Search by filename…", sNew:"Newest", sOld:"Oldest",
   sBig:"Size: largest", sSmall:"Size: smallest", sDl:"Most downloaded", sName:"Name",
-  noMatch:"No files match your search", retry:"Retry",
+  noMatch:"No files match your search", retry:"Retry", netErr:"Connection lost — tap to retry",
   secKeys:"API keys", keyNamePh:"key name (e.g. ci-bot)", mkKey:"Create key",
   keyOnce:"Copy this key now — it will not be shown again", revoke:"Revoke",
   revOk:"Key revoked", noKeys:"No keys yet", pasteT:"Paste from clipboard",
@@ -1479,6 +1479,49 @@ function toast(msg,kind="ok"){
   $("#toasts").appendChild(d);
   setTimeout(()=>{d.style.opacity="0";d.style.transition=".3s";setTimeout(()=>d.remove(),320)},2800);
 }
+/* UX-01 (v0.15.20): native prompt()/confirm() replacements.
+   askText(title, defValue) → string|null ; askConfirm(text) → boolean.
+   RTL-safe, mobile-friendly, styled like the rest of the modals. */
+function askText(title,defValue){
+  return new Promise(resolve=>{
+    const wrap=document.createElement("div");
+    wrap.className="modal on";
+    wrap.innerHTML='<div class="modal-card" style="max-width:340px;width:100%">'
+      +'<h3 style="font-size:14.5px">'+esc(title)+'</h3>'
+      +'<input id="__askInp" type="text" autocomplete="off" style="width:100%;margin:12px 0 16px;padding:10px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13.5px">'
+      +'<div style="display:flex;gap:8px;justify-content:flex-start">'
+      +'<button id="__askOk" class="btn" style="padding:8px 18px">'+esc(t("ok"))+'</button>'
+      +'<button id="__askNo" class="btn-ghost btn" style="padding:8px 14px">'+esc(t("cancel"))+'</button>'
+      +'</div></div>';
+    document.body.appendChild(wrap);
+    const inp=wrap.querySelector("#__askInp");
+    inp.value=defValue||"";
+    const done=v=>{wrap.remove();resolve(v);};
+    wrap.querySelector("#__askOk").onclick=()=>done(inp.value.trim()||null);
+    wrap.querySelector("#__askNo").onclick=()=>done(null);
+    wrap.onclick=e=>{if(e.target===wrap)done(null);};
+    inp.onkeydown=e=>{if(e.key==="Enter")done(inp.value.trim()||null);if(e.key==="Escape")done(null);};
+    setTimeout(()=>inp.focus(),30);
+  });
+}
+function askConfirm(text){
+  return new Promise(resolve=>{
+    const wrap=document.createElement("div");
+    wrap.className="modal on";
+    wrap.innerHTML='<div class="modal-card" style="max-width:340px;width:100%">'
+      +'<p style="margin:4px 0 18px;font-size:13.5px;color:var(--tx);white-space:pre-wrap">'+esc(text)+'</p>'
+      +'<div style="display:flex;gap:8px;justify-content:flex-start">'
+      +'<button id="__askYes" class="btn" style="padding:8px 18px">'+esc(t("ok"))+'</button>'
+      +'<button id="__askNo" class="btn-ghost btn" style="padding:8px 14px">'+esc(t("cancel"))+'</button>'
+      +'</div></div>';
+    document.body.appendChild(wrap);
+    const done=v=>{wrap.remove();resolve(v);};
+    wrap.querySelector("#__askYes").onclick=()=>done(true);
+    wrap.querySelector("#__askNo").onclick=()=>done(false);
+    wrap.onclick=e=>{if(e.target===wrap)done(false);};
+    document.addEventListener("keydown",function esc2(e){if(e.key==="Escape"){document.removeEventListener("keydown",esc2);done(false);}});
+  });
+}
 function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML;}
 
 /* ================= formatting ================= */
@@ -1568,6 +1611,9 @@ function showApp(){
   }
   syncClientZkUI();
   refresh();
+  // UX-03: re-attach to a still-running ingest job after a page reload
+  const activeJob=sessionStorage.getItem("anbar-ingest-job");
+  if(activeJob){pollIngest(activeJob);}
   // consume a PWA-shared URL: prefill + auto-submit the ingest form
   const shared=sessionStorage.getItem("anbar-shared");
   if(shared){
@@ -1685,7 +1731,7 @@ function updateBreadcrumb() {
   }
 }
 $("#newFolderBtn").onclick = guardBtn($("#newFolderBtn"), async () => {
-  const name = prompt(t("newFolderPrompt"));
+  const name = await askText(t("newFolderPrompt"));
   if (!name) return;
   const cleanName = name.replace(/[\/\\?%*:|"<>]/g, "").trim();
   if (!cleanName) return;
@@ -1816,6 +1862,7 @@ $("#fType").onchange=e=>{fType=e.target.value;renderRows();};
 async function refresh(){
   const btn=$("#refBtn");
   btn&&btn.classList.add("busy");   // spin the arrows while updating
+  let netOk=true;   // UX-04: surface silent network failures
   try{
     await Promise.all([(async()=>{
       try{
@@ -1823,18 +1870,39 @@ async function refresh(){
         maxUploadBytes=st.max_upload_bytes||maxUploadBytes;
         updateLimTag();
         cacheInfo(st);
-      }catch(e){}
+      }catch(e){
+        netOk=false;
+        console.warn('[anbar] /admin/status failed:',e.message);
+      }
     })(),(async()=>{
       try{
-        const r=await api("/api/v1/admin/objects");
+        // UX-02 (v0.15.20): pull up to 500 objects (server caps at 500) —
+        // the old implicit 50-row cap made everything beyond it invisible
+        const r=await api("/api/v1/admin/objects?limit=500");
         files=r.objects||[];
-      }catch(e){files=[];console.error('[anbar] /api/v1/admin/objects failed:',e.message);if(e.message==='401'||e.message.includes('authentication')){authed=false;showLogin();toast(t('badKey'),'err');}}
+      }catch(e){netOk=false;files=[];console.error('[anbar] /api/v1/admin/objects failed:',e.message);if(e.message==='401'||e.message.includes('authentication')){authed=false;showLogin();toast(t('badKey'),'err');}}
     })()]);
+    showNetBanner(!netOk);
     renderRows();
     refreshTrashBadge();
+  }catch(e){
+    showNetBanner(true);
+    renderRows();
   }finally{
     btn&&btn.classList.remove("busy");
   }
+}
+function showNetBanner(show){
+  // UX-04: a fixed banner instead of silently swallowing refresh errors
+  let b=$("#netBanner");
+  if(show&&!b){
+    b=document.createElement("div");
+    b.id="netBanner";
+    b.style.cssText="position:sticky;top:0;z-index:60;background:#7f1d1d;color:#fff;padding:8px 14px;font-size:12.5px;text-align:center;cursor:pointer";
+    b.textContent=t("netErr")+" — "+t("retry");
+    b.onclick=()=>{b.remove();refresh();};
+    document.body.prepend(b);
+  }else if(!show&&b){b.remove();}
 }
 function cacheInfo(st){
   const c=st.cache||{};
@@ -1939,7 +2007,7 @@ function renderRows(){
       if(fic) fic.onclick = enter;
       tr.querySelector('[data-a="fold-rename"]').onclick = async (e) => {
         e.stopPropagation();
-        const p = prompt(t("foldRenameT"), o.fullPrefix.replace(/\/$/, ""));
+        const p = await askText(t("foldRenameT"), o.fullPrefix.replace(/\/$/, ""));
         if (!p || p === o.filename) return;
         try {
           await api("/api/v1/admin/folders/rename", {
@@ -1957,7 +2025,7 @@ function renderRows(){
       tr.querySelector('[data-a="fold-copy"]').onclick = async (e) => {
         e.stopPropagation();
         const base = o.filename.replace(/\/$/, "");
-        const p = prompt(t("foldCopyT") || t("newFolderPrompt"), base + "_copy");
+        const p = await askText(t("foldCopyT") || t("newFolderPrompt"), base + "_copy");
         if (!p) return;
         const clean = p.trim().replace(/[\\/?%*:|"<>]/g, "");
         if (!clean) return;
@@ -1974,7 +2042,7 @@ function renderRows(){
       };
       tr.querySelector('[data-a="fold-del"]').onclick = async (e) => {
         e.stopPropagation();
-        if (!confirm(t("foldDelT") + " — " + o.filename + "؟")) return;
+        if(!(await askConfirm(t("foldDelT") + " — " + o.filename + "؟"))) return;
         try {
           await api("/api/v1/admin/folders/delete", {
             method: "POST",
@@ -2238,12 +2306,12 @@ function renderGallery(list){
           toast(t("movedOk"));refresh();
         }catch(err){toast(err.message,"err");}
       };
-      cell.querySelector('[data-a="fold-rename"]').onclick=(e)=>{e.stopPropagation();const p=prompt(t("foldRenameT"),o.fullPrefix.replace(/\/$/,""));if(!p)return;api("/api/v1/admin/folders/rename",{method:"POST",body:JSON.stringify({old_path:o.fullPrefix,new_path:p})}).then(()=>{toast(t("saved"));refresh();}).catch(err=>toast(err.message,"err"));};
+      cell.querySelector('[data-a="fold-rename"]').onclick=async(e)=>{e.stopPropagation();const p=await askText(t("foldRenameT"),o.fullPrefix.replace(/\/$/,""));if(!p)return;api("/api/v1/admin/folders/rename",{method:"POST",body:JSON.stringify({old_path:o.fullPrefix,new_path:p})}).then(()=>{toast(t("saved"));refresh();}).catch(err=>toast(err.message,"err"));};
       cell.querySelector('[data-a="fold-move"]').onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename);};
       cell.querySelector('[data-a="fold-copy"]').onclick=async(e)=>{
         e.stopPropagation();
         const base = o.filename.replace(/\/$/, "");
-        const p = prompt(t("foldCopyT") || t("newFolderPrompt"), base + "_copy");
+        const p = await askText(t("foldCopyT") || t("newFolderPrompt"), base + "_copy");
         if (!p) return;
         const clean = p.trim().replace(/[\\/?%*:|"<>]/g, "");
         if (!clean) return;
@@ -2258,7 +2326,7 @@ function renderGallery(list){
           refresh();
         } catch(err) { toast(err.message, "err"); }
       };
-      cell.querySelector('[data-a=del]').onclick=(e)=>{e.stopPropagation();if(!confirm(t("foldDelT")+" — "+o.filename+"؟"))return;api("/api/v1/admin/folders/delete",{method:"POST",body:JSON.stringify({path:o.fullPrefix})}).then(()=>{toast(t("delOk"));refresh();}).catch(err=>toast(err.message,"err"));};
+      cell.querySelector('[data-a=del]').onclick=async(e)=>{e.stopPropagation();if(!(await askConfirm(t("foldDelT")+" — "+o.filename+"؟")))return;api("/api/v1/admin/folders/delete",{method:"POST",body:JSON.stringify({path:o.fullPrefix})}).then(()=>{toast(t("delOk"));refresh();}).catch(err=>toast(err.message,"err"));};
     }
     const enter = (e) => {
       e.stopPropagation();
@@ -2327,7 +2395,7 @@ $("#selAllBtn").onclick=()=>{
 };
 $("#selDelBtn").onclick=guardBtn($("#selDelBtn"),async()=>{
   if(!selSet.size)return;
-  if(!confirm(t("delSel")+" ("+selSet.size+")؟"))return;
+  if(!(await askConfirm(t("delSel")+" ("+selSet.size+")؟")))return;
   const folders=[...selSet].filter(id=>String(id).startsWith("folder:"));
   const realIds=[...selSet].filter(id=>!String(id).startsWith("folder:"));
   let ok=0;
@@ -2466,7 +2534,7 @@ $("#linksModal").onclick=e=>{if(e.target.id==="linksModal")$("#linksModal").clas
 const revokeAllBtn=$("#revokeAllLinksBtn");
 if(revokeAllBtn){
   revokeAllBtn.onclick=async()=>{
-    if(!confirm(t("revokeAllConfirm")))return;
+    if(!(await askConfirm(t("revokeAllConfirm"))))return;
     try{
       const r=await api("/api/v1/admin/links/revoke-all",{method:"POST"});
       toast(t("allLinksRevoked"));
@@ -2567,7 +2635,7 @@ async function openTrash(){
          catch(e){toast(e.message,"err");}
        };
        d.querySelector(".trpg").onclick=async()=>{
-         if(!confirm(t("purge")+" — "+(o.filename||o.id)+"؟"))return;
+         if(!(await askConfirm(t("purge")+" — "+(o.filename||o.id)+"؟")))return;
          try{await api("/api/v1/admin/trash/"+encodeURIComponent(o.id),{method:"DELETE"});toast(t("purged"));openTrash();refreshTrashBadge();}
          catch(e){toast(e.message,"err");}
        };
@@ -2580,7 +2648,7 @@ $("#trashBtn").onclick=openTrash;
 $("#trashClose").onclick=()=>$("#trashModal").classList.remove("on");
 $("#trashModal").onclick=e=>{if(e.target.id==="trashModal")$("#trashModal").classList.remove("on");};
 $("#trashEmptyBtn").onclick=guardBtn($("#trashEmptyBtn"),async()=>{
- if(!confirm(t("trashEmpty")+"؟"))return;
+ if(!(await askConfirm(t("trashEmpty")+"؟")))return;
  try{
    const r=await api("/api/v1/admin/trash");
    for(const o of (r.items||[])){
@@ -2592,7 +2660,7 @@ $("#trashEmptyBtn").onclick=guardBtn($("#trashEmptyBtn"),async()=>{
 
 async function renameObj(o){
   const currentBase=o.displayName||(o.filename?o.filename.split("/").pop():o.id);
-  const name=prompt(t("renameFile")||t("renameT"),currentBase);
+  const name=await askText(t("renameFile")||t("renameT"),currentBase);
   if(name===null)return;
   const clean=name.trim().replace(/[\\/?%*:|"<>]/g,"");
   if(!clean||clean===currentBase)return;
@@ -2895,7 +2963,7 @@ $("#copyBtn").onclick=async()=>{
 };
 $("#linkClose").onclick=()=>$("#linkModal").classList.remove("on");
 /* ================= global keyboard shortcuts (v0.14) ================= */
-document.addEventListener("keydown",e=>{
+document.addEventListener("keydown",async e=>{
   const activeTag=document.activeElement?document.activeElement.tagName.toLowerCase():"";
   const isInput=activeTag==="input"||activeTag==="textarea"||activeTag==="select";
   if(e.key==="Escape"){
@@ -2950,7 +3018,7 @@ document.addEventListener("keydown",e=>{
         const fp=String(id).slice("folder:".length);
         const fld=visibleFiles().find(x=>x.isFolder&&x.fullPrefix===fp);
         if(fld){
-          const p=prompt(t("foldRenameT"),fld.fullPrefix.replace(/\/$/,""));
+          const p=await askText(t("foldRenameT"),fld.fullPrefix.replace(/\/$/,""));
           if(p&&p!==fld.filename){
             api("/api/v1/admin/folders/rename",{method:"POST",body:JSON.stringify({old_path:fld.fullPrefix,new_path:p})})
               .then(()=>{toast(t("saved"));refresh();}).catch(err=>toast(err.message,"err"));
@@ -2972,7 +3040,7 @@ document.addEventListener("keydown",e=>{
 }
 $("#linkModal").onclick=e=>{if(e.target.id==="linkModal")$("#linkModal").classList.remove("on");};
 async function delObj(o){
-  if(!confirm(t("delQ")))return;
+  if(!(await askConfirm(t("delQ"))))return;
   try{
     await api("/f/"+encodeURIComponent(o.id),{method:"DELETE"});
     toast(t("delOk"));refresh();
@@ -3091,6 +3159,8 @@ $("#urlForm").onsubmit=async ev=>{
   try{
     const r=await api("/api/v1/upload/url",{method:"POST",body:JSON.stringify({url})});
     toast(t("urlStart"));
+    // UX-03: persist the active job so a page reload can re-attach
+    sessionStorage.setItem("anbar-ingest-job",r.job_id);
     pollIngest(r.job_id);
   }catch(e){toast(t("urlFail")+": "+e.message,"err");btn.disabled=false;inp.disabled=false;}
 };
@@ -3104,8 +3174,14 @@ async function pollIngest(jobId){
     await new Promise(r=>setTimeout(r,1200));
     let j;
     try{j=await api("/api/v1/upload/url/"+jobId);}
-    catch(e){stat.textContent=e.message;$("#urlBtn").disabled=false;$("#urlInput").disabled=false;return;}
+    catch(e){
+      // UX-03: 404 after a server restart means the job is gone — clear
+      // the handle instead of polling forever
+      sessionStorage.removeItem("anbar-ingest-job");
+      stat.textContent=e.message;$("#urlBtn").disabled=false;$("#urlInput").disabled=false;return;
+    }
     if(j.state==="error"){
+      sessionStorage.removeItem("anbar-ingest-job");
       stat.textContent=t("urlFail")+": "+(j.error||"");
       stat.style.color="var(--err)";pct.textContent="";
       $("#urlBtn").disabled=false;$("#urlInput").disabled=false;
@@ -3113,6 +3189,7 @@ async function pollIngest(jobId){
       return;
     }
     if(j.state==="done"){
+      sessionStorage.removeItem("anbar-ingest-job");
       bar.style.width="100%";bar.style.background="var(--ok)";
       stat.textContent=t("urlDone")+" — "+esc(j.object.filename)+" ("+humanSize(j.object.size)+")";
       stat.style.color="var(--ok)";pct.textContent="";
@@ -3371,7 +3448,7 @@ const ClientZK = {
 let clientZkOn = localStorage.getItem("anbar-client-zk") === "1";
 let clientZkPass = sessionStorage.getItem("anbar-client-zk-pass") || "";
 
-function getClientZkPassword(forcePrompt = false) {
+async function getClientZkPassword(forcePrompt = false) {
   if (clientZkPass && !forcePrompt) return clientZkPass;
   const inputPass = $("#s_client_zk_pass")?.value?.trim();
   if (inputPass) {
@@ -3379,10 +3456,11 @@ function getClientZkPassword(forcePrompt = false) {
     sessionStorage.setItem("anbar-client-zk-pass", clientZkPass);
     return clientZkPass;
   }
-  if (!forcePrompt && _apiKey) {
-    return _apiKey;
-  }
-  const entered = prompt(t("zkPromptPass"), clientZkPass || _apiKey || "");
+  // SEC-03 fix (v0.15.20): NEVER fall back to the admin/API key as the ZK
+  // passphrase — files "encrypted" with it are only as secret as the admin
+  // key and the user falsely believes they have zero-knowledge protection.
+  if (!forcePrompt) return null;
+  const entered = await askText(t("zkPromptPass"), clientZkPass || "");
   if (entered) {
     clientZkPass = entered.trim();
     sessionStorage.setItem("anbar-client-zk-pass", clientZkPass);
@@ -3430,7 +3508,7 @@ async function downloadFileWithZk(o) {
       document.body.appendChild(a); a.click(); a.remove();
       return;
     }
-    const pass = getClientZkPassword(true);
+    const pass = await getClientZkPassword(true);
     if (!pass) return;
     const buf = await blob.arrayBuffer();
     const decBuf = await ClientZK.decrypt(buf, pass);
@@ -3449,7 +3527,7 @@ async function downloadFileWithZk(o) {
 async function uploadOne(it){
   let fileToSend = it.file;
   if (clientZkOn && !it._zkEncrypted) {
-    const pass = getClientZkPassword(false);
+    const pass = await getClientZkPassword(false);
     if (!pass) throw new Error("Client ZK passphrase required");
     const el = document.querySelector('.qitem[data-id="'+it.id+'"]');
     if (el) {
@@ -3580,7 +3658,7 @@ function initTgAuthUI() {
   const btnLogout = document.getElementById("btnTgLogout");
   if (btnLogout) {
     btnLogout.onclick = async () => {
-      if (!confirm("آیا مایلید از سشن تلگرام خارج شوید؟")) return;
+      if(!(await askConfirm("آیا مایلید از سشن تلگرام خارج شوید؟"))) return;
       try {
         await api("/api/v1/admin/telegram/logout", { method: "POST" });
         toast("از تلگرام خارج شدید");
@@ -3723,7 +3801,7 @@ $("#btnImportBackup").onclick=()=>{
 $("#backupFileInput").onchange=async(e)=>{
   const file=e.target.files&&e.target.files[0];
   if(!file)return;
-  if(!confirm(t("importBackupConfirm"))) {
+  if(!(await askConfirm(t("importBackupConfirm")))) {
     $("#backupFileInput").value="";
     return;
   }
@@ -3758,7 +3836,7 @@ $("#btnPushTgBackup").onclick=async()=>{
   finally{btn.disabled=false;btn.style.opacity="";}
 };
 $("#btnChannelRebuild").onclick=async()=>{
-  if(!confirm(t("channelRebuildConfirm")))return;
+  if(!(await askConfirm(t("channelRebuildConfirm"))))return;
   const btn=$("#btnChannelRebuild");
   const origText = btn.innerHTML;
   btn.disabled=true;btn.style.opacity=".6";
@@ -3881,7 +3959,7 @@ $("#btnSetCustomSecret").onclick=guardBtn($("#btnSetCustomSecret"),async()=>{
   const sec=$("#s_enc_secret")?.value?.trim();
   if(!sec){toast(t("keyPh"),"err");return;}
   if(sec.length<8){toast("Secret must be at least 8 characters","err");return;}
-  if(!confirm(t("rotateSecretConfirm")))return;
+  if(!(await askConfirm(t("rotateSecretConfirm"))))return;
   try{
     const r=await api("/api/v1/admin/auth/rotate-secret",{
       method:"POST",
@@ -3891,7 +3969,7 @@ $("#btnSetCustomSecret").onclick=guardBtn($("#btnSetCustomSecret"),async()=>{
   }catch(e){toast(e.message,"err");}
 });
 $("#btnRotateSecret").onclick=guardBtn($("#btnRotateSecret"),async()=>{
-  if(!confirm(t("rotateSecretConfirm")))return;
+  if(!(await askConfirm(t("rotateSecretConfirm"))))return;
   try{
     const r=await api("/api/v1/admin/auth/rotate-secret",{
       method:"POST",

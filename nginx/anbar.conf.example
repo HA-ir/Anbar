@@ -9,6 +9,13 @@ server {
     ssl_certificate     /etc/letsencrypt/live/d.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/d.example.com/privkey.pem;
 
+    # PERF-02: compress text responses (the app also gzips via middleware —
+    # nginx handles static/html paths before hitting the app)
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/javascript application/json application/javascript application/xml image/svg+xml;
+
     # chunked uploads up to the logical ceiling (backend ceiling still applies per chunk)
     client_max_body_size 2048m;
     # stream uploads to the app without buffering on disk

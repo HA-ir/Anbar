@@ -330,22 +330,58 @@ async def backup_push_telegram(request: Request):
 
 @router.post("/admin/backup/import")
 async def backup_import(request: Request, file: UploadFile):
-    """Import and restore a binary SQLite database backup file (admin only)."""
+    """Import and restore a binary SQLite database backup file (admin only).
+
+    SEC-05 (v0.15.20): the upload is size-capped (256MB) and streamed to a
+    temp file instead of being buffered whole in RAM — a huge or malicious
+    upload can no longer OOM the process.
+    """
     require_admin(request)
     db = request.app.state.db
-    content = await file.read()
+
+    _MAX_BACKUP_BYTES = 256 * 1024 * 1024
+    declared = getattr(file, "size", None)
+    if isinstance(declared, int) and declared >= 0 and declared > _MAX_BACKUP_BYTES:
+        raise HTTPException(
+            413, f"backup file exceeds {_MAX_BACKUP_BYTES // (1024 * 1024)}MB limit"
+        )
+
+    import tempfile
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
     try:
-        res = db.restore_bytes(content)
-        db.log_audit("backup.restore", actor="admin", details=res)
-        return {
-            "status": "ok",
-            "message": "Database restored successfully",
-            **res,
-        }
-    except ValueError as e:
-        raise HTTPException(400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(500, detail=f"Database restore failed: {e}") from e
+        written = 0
+        while True:
+            piece = await file.read(1024 * 1024)
+            if not piece:
+                break
+            written += len(piece)
+            if written > _MAX_BACKUP_BYTES:
+                raise HTTPException(
+                    413, f"backup file exceeds {_MAX_BACKUP_BYTES // (1024 * 1024)}MB limit"
+                )
+            tmp.write(piece)
+        tmp.close()
+
+        try:
+            res = db.restore_from_file(tmp.name)
+            db.log_audit("backup.restore", actor="admin", details=res)
+            return {
+                "status": "ok",
+                "message": "Database restored successfully",
+                **res,
+            }
+        except ValueError as e:
+            raise HTTPException(400, detail=str(e)) from e
+        except Exception as e:
+            raise HTTPException(500, detail=f"Database restore failed: {e}") from e
+    finally:
+        import os
+
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
 
 
 
@@ -733,7 +769,34 @@ def _write_env_dict(path: Path, updates: dict[str, str]) -> bool:
             if k not in seen and v is not None:
                 new_lines.append(f"{k}={v}")
 
-        path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        # Atomic write (v0.15.20, SEC-04): a crash mid-write must never leave
+        # a truncated .env — the service would not start after a restart.
+        # Write to a temp file in the same directory, fsync, then os.replace.
+        import os
+        import tempfile
+
+        content = "\n".join(new_lines) + "\n"
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+            # keep a one-shot backup of the previous file (best effort)
+            if path.exists():
+                try:
+                    path.replace(path.with_suffix(path.suffix + ".bak"))
+                except OSError:
+                    pass
+            os.replace(tmp_name, path)
+        except BaseException:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
         return True
     except OSError as exc:
         import logging

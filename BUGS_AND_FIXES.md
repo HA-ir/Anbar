@@ -1,6 +1,6 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.19
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.20
 
 ## v0.15.19 — 2026-08-31 (Audit Fixes — Loop #9)
 
@@ -161,3 +161,27 @@
 
 ### A-018 · UI: بازخورد Rebuild کانال
 - toast پیشرفت، restore متن دکمه، refresh خودکار لیست و breadcrumb بعد از rebuild.
+
+## v0.15.20 — 2026-08-31 (Improvement Plan — Batches 1-4)
+
+پیاده‌سازی ۱۷ آیتم از IMPROVEMENT_PLAN.md (MP-01/02، SEC-01…05، ARCH-03/04، PERF-02/04، UX-01…04، DOC-01، QUAL-03). خلاصه:
+
+- **MP-01**: resume روی `/api/v1/upload` (multipart) هم فعال شد — قرارداد مشترک با `upload/raw` (X-Upload-Id / X-Resume-From).
+- **MP-02**: نشت kv بسته شد — `upres:` بعد از commit حذف + prune دوره‌ای 24h (فرمت envelope با `_ts`).
+- **SEC-01**: XFF فقط از peer لوکال‌هاست پذیرفته می‌شود و آخرین hop برمی‌دارد (سازگار با nginx loopback).
+- **SEC-02**: کلید admin دیگر از `?k=` پذیرفته نمی‌شود (breaking عمدی؛ UI از cookie استفاده می‌کند).
+- **SEC-03**: fallback بی‌صدای passphrase ZK → کلید API حذف شد؛ بدون passphrase آپلود ZK خطای واضح می‌دهد.
+- **SEC-04**: نوشتن `.env` اتمیک (tmp + fsync + os.replace + `.bak`).
+- **SEC-05**: import بکاپ با سقف 256MB و streaming به tmp (بدون OOM).
+- **PERF-02**: GZipMiddleware (min 1000B؛ مسیرهای media مستثنا) + gzip directives در nginx example.
+- **PERF-04**: `Cache-Control: private, max-age=3600` روی پاسخ کامل 200 آبجکت.
+- **ARCH-03**: prune خودکار JOBS تمام‌شده‌ی >1h.
+- **ARCH-04**: retention 90 روزه برای audit_logs (در حلقه prune موجود).
+- **UX-01**: همه‌ی prompt()/confirm() بومی → modal های RTL-safe (`askText`/`askConfirm`).
+- **UX-02**: داشبورد limit=500 (سقف پنهان ۵۰ برداشته شد).
+- **UX-03**: re-attach job اینجست پس از reload (sessionStorage).
+- **UX-04**: بنر خطای شبکه با retry در داشبورد.
+- **DOC-01**: نام‌های env سند DR به نام‌های واقعی config اصلاح شد.
+- **QUAL-03**: برچسب گمراه‌کننده «رمزنگاری» → «رمزنگاری caption و متادیتا».
+
+تست: 243 → **284 passed**. فایل‌های جدید تست: `test_v01520_improvements.py`، `test_v01520_batch2.py`، `test_v01520_batch3.py`.

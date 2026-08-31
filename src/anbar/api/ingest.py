@@ -35,6 +35,24 @@ log = logging.getLogger("anbar.ingest")
 
 # module-level job table (single-process service; survives per-request)
 JOBS: dict[str, dict] = {}
+JOBS_MAX_AGE_S = 3600  # finished jobs are pruned after 1h (v0.15.20, ARCH-03)
+
+
+def _prune_jobs() -> int:
+    """Drop finished ingest jobs older than JOBS_MAX_AGE_S (bounded memory).
+
+    Called from the job status endpoint (cheap, piggybacks on traffic).
+    Returns rows removed.
+    """
+    now = time.time()
+    stale = [
+        jid
+        for jid, j in JOBS.items()
+        if j.get("state") in ("done", "error") and now - j.get("started", now) > JOBS_MAX_AGE_S
+    ]
+    for jid in stale:
+        JOBS.pop(jid, None)
+    return len(stale)
 MAX_CONCURRENT = 2
 _SEM = asyncio.Semaphore(MAX_CONCURRENT)
 
@@ -237,6 +255,7 @@ async def upload_url(request: Request):
 @router.get("/upload/url/{job_id}")
 async def upload_url_status(request: Request, job_id: str):
     require_admin(request)
+    _prune_jobs()
     job = JOBS.get(job_id)
     if job is None:
         raise HTTPException(404, "unknown job")

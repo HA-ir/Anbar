@@ -25,12 +25,19 @@ If your server dies, you can launch a fresh Anbar container anywhere in under 1 
    ```bash
    docker run -d \
      -p 8567:8567 \
-     -e ANBAR_TG_BOT_TOKEN="your_bot_token" \
-     -e ANBAR_TG_CHAT_ID="-100xxxxxxxxx" \
+     -e ANBAR_BOT_TOKEN="your_bot_token" \
+     -e ANBAR_CHANNEL_ID="-100xxxxxxxxx" \
      -e ANBAR_HMAC_SECRET="your_previous_master_secret" \
-     -e ANBAR_STORAGE_ENCRYPTION="1" \
      ghcr.io/ha-ir/anbar:latest
    ```
+
+   > **DOC-01 fix (v0.15.20):** the env names here previously showed
+   > `ANBAR_TG_BOT_TOKEN` / `ANBAR_TG_CHAT_ID` / `ANBAR_STORAGE_ENCRYPTION`,
+   > which do not exist in `config.py`. The real names are `ANBAR_BOT_TOKEN`
+   > and `ANBAR_CHANNEL_ID` (see `src/anbar/config.py`). There is also no
+   > storage-encryption env switch: `ANBAR_HMAC_SECRET` enables the
+   > encrypted-caption scheme (`anbar:v1:e:`) automatically — chunk *payloads*
+   > are NOT encrypted at rest, only captions/metadata are.
 
 2. **Trigger Database Rebuild**:
    - **Via Web UI**: Go to **Settings Drawer** (`⚙️`) $\rightarrow$ Click **«اسکن و بازسازی دیتابیس از کانال تلگرام»** (`Scan & Rebuild from Telegram`).

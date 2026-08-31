@@ -12,10 +12,21 @@ _WINDOW_S = 60
 
 
 def _client_ip(request: Request) -> str:
+    """Best-effort client IP for rate limiting.
+
+    SEC-01 (v0.15.20): X-Forwarded-For is only trusted when the TCP peer is
+    a loopback address — i.e. the request actually arrived through the
+    local reverse proxy. A direct client (or one spoofing XFF on a proxied
+    chain it doesn't control) is rate-limited by its real socket address.
+    With nginx's `X-Forwarded-For $proxy_add_x_forwarded_for`, the LAST
+    entry is the address nginx saw (the real client), so we take the last
+    hop, not the first (which is client-controlled).
+    """
+    peer = request.client.host if request.client else "?"
     fwd = request.headers.get("x-forwarded-for", "")
-    if fwd:
-        return fwd.split(",")[0].strip()
-    return request.client.host if request.client else "?"
+    if fwd and peer in ("127.0.0.1", "::1", "localhost"):
+        return fwd.split(",")[-1].strip()
+    return peer
 
 
 def _raise_limited(retry_after: int) -> None:

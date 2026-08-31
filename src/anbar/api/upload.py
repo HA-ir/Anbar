@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
@@ -68,6 +69,11 @@ async def _commit(
             "uploader_key": _uploader_key(request),
         }
     )
+    # resume checkpoint no longer needed once the object is committed —
+    # without this the upres:<id> rows accumulate in kv forever (MP-02)
+    upload_id = request.headers.get("x-upload-id", "").strip()
+    if upload_id:
+        db.kv_delete(f"upres:{upload_id}")
     db.log_audit(
         "file.upload",
         actor="admin",
@@ -108,8 +114,9 @@ async def _store_stream(
     prior: list[dict] = []
     if ck_key and resume_from:
         try:
-            prior = json.loads(db.kv_get(ck_key, "[]") or "[]")
-        except json.JSONDecodeError:
+            raw = json.loads(db.kv_get(ck_key, "") or "")  # v0.15.20: envelope
+            prior = raw.get("chunks", []) if isinstance(raw, dict) else raw
+        except (json.JSONDecodeError, AttributeError):
             prior = []
         if resume_from > len(prior):
             raise HTTPException(
@@ -129,7 +136,15 @@ async def _store_stream(
             db.kv_set(
                 ck_key,
                 json.dumps(
-                    [{"s": c.size, "f": c.file_id, "m": c.message_id} for c in manifest.chunks],
+                    {
+                        # _ts lets kv_prune_prefix drop checkpoints abandoned
+                        # mid-upload (older than 24h) without a schema change
+                        "_ts": int(time.time()),
+                        "chunks": [
+                            {"s": c.size, "f": c.file_id, "m": c.message_id}
+                            for c in manifest.chunks
+                        ],
+                    },
                     separators=(",", ":"),
                 ),
             )
@@ -215,18 +230,34 @@ async def _store_stream(
 
 @router.post("/upload")
 async def upload_multipart(request: Request, file: Annotated[UploadFile, File(...)]):
-    """Multipart upload (field `file`). Streams to the backend in chunks."""
+    """Multipart upload (field `file`). Streams to the backend in chunks.
+
+    Resume (v0.15.20): send `X-Upload-Id` (any client-generated id) to make
+    an upload resumable — same contract as `upload/raw`. If the connection
+    drops, re-send with the same id + `X-Resume-From: <chunks-done>`;
+    already-stored chunks are drained, not re-posted. Checkpoints live in
+    kv for 24h.
+    """
     require_uploader(request)
     limit_upload(request.app.state.db, request, _rate_upload(request))
     filename = file.filename or "upload.bin"
     content_type = file.content_type or "application/octet-stream"
     if (await _peek_size(file)) > _max_upload_bytes(request):
         raise HTTPException(413, "object exceeds configured ceiling")
+    upload_id = request.headers.get("x-upload-id", "").strip() or None
+    resume_from = 0
+    if upload_id:
+        try:
+            resume_from = max(0, int(request.headers.get("x-resume-from", "0") or 0))
+        except ValueError:
+            raise HTTPException(400, "X-Resume-From must be an integer") from None
     manifest, sha_hex = await _store_stream(
         request,
         _UploadFileReader(file),
         filename,
         content_type=file.content_type,
+        upload_id=upload_id,
+        resume_from=resume_from,
     )
     return await _commit(request, manifest, sha_hex, filename, content_type)
 

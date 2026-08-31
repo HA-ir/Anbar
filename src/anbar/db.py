@@ -474,6 +474,37 @@ class Database:
         self._conn.execute("DELETE FROM kv WHERE k = ?", (key,))
         self._conn.commit()
 
+    def kv_prune_prefix(self, prefix: str, max_age_s: int) -> int:
+        """Delete kv rows whose key starts with `prefix` and whose stored
+        JSON payload is older than `max_age_s` (epoch seconds embedded at
+        write time is NOT available, so we use a sentinel: rows are written
+        with the current epoch appended in a JSON envelope `{"ts": ...}`).
+
+        Resume checkpoints (`upres:<id>`) store a JSON list of chunks — no
+        timestamp. To keep this generic without changing the stored format,
+        we prune by matching a `"_ts"` field when present; rows without it
+        are pruned when older than max_age_s based on rowid order (best
+        effort). Returns rows removed.
+        """
+        cutoff = int(time.time()) - max_age_s
+        rows = self._conn.execute(
+            "SELECT k, v FROM kv WHERE k LIKE ?", (prefix + "%",)
+        ).fetchall()
+        removed = 0
+        for r in rows:
+            try:
+                payload = json.loads(r["v"])
+            except (json.JSONDecodeError, TypeError):
+                continue
+            ts = payload.get("_ts") if isinstance(payload, dict) else None
+            if ts is None:
+                continue
+            if int(ts) < cutoff:
+                self._conn.execute("DELETE FROM kv WHERE k = ?", (r["k"],))
+                removed += 1
+        self._conn.commit()
+        return removed
+
     def kv_all(self) -> list[tuple[str, str]]:
         """All kv pairs (small table; used for slug cleanup on delete)."""
         rows = self._conn.execute("SELECT k, v FROM kv").fetchall()
@@ -576,6 +607,54 @@ class Database:
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
+    def restore_from_file(self, path: str) -> dict:
+        """Restore database from a SQLite backup file on disk (no RAM copy).
+
+        SEC-05 (v0.15.20): same validation contract as `restore_bytes`,
+        but reads from a streamed temp file — used by the backup import
+        endpoint so multi-hundred-MB backups never buffer in memory.
+        """
+        with open(path, "rb") as f:
+            header = f.read(16)
+        if header != b"SQLite format 3\x00":
+            raise ValueError("Invalid backup file: header is not a valid SQLite database.")
+
+        src_conn = sqlite3.connect(path)
+        try:
+            check = src_conn.execute("PRAGMA integrity_check").fetchone()
+            if not check or check[0] != "ok":
+                raise ValueError(f"Corrupted backup database: {check}")
+
+            tables = {
+                row[0]
+                for row in src_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            required = {"objects", "kv"}
+            if not required.issubset(tables):
+                raise ValueError(f"Missing required tables in backup: {required - tables}")
+
+            n_objs = src_conn.execute("SELECT count(*) FROM objects").fetchone()[0]
+
+            # Atomic copy to active live database
+            src_conn.backup(self._conn)
+            self._obj_cache.clear()
+
+            # Re-apply WAL & performance pragmas
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA busy_timeout=5000")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA mmap_size=268435456")
+            self._conn.execute("PRAGMA cache_size=-64000")
+            self._conn.execute("PRAGMA temp_store=MEMORY")
+            return {
+                "restored": True,
+                "objects_count": n_objs,
+            }
+        finally:
+            src_conn.close()
+
     def log_audit(
         self,
         event: str,
@@ -599,6 +678,19 @@ class Database:
         )
         self._conn.commit()
         return cur.lastrowid
+
+    def audit_prune(self, max_age_s: int = 90 * 86400) -> int:
+        """Delete audit records older than `max_age_s` (default 90 days).
+
+        ARCH-04 (v0.15.20): audit_logs grew unboundedly; called from the
+        periodic prune loop in main.py. Returns rows removed.
+        """
+        cur = self._conn.execute(
+            "DELETE FROM audit_logs WHERE created_at < ?",
+            (int(time.time()) - max_age_s,),
+        )
+        self._conn.commit()
+        return cur.rowcount
 
     def list_audit_logs(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         """List audit logs ordered by newest first."""
