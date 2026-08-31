@@ -1,6 +1,19 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.24
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.25
+
+## v0.15.25 — 2026-08-31 (Improvement Plan — PERF-01)
+
+### PERF-01 · micro-cache chunk برای seeking — Severity: عملکرد (بلندمدت)
+- **باس:** disk LRU (F6) فقط دانلود کامل را سرو می‌کرد؛ هر درخواست Range (سیک مدیا در پلیر) مسیر بک‌انده می‌رفت و seek به داخل چانکی که قبلاً دیده شده = دانلود دوباره‌ی کل chunk 16MB از Telegram CDN برای پخش چند ثانیه.
+- **فیکس:**
+  - `ChunkMicroCache` در `src/anbar/cache.py`: LRU درون-RAM با کلید (obj_id, chunk_index) — سقف بایت (پیش‌فرض 32MB ≈ ۲ chunk)، TTL 120s، ورود chunk بزرگ‌تر از کل بودجه ممنوع، صفر نوشتن دیسک (تعهد zero-retention دست‌نخورده)، آمار تجمعی hits/misses.
+  - `download.py`: `_fetch_chunk_bytes` حالا cache_key=(obj_id, chunk_idx) می‌پذیرد؛ hit از RAM برمی‌گردد، miss از بک‌اند واکشی و admit می‌شود. هر سه مسیر (filling_stream، تک‌سگمنت، prefetch depth-2) سیم‌کشی شدند.
+  - knob رانتایم `seek_cache_mb` (۰ = خاموش، بازه 0–512، پیش‌فرض 32): env `ANBAR_SEEK_CACHE_MB` + runtime SPEC + `_sync_chunk_cache` برای تغییر زنده از ادمین بدون restart.
+  - `remove_object(obj_id)` در مسیرهای trash و purge → chunk های آبجکت حذف‌شده از RAM هم می‌روند.
+  - آمار `chunk_cache` (enabled/entries/bytes/hits/misses) در `GET /admin/status`.
+- **تست:** `tests/test_seek_cache.py` — ۱۶ تست. Unit: roundtrip، شمارش miss، بودجه صفر = خاموش، chunk oversized، eviction LRU، مقاومت با touch، TTL expiry، replace هم‌کلید، remove_object، close. E2E با شمارنده FakeBackend: دو seek متوالی در یک chunk → `open_calls` فقط +1 (قبلاً +2)، درستی بایت‌ها روی مرز chunk‌ها و انتهای فایل، گزارش status، override=0 → هر seek می‌رود بک‌اند، delete → entries صفر. کل ۳۳۲ → **۳۴۸ سبز**؛ ruff روی فایل‌های تغییر یافته تمیز.
+- **یادداشت‌ها:** ۱۶ خطای ruff در فایل‌های خارج از این تغییر (scripts/bench_10g_hybrid.py و…) از قبل وجود داشتند — عمداً دست نخوردند تا این commit تک‌موضوعی بماند. نکته بلندمدتِ «chunk کوچک‌تر برای مدیا» همچنان ایده آینده است و به این فیکس وابسته نیست.
 
 ## v0.15.24 — 2026-08-31 (دیپلوی پروداکشن + E2E واقعی)
 
