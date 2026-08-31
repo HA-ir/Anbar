@@ -3663,6 +3663,7 @@ async function loadSystemStats(){
           { name: "PDF", b: bd.pdf, color: "#ef4444" },
           { name: "Code/Text", b: bd.text, color: "#10b981" },
           { name: "Archive", b: bd.archive, color: "#6366f1" },
+          { name: "Other", b: bd.other, color: "#9ca3af" },
         ].filter(x => x.b > 0);
         legend.innerHTML = items.map(x => `<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:${x.color}"></span>${x.name}: ${humanSize(x.b)}</span>`).join("");
       }

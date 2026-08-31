@@ -4,6 +4,12 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.13] — 2026-08-31
+
+### Fixed
+- **S3 GetObject Range Parsing (500 → 416)**: Malformed (`bytes=abc-def`, `bytes=5-2`) or out-of-bounds (`bytes=150-`, oversized end) Range headers previously raised an unhandled `ValueError` and returned HTTP 500. Now parsed defensively: invalid ranges get a spec-compliant XML `InvalidRange` 416, oversized ends are clamped to the last byte (RFC 9110 §14.2), and multi-range requests fall back to serving the full object.
+- **UI: Storage Legend Missing "Other"**: The storage-distribution legend omitted the `other` category even though the bar itself (`sdOth`) renders it — legend now lists it when non-zero.
+
 ## [0.15.12] — 2026-08-31
 
 ### Fixed

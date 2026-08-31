@@ -172,13 +172,38 @@ async def get_object(bucket: str, key: str, request: Request):
 
     range_h = request.headers.get("range")
     if range_h and range_h.startswith("bytes="):
-        # Range parsing
-        parts = range_h[6:].split("-")
-        start = int(parts[0]) if parts[0] else 0
-        end = int(parts[1]) if parts[1] else total - 1
-        length = end - start + 1
-        segments = manifest.map_range(start, end + 1)
-        status_code = 206
+        # v0.15.13 audit fix: malformed/out-of-bounds Range previously raised an
+        # unhandled ValueError => 500. Parse defensively and answer 416 per the
+        # S3/HTTP spec, clamping an oversized suffix end to the last byte.
+        raw = range_h[6:].strip()
+        if "," in raw:  # multi-range: serve the full object (simplest spec-legal fallback)
+            start, end = None, None
+            length = total
+            segments = manifest.map_range(0, total)
+            status_code = 200
+        else:
+            parts = raw.split("-")
+            try:
+                start = int(parts[0]) if parts[0] else 0
+                end = int(parts[1]) if parts[1] else total - 1
+            except (ValueError, IndexError):
+                return _xml_error(
+                    "InvalidRange",
+                    "The requested range is not satisfiable.",
+                    f"/{bucket}/{key}",
+                    416,
+                )
+            if start >= total or start > end:
+                return _xml_error(
+                    "InvalidRange",
+                    "The requested range is not satisfiable.",
+                    f"/{bucket}/{key}",
+                    416,
+                )
+            end = min(end, total - 1)  # clamp oversized end (RFC 9110 §14.2)
+            length = end - start + 1
+            segments = manifest.map_range(start, end + 1)
+            status_code = 206
     else:
         start, end = None, None
         length = total
