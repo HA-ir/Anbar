@@ -78,7 +78,12 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .app.on{display:block}
 .topbar{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg2) 82%,transparent);
   backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
-.topbar-in{max-width:1080px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+/* BUG-v0.15.26: desktop responsiveness — the page used to be hard-capped at
+   1080px (leftover from the mobile-first era), so on wide desktop monitors it
+   floated as a narrow strip and the files table overflowed its container.
+   Fluid width with a sane cap + table-layout:fixed and internal ellipsis
+   keeps the name column shrinkable so the table always fits its box. */
+.topbar-in{max-width:min(1280px,96vw);margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
 .topbar .logo{margin:0;gap:9px}
 .topbar .logo-mark{width:34px;height:34px;border-radius:10px}
 .topbar .logo-mark svg{width:18px;height:18px}
@@ -93,7 +98,7 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .seg button{padding:5px 11px;border-radius:7px;font-size:12.5px;font-weight:600;color:var(--tx2);transition:.15s}
 .seg button.on{background:var(--bg2);color:var(--tx);box-shadow:var(--shadow)}
 /* ============ layout ============ */
-.wrap{max-width:1080px;margin:0 auto;padding:26px 20px 70px}
+.wrap{max-width:min(1280px,96vw);margin:0 auto;padding:26px 20px 70px}
 /* dropzone */
 .drop{border:2px dashed var(--line2);border-radius:16px;background:var(--bg2);padding:34px 20px;text-align:center;
   transition:.2s;cursor:pointer;margin-bottom:22px}
@@ -141,8 +146,13 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
   border-radius:6px;transition:width .25s ease}
 .qitem.done .qbar i{background:var(--ok)}
 .qitem.fail .qbar i{background:var(--err)}
-.qstat{font-size:11.5px;color:var(--tx2);margin-top:6px;display:flex;justify-content:space-between}
+.qstat{font-size:11.5px;color:var(--tx2);margin-top:6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .qstat .err{color:var(--err);font-weight:500}
+/* BUG-v0.15.26: cancel button for in-flight/queued uploads */
+.qcancel{width:auto;padding:3px 10px;font-size:11.5px;border:1px solid var(--line2);border-radius:8px;
+  color:var(--tx2);background:var(--bg3);flex:none}
+.qcancel:hover{border-color:var(--err);color:var(--err);background:var(--err-soft)}
+.qitem.canceled .qbar i{background:var(--tx3)}
 /* filter bar */
 .filterbar{display:flex;gap:10px;margin-bottom:14px}
 .searchbox{flex:1;position:relative;display:flex;align-items:center}
@@ -237,10 +247,32 @@ html[dir="ltr"] .date-cell{direction:ltr;text-align:left}
 /* table */
 .tbl-wrap{background:var(--bg2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
 .tbl-wrap:has(.gallery), #tblWrap:has(.gallery){overflow:visible !important}
-table{width:100%;border-collapse:collapse}
+/* BUG-v0.15.26: in gallery mode the table chrome (header row + card
+   background/shadow behind the tiles) must disappear completely — the old
+   rule only reset overflow, leaving the "name size date downloads actions"
+   strip and a white plate visible behind the cards. */
+.tbl-wrap:has(.gallery) thead,
+#tblWrap:has(.gallery) thead{display:none !important}
+.tbl-wrap:has(.gallery) table,
+#tblWrap:has(.gallery) table{display:none !important}
+.tbl-wrap:has(.gallery),
+#tblWrap:has(.gallery){
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);font-weight:600;
-  text-align:start;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--bg3)}
-td{padding:13px 16px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+  text-align:start;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--bg3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td{padding:13px 16px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle;
+  overflow:hidden;text-overflow:ellipsis}
+/* BUG-v0.15.26: column ratio — name gets the lion's share, fixed narrow
+   columns for size/date/downloads, actions keep its natural width */
+th:nth-child(1){width:auto}
+th:nth-child(2),th:nth-child(3),th:nth-child(4){width:150px}
+th:nth-child(5){width:250px}
+td{word-wrap:break-word}
 tr:last-child td{border-bottom:none}
 tbody tr{transition:background .12s}
 tbody tr:hover{background:var(--hover)}
@@ -433,10 +465,13 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
   .topbar .v{display:none}
   .drop{padding:24px 14px;margin-bottom:16px;border-radius:13px}
   /* table collapses into stacked "cards": thead hidden, each td labelled
-     via its data-th attribute — no horizontal scroll, fully responsive */
+     via its data-th attribute — no horizontal scroll, fully responsive.
+     BUG-v0.15.26: reset the desktop table-layout:fixed + fixed column
+     widths so card mode keeps its natural flow. */
   .tbl-wrap{border-radius:13px;background:transparent;border:none;box-shadow:none}
-  table{display:block}
+  table{display:block;table-layout:auto}
   thead{display:none}
+  th{width:auto !important}
   tbody{display:flex;flex-direction:column;gap:10px}
   tr{display:block;background:var(--bg2);border:1px solid var(--line);border-radius:13px;
     box-shadow:var(--shadow);padding:4px 6px}
@@ -797,26 +832,26 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:32px;height:32px;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold">✓</div>
           <div>
-            <div style="font-weight:700;font-size:13.5px;color:var(--ok)">لاگین تلگرام فعال است</div>
-            <small style="color:var(--tx2);font-size:11.5px">کلاینت MTProto متصل و مجاز می‌باشد</small>
+            <div style="font-weight:700;font-size:13.5px;color:var(--ok)" data-i18n="tgAuthOnT">لاگین تلگرام فعال است</div>
+            <small style="color:var(--tx2);font-size:11.5px" data-i18n="tgAuthOnS">کلاینت MTProto متصل و مجاز می‌باشد</small>
           </div>
         </div>
-        <button type="button" class="btn btn-ghost" id="btnTgLogout" style="border-color:var(--err);color:var(--err);font-size:12px;padding:6px 12px;white-space:nowrap">خروج از تلگرام</button>
+        <button type="button" class="btn btn-ghost" id="btnTgLogout" data-i18n="tgAuthLogout" style="border-color:var(--err);color:var(--err);font-size:12px;padding:6px 12px;white-space:nowrap">خروج از تلگرام</button>
       </div>
 
       <div id="tgAuthLoginForm" class="set-row" style="flex-direction:column;align-items:stretch;gap:8px;background:var(--bg3);border:1.5px solid var(--line2);border-radius:10px;padding:12px;margin-top:6px">
         <div style="font-weight:600;font-size:13px;color:var(--tx);display:flex;align-items:center;gap:6px">
-          🔑 <span>احراز هویت کلاینت MTProto تلگرام</span>
+          🔑 <span data-i18n="tgAuthLoginT">احراز هویت کلاینت MTProto تلگرام</span>
         </div>
-        <small style="color:var(--tx2);font-size:11.5px">برای اسکن خودکار و بازسازی تاریخچه کانال بدون نیاز به ورود دستی سشن</small>
+        <small style="color:var(--tx2);font-size:11.5px" data-i18n="tgAuthLoginS">برای اسکن خودکار و بازسازی تاریخچه کانال بدون نیاز به ورود دستی سشن</small>
         <div style="display:flex;gap:6px">
           <input type="tel" id="s_tg_phone" placeholder="+98912..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
-          <button type="button" class="btn btn-ghost" id="btnTgSendCode" style="font-size:12px;padding:7px 12px;white-space:nowrap">ارسال کد</button>
+          <button type="button" class="btn btn-ghost" id="btnTgSendCode" data-i18n="tgAuthSendCode" style="font-size:12px;padding:7px 12px;white-space:nowrap">ارسال کد</button>
         </div>
         <div id="tgOtpRow" style="display:none;flex-direction:column;gap:8px;margin-top:4px">
           <div style="display:flex;gap:6px">
             <input type="text" id="s_tg_code" placeholder="کد دریافتی از تلگرام (OTP)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
-            <button type="button" class="btn btn-primary" id="btnTgVerifyCode" style="font-size:12px;padding:7px 14px;white-space:nowrap">تأیید و اتصال</button>
+            <button type="button" class="btn btn-primary" id="btnTgVerifyCode" data-i18n="tgAuthVerify" style="font-size:12px;padding:7px 14px;white-space:nowrap">تأیید و اتصال</button>
           </div>
           <div id="tg2faRow" style="display:none">
             <input type="password" id="s_tg_2fa_pw" placeholder="رمز عبور دو مرحله‌ای (2FA Password)" style="width:100%;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
@@ -1168,6 +1203,14 @@ const I18N={
   tgChunkLab:"حجم هر چانک (MB)",
   tgChunkSub:"حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto",
   showHash:"👁 نمایش", hideHash:"🙈 پنهان",
+  tgAuthOnT:"لاگین تلگرام فعال است", tgAuthOnS:"کلاینت MTProto متصل و مجاز می‌باشد",
+  tgAuthLogout:"خروج از تلگرام", tgAuthLoginT:"احراز هویت کلاینت MTProto تلگرام",
+  tgAuthLoginS:"برای اسکن خودکار و بازسازی تاریخچه کانال بدون نیاز به ورود دستی سشن",
+  tgAuthSendCode:"ارسال کد", tgAuthVerify:"تأیید و اتصال",
+  tgNeedPhone:"شماره موبایل را وارد کنید", tgSendingCode:"در حال ارسال کد تأیید تلگرام...",
+  tgCodeSent:"کد تأیید به تلگرام شما ارسال شد", tgNeedCode:"کد دریافتی از تلگرام را وارد کنید",
+  tgVerifying:"در حال اعتبارسنجی...", tgLogoutQ:"آیا مایلید از سشن تلگرام خارج شوید؟",
+  tgLoggedOut:"از تلگرام خارج شدید",
   upload:"آپلود / دریافت",
   empty:"هنوز فایلی آپلود نکرده‌ای",
   setT:"تنظیمات ادمین", secAuth:"احراز هویت", secRate:"محدودیت سرعت (در دقیقه)",
@@ -1203,7 +1246,7 @@ const I18N={
   cacheMasterOff:"غیرفعال — برای فعال‌سازی ANBAR_CACHE_ENABLED=true در .env و ری‌استارت لازم است",
   linkT:"لینک اشتراک‌گذاری", linkS:"این لینک بدون نیاز به ورود کار می‌کند و بعد از ۲۴ ساعت منقضی می‌شود.",
   copy:"کپی", copied:"کپی شد", close:"بستن",
-  tUp:"آپلود…", tDone:"آپلود شد", tFail:"خطا",
+  tUp:"آپلود…", tDone:"آپلود شد", tFail:"خطا", tCancel:"لغو", tCanceled:"لغو شد",
   saved:"تنظیمات ذخیره شد", purgeOk:"کش پاک شد", purgeFail:"پاک‌شدن کش خطا داشت",
   delQ:"این فایل برای همیشه حذف شود؟", delOk:"حذف شد", delFail:"حذف خطا داشت", ok:"تأیید", cancel:"انصراف",
   dlStart:"دانلود شروع شد", sizeOver:"بزرگ‌تر از سقف مجاز است", uploading:"در صف…",
@@ -1223,6 +1266,7 @@ const I18N={
   mkLink:"ساخت لینک", linkPw:"لینک رمزدار شد — رمز:",
   linkNameLab:"نام لینک (اختیاری)", ttlNever:"هرگز (بدون انقضا)",
   shareSel:"اشتراک", zipDl:"دانلود ZIP",
+  folderZipQ:"دانلود ZIP از کل پوشه؟", folderZipStart:"در حال ساخت ZIP از پوشه…",
   albumOk:"لینک آلبوم ساخته شد", albumSub:"یک لینک برای همه فایل‌ها — گالری عمومی با دانلود تکی",
   linksT:"لینک‌های فعال", linksS:"همه لینک‌های ساخته‌شده — امکان ابطال فوری",
   revokeAllLinks:"ابطال همه",
@@ -1313,6 +1357,14 @@ const I18N={
   tgChunkLab:"Chunk Size (MB)",
   tgChunkSub:"Max 19 for Bot, max 49 for MTProto",
   showHash:"👁 Show", hideHash:"🙈 Hide",
+  tgAuthOnT:"Telegram login active", tgAuthOnS:"MTProto client connected and authorized",
+  tgAuthLogout:"Sign out of Telegram", tgAuthLoginT:"Telegram MTProto Client Auth",
+  tgAuthLoginS:"For automatic channel scans & rebuilds without a manual session",
+  tgAuthSendCode:"Send code", tgAuthVerify:"Verify & connect",
+  tgNeedPhone:"Enter your phone number", tgSendingCode:"Sending Telegram verification code...",
+  tgCodeSent:"Verification code sent to your Telegram", tgNeedCode:"Enter the code you received",
+  tgVerifying:"Verifying...", tgLogoutQ:"Sign out of the Telegram session?",
+  tgLoggedOut:"Signed out of Telegram",
   upload:"Upload / Ingest",
   empty:"No files yet",
   setT:"Admin settings", secAuth:"Authentication", secRate:"Rate limits (per minute)",
@@ -1348,7 +1400,7 @@ const I18N={
   cacheMasterOff:"Disabled — set ANBAR_CACHE_ENABLED=true in .env and restart to enable",
   linkT:"Share link", linkS:"Works without login; expires in 24 hours.",
   copy:"Copy", copied:"Copied", close:"Close",
-  tUp:"Uploading…", tDone:"Uploaded", tFail:"Error",
+  tUp:"Uploading…", tDone:"Uploaded", tFail:"Error", tCancel:"Cancel", tCanceled:"Canceled",
   saved:"Settings saved", purgeOk:"Cache purged", purgeFail:"Purge failed",
   delQ:"Delete this file permanently?", delOk:"Deleted", delFail:"Delete failed", ok:"OK", cancel:"Cancel",
   dlStart:"Download started", sizeOver:"exceeds the size limit", uploading:"Queued…",
@@ -1368,6 +1420,7 @@ const I18N={
   mkLink:"Create link", linkPw:"Password-protected link — password:",
   linkNameLab:"Link name (optional)", ttlNever:"Never (no expiry)",
   shareSel:"Share", zipDl:"Download ZIP",
+  folderZipQ:"Download this folder as ZIP?", folderZipStart:"Building folder ZIP…",
   albumOk:"Album link created", albumSub:"One link for all files — public gallery with per-file download",
   linksT:"Active links", linksS:"Every minted link — revoke instantly",
   revokeAllLinks:"Revoke All",
@@ -1412,12 +1465,30 @@ function applyI18n(){
   document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));
   document.querySelectorAll("[data-i18n-ph]").forEach(el=>el.placeholder=t(el.dataset.i18nPh));
   document.querySelectorAll("[data-i18n-title]").forEach(el=>el.title=t(el.dataset.i18nTitle));
+  // BUG-v0.15.26: re-sync every dynamically-rendered surface whose text is
+  // generated with t() outside of applyI18n — switching language used to
+  // leave them in the previous language until a full page reload.
+  syncClientZkUI();                 // "ZK: خاموش / ZK: OFF" dropzone badge
+  renderQueue();                    // upload queue status texts + cancel/retry
+  syncViewBtn();                    // table/gallery toggle tooltip
+  syncHashToggleBtn();              // API hash show/hide button label
+  const selModeBtn=$("#selectModeBtn");
+  if(selModeBtn){const s=selModeBtn.querySelector("span");
+    if(s&&s.dataset.i18n){s.textContent=t(s.dataset.i18n);}}
+  // file-modal meta chips (chunks / downloads) only if a file is open
+  if(typeof fmObj!=="undefined"&&fmObj&&$("#fileModal").classList.contains("on"))openFileModal(fmObj);
+  // open modals re-render in the new language
+  if($("#linksModal").classList.contains("on"))openLinks();
+  if($("#trashModal").classList.contains("on"))openTrash();
+  // md preview toggle buttons inside an open text preview
+  const mdR=$("#mdTabRender"),mdRaw=$("#mdTabRaw");
+  if(mdR)mdR.innerHTML="👁️ "+(lang==="fa"?"پیش‌نمایش":"Preview");
+  if(mdRaw)mdRaw.innerHTML="📝 "+(lang==="fa"?"کد خام":"Raw");
   $("#langFa").classList.toggle("on",lang==="fa");
   $("#langEn").classList.toggle("on",lang==="en");
   updateLimTag();
   renderRows();
   renderThemeIcon();
-  syncHashToggleBtn();
 }
 let langSwitching=false;
 function setLang(l){
@@ -1972,7 +2043,9 @@ function renderRows(){
       +'<td class="num" data-th="'+t("thDl")+'">'+(isDir ? '—' : (o.downloaded??0))+'</td>'
       +'<td data-th="'+t("thAct")+'"><div class="acts">'
       +(isDir
-        ? '<button class="act" data-a="fold-rename" title="'+esc(t("foldRenameT"))+'">'+RN_ICON+'</button>'
+        ? '<button class="act" data-a="fold-zip" title="'+esc(t("zipDl"))+'"><svg viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg></button>'
+          +'<button class="act" data-a="fold-share" title="'+esc(t("linkT"))+'"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>'
+          +'<button class="act" data-a="fold-rename" title="'+esc(t("foldRenameT"))+'">'+RN_ICON+'</button>'
           +'<button class="act" data-a="fold-move" title="'+esc(t("foldMoveT"))+'">'+MV_ICON+'</button>'
           +'<button class="act" data-a="fold-copy" title="'+esc(t("foldCopyT"))+'">'+CP_ICON+'</button>'
           +'<button class="act del" data-a="fold-del" title="'+esc(t("foldDelT"))+'"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg></button>'
@@ -2005,6 +2078,11 @@ function renderRows(){
       tr.querySelector(".fn").onclick = enter;
       const fic = tr.querySelector(".fic");
       if(fic) fic.onclick = enter;
+      /* BUG-v0.15.26: whole-folder ZIP download + album share */
+      const zipBtn = tr.querySelector('[data-a="fold-zip"]');
+      if (zipBtn) zipBtn.onclick = (e) => { e.stopPropagation(); downloadFolderZip(o.fullPrefix); };
+      const shareBtn = tr.querySelector('[data-a="fold-share"]');
+      if (shareBtn) shareBtn.onclick = (e) => { e.stopPropagation(); shareFolder(o.fullPrefix); };
       tr.querySelector('[data-a="fold-rename"]').onclick = async (e) => {
         e.stopPropagation();
         const p = await askText(t("foldRenameT"), o.fullPrefix.replace(/\/$/, ""));
@@ -2210,6 +2288,8 @@ function renderGallery(list){
     const acts = isDir
       ? '<button class="gmenu-btn" data-a="menu-toggle" title="'+esc(t("manageB")||"گزینه‌ها")+'" aria-label="options"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="19" r="2.2"/></svg></button>'
         +'<div class="gmenu-pop">'
+        +'<button class="gmenu-item" data-a="fold-zip"><svg viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg> <span>'+esc(t("zipDl"))+'</span></button>'
+        +'<button class="gmenu-item" data-a="fold-share"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg> <span>'+esc(t("linkT"))+'</span></button>'
         +'<button class="gmenu-item" data-a="fold-rename">'+RN_ICON+' <span>'+esc(t("renameT"))+'</span></button>'
         +'<button class="gmenu-item" data-a="fold-move">'+MV_ICON+' <span>'+esc(t("moveTitle"))+'</span></button>'
         +'<button class="gmenu-item" data-a="fold-copy">'+CP_ICON+' <span>'+esc(t("copyFileT"))+'</span></button>'
@@ -2306,6 +2386,8 @@ function renderGallery(list){
           toast(t("movedOk"));refresh();
         }catch(err){toast(err.message,"err");}
       };
+      cell.querySelector('[data-a="fold-zip"]').onclick=(e)=>{e.stopPropagation();if(menuPop)menuPop.classList.remove("on");downloadFolderZip(o.fullPrefix);};
+      cell.querySelector('[data-a="fold-share"]').onclick=(e)=>{e.stopPropagation();if(menuPop)menuPop.classList.remove("on");shareFolder(o.fullPrefix);};
       cell.querySelector('[data-a="fold-rename"]').onclick=async(e)=>{e.stopPropagation();const p=await askText(t("foldRenameT"),o.fullPrefix.replace(/\/$/,""));if(!p)return;api("/api/v1/admin/folders/rename",{method:"POST",body:JSON.stringify({old_path:o.fullPrefix,new_path:p})}).then(()=>{toast(t("saved"));refresh();}).catch(err=>toast(err.message,"err"));};
       cell.querySelector('[data-a="fold-move"]').onclick=(e)=>{e.stopPropagation();openMoveModal([o.id],o.filename);};
       cell.querySelector('[data-a="fold-copy"]').onclick=async(e)=>{
@@ -3323,13 +3405,18 @@ function renderQueue(){
       +'<span class="sz">'+humanSize(it.file.size)+'</span></div>'
       +'<div class="qbar"><i style="width:'+it.prog+'%"></i></div>'
       +'<div class="qstat"><span>'+(it.state==="fail"?'<span class="err">'+esc(it.err||"")+'</span>'
-        :it.state==="done"?t("tDone"):it.state==="up"?t("tUp"):t("uploading"))
-        +'</span>'+(it.state==="fail"?'<button class="btn-ghost btn qretry" data-id="'+it.id+'" style="padding:3px 10px;font-size:11.5px">'+esc(t("retry"))+'</button>'
+        :it.state==="canceled"?t("tCanceled"):it.state==="done"?t("tDone"):it.state==="up"?t("tUp"):t("uploading"))
+        +'</span>'
+      +((it.state==="up"||it.state==="wait")?'<button class="btn-ghost btn qcancel" data-id="'+it.id+'">'+esc(t("tCancel"))+'</button>':'')
+      +(it.state==="fail"?'<button class="btn-ghost btn qretry" data-id="'+it.id+'" style="padding:3px 10px;font-size:11.5px">'+esc(t("retry"))+'</button>'
         :'<span>'+(it.state==="up"?Math.floor(it.prog)+"%":"")+'</span>')+'</div>';
     q.appendChild(d);
   }
   q.querySelectorAll(".qretry").forEach(b=>{
     b.onclick=()=>retryItem(b.dataset.id);
+  });
+  q.querySelectorAll(".qcancel").forEach(b=>{
+    b.onclick=()=>cancelItem(b.dataset.id);
   });
 }
 async function pump(){
@@ -3341,15 +3428,16 @@ async function pump(){
     await uploadOne(it);
     it.state="done";it.prog=100;
   }catch(e){
-    it.state="fail";it.err=e.message;
+    if(e&&e.message==="__canceled__"){it.state="canceled";it.err="";}   // BUG-v0.15.26
+    else{it.state="fail";it.err=e.message;}
   }
   renderQueue();
   uploading=false;
-  // auto-remove finished items after a bit
+  // auto-remove finished items after a bit (canceled counts as finished too)
   setTimeout(()=>{
-    const done=queue.filter(q=>q.state==="done");
-    if(done.length===queue.length)queue=[];
-    else queue=queue.filter(q=>q.state!=="done");
+    const gone=queue.filter(q=>q.state==="done"||q.state==="canceled");
+    if(gone.length===queue.length)queue=[];
+    else queue=queue.filter(q=>q.state!=="done"&&q.state!=="canceled");
     renderQueue();
   },4000);
   refresh();
@@ -3543,6 +3631,7 @@ async function uploadOne(it){
   return new Promise((res,rej)=>{
     const fd=new FormData();fd.append("file",fileToSend,fileToSend.name);
     const xhr=new XMLHttpRequest();
+    it._xhr=xhr;   // BUG-v0.15.26: keep a handle so the cancel button can abort
     xhr.open("POST","/api/v1/upload");
     xhr.withCredentials=true;
     if(_apiKey)xhr.setRequestHeader("Authorization","Bearer "+_apiKey);
@@ -3565,14 +3654,72 @@ async function uploadOne(it){
       else{try{rej(new Error(JSON.parse(xhr.responseText).detail||xhr.status))}catch(e){rej(new Error("HTTP "+xhr.status))}}
     };
     xhr.onerror=()=>rej(new Error("network"));
+    xhr.onabort=()=>rej(new Error("__canceled__"));   // BUG-v0.15.26
     xhr.send(fd);
   });
+}
+/* BUG-v0.15.26: cancel one upload — abort the in-flight XHR (or de-queue a
+   waiting item), mark it canceled and let pump() move on / stop. */
+function cancelItem(id){
+  const it=queue.find(q=>q.id===id);
+  if(!it)return;
+  if(it._xhr){try{it._xhr.abort();}catch(e){}}
+  it._canceled=true;
+  it.state="canceled";it.err="";
+  renderQueue();
+  // if nothing is uploading anymore the pump loop is stuck on this item —
+  // uploadOne's promise rejects and pump() continues with the next item.
 }
 async function retryItem(id){
   const it=queue.find(q=>q.id===id);
   if(!it||uploading)return;
   it.state="wait";it.err="";
   renderQueue();pump();
+}
+
+/* BUG-v0.15.26: whole-folder actions — download every file under a folder as
+   one ZIP, or mint one album share link for the whole folder. The folder is
+   virtual (a filename prefix), so we collect its members client-side from the
+   already-loaded listing (≤500 rows, same data the table renders). */
+function collectFolderIds(prefix){
+  const p=(prefix||"").replace(/\/+$/,"")+"/";
+  return files.filter(o=>{
+    const fn=o.filename||"";
+    return fn.startsWith(p)&&!o.isFolder&&fn!==p;
+  }).map(o=>o.id);
+}
+async function downloadFolderZip(prefix){
+  const ids=collectFolderIds(prefix);
+  if(!ids.length){toast(t("zipFilesOnly"),"err");return;}
+  toast(t("folderZipStart"));
+  try{
+    const r=await fetch("/f/zip",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ids:ids})});
+    if(!r.ok){throw new Error((await r.json()).detail||r.status);}
+    const blob=await r.blob();
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    const clean=(prefix||"folder").replace(/\/+$/,"").replace(/[^\w\u0600-\u06FF.-]+/g,"_")||"folder";
+    a.download="anbar-"+clean+"-"+new Date().toISOString().slice(0,10)+".zip";
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+  }catch(e){toast(e.message,"err");}
+}
+async function shareFolder(prefix){
+  const ids=collectFolderIds(prefix);
+  if(!ids.length){toast(t("shareFilesOnly"),"err");return;}
+  try{
+    const j=await api("/f/album",{method:"POST",
+      body:JSON.stringify({ids:ids})});
+    $("#linkT_h").textContent=t("albumOk")+" ("+j.count+")";
+    $("#linkS").textContent=t("albumSub");
+    $("#linkUrl").textContent=j.url;
+    const qr=$("#linkQr");
+    qr.src="/f/"+ids[0]+"/qr?_="+Date.now();
+    qr.style.display="block";
+    $("#linkModal").classList.add("on");
+  }catch(e){toast(e.message,"err");}
 }
 
 /* double-submit guard (v0.15.11): disables the button while its async handler runs */
@@ -3598,9 +3745,9 @@ function initTgAuthUI() {
     btnSend.onclick = async () => {
       const phoneInp = document.getElementById("s_tg_phone");
       const phone = phoneInp ? phoneInp.value.trim() : "";
-      if (!phone) { toast("شماره موبایل را وارد کنید", "err"); return; }
+      if (!phone) { toast(t("tgNeedPhone"), "err"); return; }
       btnSend.disabled = true;
-      toast("در حال ارسال کد تأیید تلگرام...");
+      toast(t("tgSendingCode"));
       try {
         const r = await api("/api/v1/admin/telegram/send-code", {
           method: "POST",
@@ -3609,7 +3756,7 @@ function initTgAuthUI() {
         _tgPhoneCodeHash = r.phone_code_hash || "";
         const otpRow = document.getElementById("tgOtpRow");
         if (otpRow) otpRow.style.display = "flex";
-        toast(r.message || "کد تأیید به تلگرام شما ارسال شد");
+        toast(r.message || t("tgCodeSent"));
       } catch (err) {
         toast(err.message, "err");
       } finally {
@@ -3625,9 +3772,9 @@ function initTgAuthUI() {
       const pwInp = document.getElementById("s_tg_2fa_pw");
       const code = codeInp ? codeInp.value.trim() : "";
       const password = pwInp ? pwInp.value : "";
-      if (!code) { toast("کد دریافتی از تلگرام را وارد کنید", "err"); return; }
+      if (!code) { toast(t("tgNeedCode"), "err"); return; }
       btnVerify.disabled = true;
-      toast("در حال اعتبارسنجی...");
+      toast(t("tgVerifying"));
       try {
         const r = await api("/api/v1/admin/telegram/verify-code", {
           method: "POST",
@@ -3658,10 +3805,10 @@ function initTgAuthUI() {
   const btnLogout = document.getElementById("btnTgLogout");
   if (btnLogout) {
     btnLogout.onclick = async () => {
-      if(!(await askConfirm("آیا مایلید از سشن تلگرام خارج شوید؟"))) return;
+      if(!(await askConfirm(t("tgLogoutQ")))) return;
       try {
         await api("/api/v1/admin/telegram/logout", { method: "POST" });
-        toast("از تلگرام خارج شدید");
+        toast(t("tgLoggedOut"));
         await loadTelegramConfig();
       } catch (err) {
         toast(err.message, "err");
@@ -3893,6 +4040,25 @@ function syncHashToggleBtn(){
   btn.classList.toggle("btn-ghost",!isVis);
   btn.style.borderColor=isVis?"var(--brand)":"";
 }
+/* BUG-v0.15.26: the show/hide button "didn't work" because the field is kept
+   empty (B-054 — the raw hash never leaves the server), so toggling input
+   type had nothing to reveal. Now toggling reveals the MASKED value
+   (e.g. abcd••••wxyz) — enough to verify which hash is configured without
+   exposing the secret. Masked values are rejected server-side on save
+   (they contain "•"), so revealing can never overwrite the stored hash. */
+let _tgApiHashMasked="";
+$("#s_tg_hash_toggle").onclick=()=>{
+  const inp=$("#s_tg_api_hash");
+  if(!inp)return;
+  if(inp.type==="password"){
+    inp.type="text";
+    if(!inp.value.trim()&&_tgApiHashMasked)inp.value=_tgApiHashMasked;
+  }else{
+    inp.type="password";
+    if(inp.value.trim()===_tgApiHashMasked)inp.value="";
+  }
+  syncHashToggleBtn();
+};
 
 
 
@@ -3918,6 +4084,7 @@ async function loadTelegramConfig(){
       // or the masked value must not wipe the stored hash.
       $("#s_tg_api_hash").value="";
       $("#s_tg_api_hash").placeholder=r.api_hash_masked||"Telegram API Hash...";
+      _tgApiHashMasked=r.api_hash_masked||"";   // BUG-v0.15.26: for reveal toggle
     }
     if($("#s_tg_peer"))$("#s_tg_peer").value=r.mtproto_peer||"";
     const isAuthed = !!r.session_authorized;

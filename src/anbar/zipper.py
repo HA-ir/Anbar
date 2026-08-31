@@ -48,7 +48,6 @@ async def stream_zip(entries: list[tuple[str, str, dict]], fetch_chunk) -> Async
     """
     q: asyncio.Queue = asyncio.Queue(maxsize=32)
     q_loop = asyncio.get_running_loop()
-    work_loop = asyncio.new_event_loop()
     box: dict[str, bytes] = {}
 
     def _segments(manifest: dict):
@@ -57,7 +56,6 @@ async def stream_zip(entries: list[tuple[str, str, dict]], fetch_chunk) -> Async
 
     def work() -> None:
         try:
-            asyncio.set_event_loop(work_loop)
             bridge = _LoopBridge(q, q_loop)
             with zipfile.ZipFile(
                 bridge, "w", compression=zipfile.ZIP_STORED, allowZip64=True
@@ -69,7 +67,19 @@ async def stream_zip(entries: list[tuple[str, str, dict]], fetch_chunk) -> Async
                     # force_zip64 keeps the local header honest (data desc).
                     with zf.open(info, "w", force_zip64=True) as dst:
                         for i, off, length in _segments(manifest):
-                            data = work_loop.run_until_complete(fetch_chunk(obj_id, i, off, length))
+                            # BUG-v0.15.26: fetch_chunk MUST run on the MAIN
+                            # loop — Telethon (MTProto) binds its client to
+                            # the loop it connected on, and the old
+                            # work_loop.run_until_complete(...) triggered
+                            # "The asyncio event loop must not change after
+                            # connection", killing every real-file ZIP
+                            # mid-stream (fake-backend tests never hit it).
+                            # The consumer below awaits q.get(), so the main
+                            # loop is free to serve this coroutine meanwhile.
+                            fut = asyncio.run_coroutine_threadsafe(
+                                fetch_chunk(obj_id, i, off, length), q_loop
+                            )
+                            data = fut.result(600)
                             dst.write(data)
         except Exception as e:  # noqa: BLE001 - surfaced on the consumer side
             import traceback
@@ -77,7 +87,6 @@ async def stream_zip(entries: list[tuple[str, str, dict]], fetch_chunk) -> Async
             traceback.print_exc()
             box["error"] = str(e).encode() or b"zip failed"
         finally:
-            work_loop.close()
             asyncio.run_coroutine_threadsafe(q.put(_END), q_loop).result(60)
 
     threading.Thread(target=work, daemon=True, name="anbar-zip").start()

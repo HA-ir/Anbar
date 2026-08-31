@@ -390,8 +390,11 @@ async def download(request: Request, obj_id: str):
     if start is not None:
         headers["Content-Range"] = f"bytes {start}-{end}/{total}"
     status = 206 if start is not None else 200
-    db.bump_downloads(obj_id)
+    # BUG-v0.15.26: only a full 200 body (no Range header) counts as a
+    # download — Range probes (206, e.g. <video preload="metadata"> in the
+    # preview modal) must NOT bump the counter.
     if start is None:
+        db.bump_downloads(obj_id)
         # v0.10.4: per-link download stats (best-effort, full downloads only)
         from .. import links as links_registry
 

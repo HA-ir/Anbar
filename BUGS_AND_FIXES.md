@@ -1,6 +1,65 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.25
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.26
+
+## v0.15.26 — 2026-08-31 (UX Fixes — گزارش کاربر)
+
+### UX-01 · دکمه لغو آپلود — Severity: UX
+- **باس:** صف آپلود فقط دکمه retry برای آیتم‌های fail داشت؛ در حین آپلود (حتی چندصد مگابایتی) هیچ راهی برای پشیمانی و لغو نبود.
+- **فیکس (src/anbar/ui/index.html):**
+  - دکمه «لغو» روی هر آیتم در حالت `wait` (در صف) و `up` (در حال ارسال).
+  - `uploadOne` هندل XHR را روی آیتم نگه می‌دارد (`it._xhr`)؛ `cancelItem(id)` آن را abort می‌کند (`xhr.onabort` → reject با sentinel `__canceled__`).
+  - `pump()` حالت `canceled` را از `fail` تشخیص می‌دهد، آیتم لغوشده بعد از ۴ ثانیه مثل done از صف پاک می‌شود و صف به آیتم بعدی می‌رود.
+  - i18n: `tCancel` / `tCanceled` در fa/en.
+
+### UX-02 · ریسپانسیو نبودن صفحه اصلی در desktop — Severity: UI
+- **باس:** `.wrap` و `.topbar-in` با `max-width:1080px` هاردکپ شده بودند (میراث mobile-first)؛ روی مانیتورهای عریض صفحه یک نوار باریک وسط می‌ماند و جدول فایل‌ها از کانتینر بیرون می‌زد.
+- **فیکس:**
+  - عرض سیال `max-width:min(1280px,96vw)` برای هر دو کانتینر.
+  - `table{table-layout:fixed}` + نسبت ستون‌ها (نام = auto/باقی‌مانده، حجم/تاریخ/دانلود = 150px، عملیات = 250px) + `overflow:hidden; text-overflow:ellipsis` روی th/td — جدول همیشه در کادر خود جا می‌شود و نام فایل بلند ellipsis می‌گیرد.
+  - `@media(max-width:720px)` (حالت کارت) ریست می‌شود: `table-layout:auto` و `th{width:auto !important}`.
+
+### UX-03 · دانلود ZIP و اشتراک کل پوشه — Severity: Feature Gap
+- **باس:** endpoint های `/f/zip` و `/f/album` از قبل وجود داشتند (v0.10/v0.10.4) ولی فقط برای multi-select سیم‌کشی شده بودند؛ برای پوشه‌ها هیچ اکشنی نبود.
+- **فیکس:**
+  - `collectFolderIds(prefix)`: اعضای پوشه از لیست لودشده (≤500 ردیف، همان داده جدول) جمع می‌شود.
+  - `downloadFolderZip(prefix)`: ZIP استریمی همه فایل‌های پوشه با نام `anbar-<folder>-<date>.zip`.
+  - `shareFolder(prefix)`: یک لینک آلبوم عمومی برای کل پوشه.
+  - Table view: دو دکمه جدید ZIP و اشتراک در اکشن‌های ردیف پوشه. Gallery view: دو آیتم در منوی ⋮ پوشه. هندلرها در هر دو view وصل شدند.
+
+### UX-04 · هدر جدول و پس‌زمینه پشت کارت‌های گالری — Severity: UI
+- **باس:** `renderGallery` فقط `tbody` را خالی می‌کرد و گرید را داخل `.tbl-wrap` می‌گذاشت؛ قانون CSS فعلی فقط `overflow:visible` می‌داد — پس نوار «نام/حجم/تاریخ/دانلود/عملیات» (thead) و صفحه سفید سایه‌دار کانتینر پشت کارت‌ها می‌ماند.
+- **فیکس:** قوانین `:has(.gallery)` کامل شد — `thead{display:none}`، `table{display:none}` و `background:transparent; border:none; box-shadow:none` برای کانتینر. (پیش‌تر باگ UI-04 از IMPROVEMENT_PLAN فقط overflow را هندل کرده بود.)
+
+### UX-05 · المان‌های stale بعد از سوییچ زبان — Severity: i18n
+- **باس:** `applyI18n()` فقط `[data-i18n]` را re-render می‌کرد؛ هر متنِ دینامیکِ با `t()` ساخته‌شده تا رفرش بعدی به زبان قبلی می‌ماند. موارد یافت‌شده:
+  1. «ZK: خاموش/روشن» بج dropzone (فقط با `syncClientZkUI` آپدیت می‌شد)
+  2. صف آپلود (وضعیت‌ها + دکمه retry)
+  3. tooltip دکمه table/gallery
+  4. دکمه نمایش/پنهان API Hash
+  5. دکمه select mode
+  6. چیپ‌های مدال فایل (chunks/downloads)
+  7. مودال‌های باز Links/Trash
+  8. دکمه‌های Preview/Raw پریویو md
+  9. کل باکس MTProto Auth (عنوان، توضیح، دکمه‌های ارسال کد/تأیید/خروج) — HTML هاردکد فارسی
+  10. toast/confirm های جریان OTP تلگرام (نیاز به شماره، در حال ارسال، …)
+- **فیکس:** `applyI18n` حالا همه سطرف‌های بالا را re-sync می‌کند (`syncClientZkUI`, `renderQueue`, `syncViewBtn`, `syncHashToggleBtn`, مودال‌های باز، …). باکس MTProto Auth به `data-i18n` مهاجرت داده شد؛ ۱۵ کلید جدید fa/en (تست parity `test_dashboard_i18n.py` پاس).
+
+### UX-06 · شمارنده دانلود غیرواقعی — Severity: Data (بک‌اند)
+- **باس:** `db.bump_downloads(obj_id)` بیرون از گارد `start is None` صدا می‌شد؛ هر درخواست Range (پریویو مدیا، `<video preload="metadata">`، probe مرورگر) هم +۱ می‌زد. فایل کاربر با ۰ دانلود واقعی «۲۷» نشان می‌داد.
+- **فیکس (src/anbar/api/download.py):** bump فقط برای 200 کامل (بدون Range). درخواست‌های 206 و 304 شمرده نمی‌شوند. آمار per-link (v0.10.4) و cap لینک (v0.9.2) از قبل فقط full بودند — بدون تغییر.
+- **تست:** `tests/test_download_counter.py` — ۳ تست: Range ×2 → counter=0؛ دو دانلود کامل → 2 سپس Range → همچنان 2؛ 304 با ETag → شمرده نمی‌شود.
+
+### UX-07 · دکمه نمایش/پنهان API Hash — Severity: UI
+- **باس:** فیلد همیشه خالی است (B-054: سرور hash خام را برنمی‌گرداند)؛ toggle نوع input روی فیلد خالی هیچ افکتی نداشت.
+- **فیکس:** toggle حالا مقدار masked (مثل `abcd••••wxyz`) را در فیلد نشان می‌دهد و در حالت پنهان برمی‌گرداند به خالی. سرور از قبل مقدار حاوی `•` را در POST رد می‌کند، پس reveal هرگز نمی‌تواند hash ذخیره‌شده را بازنویسی کند. `_tgApiHashMasked` از `GET /admin/telegram-config` پر می‌شود.
+
+### UX-08 (بونوس، حین E2E کشف شد) · ZIP استریم با MTProto کاملاً خراب بود — Severity: Critical (بک‌اند)
+- **باس:** `zipper.stream_zip` کوروتین‌های `fetch_chunk` را روی یک event loop **جدید** در worker thread اجرا می‌کرد (`work_loop.run_until_complete`)؛ Telethon کلاینت MTProto به loop اصلی قفل است → `RuntimeError: The asyncio event loop must not change after connection` → هر ZIP واقعی وسط استریم ۵۰۰ می‌شد. تست‌ها fake backend دارند و این را هرگز نمی‌دیدند — در E2E واقعی روی loopback کشف شد.
+- **فیکس (src/anbar/zipper.py):** `fetch_chunk` با `asyncio.run_coroutine_threadsafe(..., q_loop)` روی **loop اصلی** اجرا می‌شود؛ worker thread فقط zip را serialize می‌کند و روی future منتظر می‌ماند (timeout 600s). Consumer که `await q.get()` است همزمان loop را آزاد نگه می‌دارد — بدون deadlock.
+- **تست واقعی:** فایل ۱۰۰KB آپلود و ZIP شد → `sha256` محتوای ZIP = sha فایل اصلی ✓.
+
+- **تست:** کل suite **۳۵۱ سبز** (۳۴۸ قبلی + ۳ جدید) · ruff روی فایل‌های تغییر یافته تمیز.
 
 ## v0.15.25 — 2026-08-31 (Improvement Plan — PERF-01)
 
