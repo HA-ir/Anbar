@@ -34,7 +34,7 @@
 
 ## 3. Backend — Storage (src/anbar/storage/*.py)
 
-- [ ] base.py
+- [~] base.py — L6 (ObjectRef/StorageBackend ABC: سالم)
 - [~] bot_backend.py — L5 (paced send, flood budget, CDN retry)
 - [~] bot_harvester.py — L5 (offset persistence)
 - [~] bot_pool.py — L5 (round-robin)
