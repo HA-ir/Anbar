@@ -33,6 +33,7 @@
 | L9 | v0.15.19 | B-057 (Path traversal در recover.py، HIGH)، B-058 (secrets در build context داکر، HIGH) | ۲ فیکس + ۱۴ تست — پوشش کامل: ۱۰ قطعه index.html، زیرساخت (Dockerfile/compose/CI/bench)، recover.py، gap-analysis تست‌ها — پوشش دور ۱۰۰٪ |
 
 **جمع:** ۱۸ باگ (B-041…B-058) · تست‌ها 209 → 260 · سطح‌ها: 5×HIGH، 5×MEDIUM، 6×LOW، 2×TRIVIAL
+**Loop #10 باز شد (v0.15.19):** همه آیتم‌های coverage به `[ ]` برگشتند — دور بعدی ممیزی کامل از صفر.
 **درس تکرارشونده:** الگوی «innerHTML بدون escape با داده کاربر» دو بار (آلبوم + miniapp) — بعد از این، همه render pathهای جدید باید esc/escape دارند.
 **CI:** یک خطای E501 (خط طولانی) هم پس از loop #1 گرفته و فیکس شد.
 
