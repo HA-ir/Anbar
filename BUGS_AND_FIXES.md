@@ -1,6 +1,21 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.14
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.15
+
+## v0.15.15 — 2026-08-31 (Audit Fixes — Loop #5)
+
+### B-050 · XSS در لیست فایل‌های Mini App تلگرام — Severity: HIGH
+- **باس:** `renderList()` در `miniapp.html` نام فایل‌ها را بدون escape داخل template literal به `innerHTML` می‌داد — نام فایل مخرب (`<img src=x onerror=...>`) داخل webview تلگرام اجرا می‌شد. (الگوی مشابه B-049 در صفحه آلبوم.)
+- **فیکس:** helper `esc()` (textContent→innerHTML) برای filename و id داخل onclick + `encodeURIComponent` روی id لینک دانلود.
+- **تست:** ۲ تست ساختاری در `test_miniapp_xss.py`.
+
+### نکات audit شده در این دور (بدون باگ)
+- `bot_backend.py` (paced send, flood budget, CDN retry با backoff): منطق سالم.
+- `bot_pool.py` (round-robin), `bot_harvester.py` (offset persistence): سالم.
+- `mtproto_backend.py` (parallel upload parts, dead-link heal): سالم.
+- `ingest.py` (URL pull: http(s)-only, size ceiling, concurrency semaphore, idle timeout): سالم.
+- `cli.py` (login/put/get/crypto/s3): سالم — بدون subprocess/eval.
+- `notify.py`: best-effort، خطاها job را نمی‌شکنند: سالم.
 
 ## v0.15.14 — 2026-08-31 (Audit Fixes — Loop #4)
 

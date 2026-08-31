@@ -90,15 +90,16 @@ function renderList(list) {
     box.innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center; padding: 12px;">فایلی یافت نشد.</p>';
     return;
   }
+  const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
   box.innerHTML = list.map(f => `
     <div class="file-item">
       <div>
-        <div class="file-name">${f.filename || f.id}</div>
+        <div class="file-name">${esc(f.filename || f.id)}</div>
         <div class="file-meta">${(f.size / (1024*1024)).toFixed(2)} MB · ${f.downloaded || 0} دانلود</div>
       </div>
       <div style="display: flex; gap: 6px;">
-        <button class="btn-act" onclick="copyLink('${f.id}')">🔗</button>
-        <a href="/f/${f.id}" target="_blank" class="btn-act">⬇</a>
+        <button class="btn-act" onclick="copyLink('${esc(f.id)}')">🔗</button>
+        <a href="/f/${encodeURIComponent(f.id)}" target="_blank" class="btn-act">⬇</a>
       </div>
     </div>
   `).join('');

@@ -4,6 +4,11 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.15] — 2026-08-31
+
+### Fixed
+- **XSS in Telegram Mini App File List**: `renderList()` interpolated `f.filename` raw into `innerHTML` — a crafted filename executed HTML/JS inside the Telegram webview. Filenames (and ids in the copy handler) are now escaped, and the download link id is `encodeURIComponent`-ed. Found in audit loop #5.
+
 ## [0.15.14] — 2026-08-31
 
 ### Fixed
