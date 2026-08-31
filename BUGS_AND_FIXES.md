@@ -1,6 +1,6 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.20
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.21
 
 ## v0.15.19 — 2026-08-31 (Audit Fixes — Loop #9)
 
@@ -185,3 +185,17 @@
 - **QUAL-03**: برچسب گمراه‌کننده «رمزنگاری» → «رمزنگاری caption و متادیتا».
 
 تست: 243 → **284 passed**. فایل‌های جدید تست: `test_v01520_improvements.py`، `test_v01520_batch2.py`، `test_v01520_batch3.py`.
+
+## v0.15.21 — 2026-08-31 (Improvement Plan — QUAL-01 + QUAL-02)
+
+### R-001 · ObjectService مشترک (QUAL-01) — Severity: REFACTOR
+- **باس:** بلوک‌های rollback/commit بین `upload.py` و `ingest.py` کپی‌پیست بودند و drift واقعی داشتند (caption و harvester فقط در مسیر آپلود).
+- **فیکس:** ماژول `src/anbar/object_service.py` — کلاس `ObjectService` با store/rollback/commit مشترک؛ هر دو route روی آن.
+- **تست:** `tests/test_object_service.py` — ۷ تست (شامل E2E ingest که باگ `nonlocal total_in` جاافتاده را کشف کرد).
+
+### F-001 · miniapp احراز هویت واقعی (QUAL-02) — Severity: MEDIUM
+- **باس:** `verify_telegram_init_data` نوشته و تست شده بود ولی به هیچ endpoint وصل نبود؛ miniapp در auth=on عملاً غیرقابل استفاده بود.
+- **فیکس:** `POST /ui/miniapp/session` (rate-limited، audited، سشن admin مثل login؛ بدون توکن → 503) + `ensureSession()` در miniapp با `credentials: include` روی همه fetch ها.
+- **تست:** `tests/test_miniapp_session.py` — ۵ تست (امضای بد/منقضی 401، بدون توکن 503، جریان کامل admin، نقش سشن).
+
+تست: 284 → **296 passed**.

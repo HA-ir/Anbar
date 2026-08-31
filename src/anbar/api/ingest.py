@@ -22,13 +22,8 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 
 from ..auth import require_admin
-from ..objects import (  # noqa: F401 (Chunk re-used in _run_job)
-    Chunk,
-    Manifest,
-    new_object_id,
-    opaque_chunk_name,
-)
-from ..storage.base import ObjectRef
+from ..object_service import ObjectService
+from ..objects import Manifest  # noqa: F401 (re-exported for job payload typing)
 
 router = APIRouter()
 log = logging.getLogger("anbar.ingest")
@@ -133,63 +128,37 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                     reader = _UrlReader(resp, IDLE_TIMEOUT)
                     total_in = 0
 
-                    async def on_chunk(data: bytes) -> ObjectRef:
-                        nonlocal total_in
-                        total_in += len(data)
-                        job["bytes"] = total_in
-                        job["chunks"] += 1
-                        return await app.state.backend.store(data, opaque_chunk_name(job["chunks"]))
+                    # QUAL-01: shared ObjectService (store/rollback/commit).
+                    # Ingest keeps its progress hooks and has no resume
+                    # checkpoint; captions were never used on this path.
+                    svc = ObjectService(
+                        backend=app.state.backend,
+                        db=app.state.db,
+                        settings=settings,
+                        filename=fname,
+                        content_type=ctype,
+                    )
 
-                    manifest = Manifest(chunks=[], total_size=0)
+                    class _JobReader:
+                        """Progress hook around the origin reader."""
 
-                    # reuse the upload chunker via a tiny shim that mirrors
-                    # _store_stream's rollback semantics
-                    from ..objects import chunk_stream
-
-                    async def put(data: bytes, media: bool = False) -> None:
-                        ref = await on_chunk(data)
-                        manifest.chunks.append(
-                            Chunk(
-                                index=len(manifest.chunks),
-                                size=len(data),
-                                file_id=ref.file_id,
-                                message_id=ref.message_id,
-                            )
-                        )
+                        async def read(self, n: int) -> bytes:
+                            nonlocal total_in
+                            data = await reader.read(n)
+                            total_in += len(data)
+                            job["bytes"] = total_in
+                            return data
 
                     try:
-                        _, sha = await chunk_stream(reader, settings.chunk_size, put)
+                        _, sha = await svc.store_stream(_JobReader())
                     except BaseException:
-                        for c in manifest.chunks:  # best-effort rollback
-                            try:
-                                await app.state.backend.delete(
-                                    ObjectRef(
-                                        file_id=c.file_id,
-                                        message_id=c.message_id,
-                                        backend=app.state.backend.name,
-                                    )
-                                )
-                            except Exception:  # noqa: BLE001
-                                pass
+                        await svc.rollback()
                         raise
-                    manifest.total_size = sum(c.size for c in manifest.chunks)
+                    manifest = svc.manifest
+                    job["chunks"] = len(manifest.chunks)
 
                     # commit into the DB exactly like a normal upload
-                    obj_id = new_object_id()
-                    db = app.state.db
-                    db.insert_object(
-                        {
-                            "id": obj_id,
-                            "file_id": manifest.chunks[0].file_id,
-                            "backend": app.state.backend.name,
-                            "filename": fname,
-                            "size": manifest.total_size,
-                            "content_type": ctype,
-                            "sha256": sha,
-                            "manifest": manifest.to_json(),
-                            "uploader_key": job.get("key"),
-                        }
-                    )
+                    obj_id = svc.commit(sha_hex=sha, uploader_key=job.get("key"))
                     job["object"] = {
                         "id": obj_id,
                         "url": f"/f/{obj_id}",

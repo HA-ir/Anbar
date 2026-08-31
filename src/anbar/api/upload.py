@@ -16,11 +16,10 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from .. import runtime
-from ..auth import effective_hmac_secret, require_uploader
-from ..objects import Chunk, Manifest, chunk_stream, new_object_id, opaque_chunk_name
+from ..auth import require_uploader
+from ..object_service import ObjectService, ResumeOutOfRange, describe_storage_error
+from ..objects import Manifest
 from ..ratelimit import limit_upload
-from ..self_healing import encode_chunk_caption
-from ..storage import FloodBudgetExceeded, ObjectRef, TelegramError
 
 router = APIRouter()
 log = logging.getLogger("anbar.upload")
@@ -51,29 +50,25 @@ def _max_upload_bytes(request: Request) -> int:
 async def _commit(
     request: Request, manifest: Manifest, sha_hex: str, filename: str, content_type: str
 ) -> JSONResponse:
+    """Commit via ObjectService and build the JSON response.
+
+    `svc` (when given) is the ObjectService that produced `manifest` — its
+    checkpoint is dropped here; otherwise cleanup falls back to the header
+    (compat with tests calling the pieces directly).
+    """
     settings = request.app.state.settings
-    backend = request.app.state.backend
     db = request.app.state.db
-    manifest.total_size = sum(c.size for c in manifest.chunks)
-    obj_id = new_object_id()
-    db.insert_object(
-        {
-            "id": obj_id,
-            "file_id": manifest.chunks[0].file_id,
-            "backend": backend.name,
-            "filename": filename,
-            "size": manifest.total_size,
-            "content_type": content_type,
-            "sha256": sha_hex,
-            "manifest": manifest.to_json(),
-            "uploader_key": _uploader_key(request),
-        }
-    )
-    # resume checkpoint no longer needed once the object is committed —
-    # without this the upres:<id> rows accumulate in kv forever (MP-02)
-    upload_id = request.headers.get("x-upload-id", "").strip()
-    if upload_id:
-        db.kv_delete(f"upres:{upload_id}")
+    svc: ObjectService | None = getattr(manifest, "_svc", None)
+    if svc is not None:
+        obj_id = svc.commit(sha_hex=sha_hex, uploader_key=_uploader_key(request))
+        svc.drop_checkpoint()
+    else:
+        svc = _service_for(request, filename, content_type, None, 0)
+        svc.manifest = manifest
+        obj_id = svc.commit(sha_hex=sha_hex, uploader_key=_uploader_key(request))
+        upload_id = request.headers.get("x-upload-id", "").strip()
+        if upload_id:
+            db.kv_delete(f"upres:{upload_id}")
     db.log_audit(
         "file.upload",
         actor="admin",
@@ -100,132 +95,45 @@ async def _store_stream(
     upload_id: str | None = None,
     resume_from: int = 0,
 ) -> tuple[Manifest, str]:
-    """Drive the chunker over `stream`; return (manifest, sha256).
+    """Store `stream` via the shared ObjectService; return (manifest, sha256).
 
     With `upload_id` set, every stored chunk bumps the kv checkpoint
     `upres:<upload_id>` so a dropped connection can resume past stored
     chunks (they are drained, not re-posted). Checkpoints expire in 24h.
     """
-    settings = request.app.state.settings
-    backend = request.app.state.backend
-    db = request.app.state.db
-    manifest = Manifest(chunks=[], total_size=0)
-    ck_key = f"upres:{upload_id}" if upload_id else None
-    prior: list[dict] = []
-    if ck_key and resume_from:
-        try:
-            raw = json.loads(db.kv_get(ck_key, "") or "")  # v0.15.20: envelope
-            prior = raw.get("chunks", []) if isinstance(raw, dict) else raw
-        except (json.JSONDecodeError, AttributeError):
-            prior = []
-        if resume_from > len(prior):
-            raise HTTPException(
-                409,
-                f"cannot resume from {resume_from}: only {len(prior)} "
-                "chunks are checkpointed for this upload id",
-            )
-        # pre-seed the manifest with the already-stored chunks
-        for i, c in enumerate(prior[:resume_from]):
-            manifest.chunks.append(
-                Chunk(index=i, size=c["s"], file_id=c["f"], message_id=c.get("m"))
-            )
-    skip_remaining = resume_from
-
-    def _checkpoint() -> None:
-        if ck_key:
-            db.kv_set(
-                ck_key,
-                json.dumps(
-                    {
-                        # _ts lets kv_prune_prefix drop checkpoints abandoned
-                        # mid-upload (older than 24h) without a schema change
-                        "_ts": int(time.time()),
-                        "chunks": [
-                            {"s": c.size, "f": c.file_id, "m": c.message_id}
-                            for c in manifest.chunks
-                        ],
-                    },
-                    separators=(",", ":"),
-                ),
-            )
-
-    harvester = getattr(request.app.state, "harvester", None)
-
-    configured_sec = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
-    active_secret = effective_hmac_secret(db, configured_sec)
-
-    async def on_chunk(data: bytes, media: bool = False) -> str:
-        nonlocal skip_remaining
-        if skip_remaining > 0:
-            skip_remaining -= 1  # duplicate of an already-stored chunk: drain
-            return ""
-        chunk_idx = len(manifest.chunks)
-        caption = encode_chunk_caption(
-            obj_id=upload_id or "",
-            chunk_idx=chunk_idx,
-            total_chunks=0,
-            filename=filename,
-            total_size=0,
-            content_type=content_type,
-            secret=active_secret,
-        )
-        ref = await backend.store(
-            data,
-            opaque_chunk_name(chunk_idx),
-            content_type=None,
-            caption=caption,
-        )
-        bot_fid = None
-        if harvester and ref.message_id is not None:
-            try:
-                bot_fid = await harvester.get_file_id_for_message(ref.message_id, timeout=2.0)
-            except Exception as e:
-                log.debug("harvester error for msg %s: %s", ref.message_id, e)
-
-        manifest.chunks.append(
-            Chunk(
-                index=len(manifest.chunks),
-                size=len(data),
-                file_id=ref.file_id,
-                message_id=ref.message_id,
-                bot_file_id=bot_fid,
-            )
-        )
-        _checkpoint()
-        return ref.file_id
-
+    svc = _service_for(request, filename, content_type, upload_id, resume_from)
+    svc.harvester = getattr(request.app.state, "harvester", None)
     try:
-        _, sha_hex = await chunk_stream(
-            stream,
-            settings.chunk_size,
-            on_chunk,
-            is_first_chunk_media=bool(content_type),
-        )
+        manifest, sha_hex = await svc.store_stream(stream)
+    except ResumeOutOfRange as e:
+        raise HTTPException(409, str(e)) from None
     except BodyReadTimeout as e:
-        for c in manifest.chunks:  # best-effort rollback of posted blobs
-            try:
-                await backend.delete(
-                    ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=backend.name)
-                )
-            except Exception:  # noqa: BLE001
-                pass
-        log.warning("upload aborted: %s (%d chunks rolled back)", e, len(manifest.chunks))
+        log.warning("upload aborted: %s (%d chunks rolled back)", e, len(svc.manifest.chunks))
         raise HTTPException(408, f"client stalled: {e}") from e
     except Exception as e:
         log.exception("upload chunk failed with error: %s", e)
-        for c in manifest.chunks:  # best-effort rollback of posted blobs
-            try:
-                await backend.delete(
-                    ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=backend.name)
-                )
-            except Exception:  # noqa: BLE001
-                pass
-        if isinstance(e, FloodBudgetExceeded):
-            raise HTTPException(504, f"telegram: {e.message}") from e
-        if isinstance(e, TelegramError):
-            raise HTTPException(502, f"telegram: {e.message}") from e
-        raise HTTPException(502, f"storage error: {e}") from e
+        status, detail = describe_storage_error(e)
+        raise HTTPException(status, detail) from e
+    manifest._svc = svc  # noqa: SLF001 — commit drops the checkpoint via it
     return manifest, sha_hex
+
+
+def _service_for(
+    request: Request,
+    filename: str,
+    content_type: str | None,
+    upload_id: str | None,
+    resume_from: int,
+) -> ObjectService:
+    return ObjectService(
+        backend=request.app.state.backend,
+        db=request.app.state.db,
+        settings=request.app.state.settings,
+        filename=filename,
+        content_type=content_type,
+        upload_id=upload_id,
+        resume_from=resume_from,
+    )
 
 
 @router.post("/upload")

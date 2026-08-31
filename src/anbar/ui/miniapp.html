@@ -68,11 +68,40 @@ if (tg) {
 
 let allFiles = [];
 
-async function loadFiles() {
+// QUAL-02: authenticate with Telegram initData before touching the API.
+// Telegram injects `tg.initData` (HMAC-signed by the bot); the server
+// verifies it and sets an HttpOnly session cookie. Without this the
+// mini app is anon and every admin API call 401s.
+async function ensureSession() {
   try {
-    const res = await fetch('/api/v1/admin/objects?limit=50', { credentials: 'omit' });
+    const me = await fetch('/ui/me', { credentials: 'include' });
+    const m = await me.json();
+    if (m.authed) return true; // already has a valid session
+  } catch (e) { /* fall through to initData exchange */ }
+  if (!tg || !tg.initData) return false; // opened outside Telegram
+  try {
+    const res = await fetch('/ui/miniapp/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ init_data: tg.initData })
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function loadFiles() {
+  const authed = await ensureSession();
+  if (!authed) {
+    document.getElementById('files').innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">احراز هویت تلگرام برقرار نشد.</p>';
+    return;
+  }
+  try {
+    const res = await fetch('/api/v1/admin/objects?limit=50', { credentials: 'include' });
     if (!res.ok) {
-      document.getElementById('files').innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">برای مشاهده کامل کلید ادمین لازم است.</p>';
+      document.getElementById('files').innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">خطا در دریافت لیست فایل‌ها.</p>';
       return;
     }
     const data = await res.json();
@@ -130,6 +159,7 @@ async function handleFileUpload(e) {
   try {
     const res = await fetch('/api/v1/upload', {
       method: 'POST',
+      credentials: 'include',
       body: formData
     });
     if (res.ok) {

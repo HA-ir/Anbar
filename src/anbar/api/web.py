@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .. import __version__, runtime
-from ..auth import constant_time_equal, whoami
+from ..auth import constant_time_equal, verify_telegram_init_data, whoami
 from ..ratelimit import limit_login
 from ..webauth import COOKIE, issue_session
 
@@ -84,6 +84,68 @@ async def logout(request: Request):
 async def me(request: Request):
     role = whoami(request)
     return {"authed": role in ("admin", "uploader"), "role": role}
+
+
+@router.post("/ui/miniapp/session")
+async def miniapp_session(request: Request):
+    """QUAL-02: exchange Telegram WebApp initData for a web session cookie.
+
+    initData is cryptographically verified against the bot token (HMAC per
+    Telegram's spec, `auth.verify_telegram_init_data`). Proves "a real
+    Telegram user opened THIS bot's mini app" — the mini app is an owner
+    tool, so the resulting session carries the admin role exactly like
+    /ui/login. Rate-limited like the password login (brute-force surface:
+    none — a wrong signature is rejected before any cookie is minted).
+    """
+    settings = request.app.state.settings
+    db = request.app.state.db
+    limit_login(db, request, runtime.get_int(db, "rate_login", settings.rate_login_per_min))
+    try:
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise ValueError("body must be a JSON object")
+    except Exception:
+        raise HTTPException(400, "expected JSON {init_data}") from None
+    init_data = (body or {}).get("init_data", "")
+    if not init_data or not isinstance(init_data, str):
+        raise HTTPException(400, "init_data required")
+
+    tokens = settings.bot_tokens
+    if not tokens:
+        raise HTTPException(503, "no bot token configured")
+
+    ok = any(verify_telegram_init_data(init_data, t) for t in tokens)
+    if not ok:
+        db.log_audit(
+            "auth.miniapp_denied",
+            actor="anon",
+            ip=request.client.host if request.client else None,
+        )
+        raise HTTPException(401, "invalid initData")
+
+    # who: extract the verified Telegram user for the audit trail only —
+    # the signature already guarantees these fields are authentic
+    import json as _json
+    import urllib.parse as _up
+
+    tg_user = None
+    try:
+        for k, v in _up.parse_qsl(init_data, keep_blank_values=True):
+            if k == "user":
+                tg_user = (_json.loads(v) or {}).get("id")
+                break
+    except Exception:  # noqa: BLE001
+        tg_user = None
+
+    ttl = runtime.get_int(db, "session_ttl", settings.web_session_ttl)
+    db.log_audit(
+        "auth.miniapp",
+        actor=str(tg_user) if tg_user is not None else "telegram-user",
+        ip=request.client.host if request.client else None,
+    )
+    resp = JSONResponse({"ok": True, "role": "admin", "user_id": tg_user})
+    _set_session(resp, request, issue_session(db, ttl, "admin"), ttl)
+    return resp
 
 
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
