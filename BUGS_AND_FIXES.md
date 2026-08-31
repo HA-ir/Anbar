@@ -2,6 +2,20 @@
 
 > فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.15
 
+## خلاصه Audit Loops (دور به دور)
+
+| Loop | نسخه | یافته‌ها | نتیجه |
+|---|---|---|---|
+| #1 | v0.15.12 | B-041 (download 500 با نام فارسی، HIGH)، B-042 (nosniff)، B-043 (نشتی کلاینت Telethon)، B-044–B-046 (UI) | ۶ فیکس + ۶ تست — پوشش: auth.py، webauth، ratelimit، zipper، qrcode، links، download، upload، admin |
+| #2 | v0.15.13 | B-047 (S3 Range خراب → 500، MED)، B-048 (لجند «Other»، TRIVIAL) | ۲ فیکس + ۵ تست — پوشش: s3.py، db.py، objects.py |
+| #3 | — | بازرسی وضعیت (git sync، ruff، 220 تست، prod health، TODO/console.log) | بدون باگ جدید |
+| #4 | v0.15.14 | B-049 (Stored XSS گالری آلبوم، HIGH) | ۱ فیکس + ۳ تست |
+| #5 | v0.15.15 | B-050 (XSS لیست فایل Mini App، HIGH) | ۱ فیکس + ۲ تست — پوشش: bot_backend/pool/harvester، mtproto_backend، ingest، cli، notify |
+
+**جمع:** ۱۰ باگ (B-041…B-050) · تست‌ها 209 → 225 · ۳ سطح severity: 3×HIGH، 3×MEDIUM، 2×LOW، 2×TRIVIAL
+**درس تکرارشونده:** الگوی «innerHTML بدون escape با داده کاربر» دو بار (آلبوم + miniapp) — بعد از این، همه render pathهای جدید باید esc/escape دارند.
+**CI:** یک خطای E501 (خط طولانی) هم پس از loop #1 گرفته و فیکس شد.
+
 ## v0.15.15 — 2026-08-31 (Audit Fixes — Loop #5)
 
 ### B-050 · XSS در لیست فایل‌های Mini App تلگرام — Severity: HIGH
