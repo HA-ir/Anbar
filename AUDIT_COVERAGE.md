@@ -64,21 +64,21 @@
 
 - [~] POST /api/v1/upload (+raw) — L1
 - [~] GET /f/{id} — L1 (B-041) + L4 (B-049 آلبوم)
-- [ ] GET /f/{id}/info
-- [ ] POST /f/{id}/link (ttl، max_dl، پسورد)
-- [ ] DELETE /f/{id} (trash/purge)
+- [~] GET /f/{id}/info — L8 (فقط metadata، بدون manifest/uploader_key — تست pin شد)
+- [~] POST /f/{id}/link (ttl، max_dl، پسورد) — L8 (HMAC زمان-ثابت، pw tag هرگز plaintext، ttl clamp سالم)
+- [~] DELETE /f/{id} (trash/purge) — L8 (owner/admin چک، kv tags پاک، tombstone شرطی)
 - [~] /api/v1/admin/* (objects، auth toggle/rotate، status، settings، cache purge) — L1
 - [~] /healthz — L3
-- [ ] S3 API (PUT/GET/DELETE object) — L2 فقط Range
-- [ ] webauth/2FA flow
-- [ ] header injection / path traversal sweep سراسری
-- [ ] secret leakage در لاگ‌ها
+- [~] S3 API (PUT/GET/DELETE object) — L8 (traversal sweep: 404/405 تمیز، keys opaque kv؛ Range از L2)
+- [~] webauth/2FA flow — L8 (کوکی duplicate-tolerant، همه مسیرهای خراب بدون 500)
+- [x] header injection / path traversal sweep سراسری — L8 (CRLF filename سندباکس شد، sweep تست pin)
+- [~] secret leakage در لاگ‌ها — L8 (guard تست استاتیک: log_audit/print هرگز secret نمی‌فرستد)
 
 ## 6. زیرساخت
 
 - [ ] docker/Dockerfile
 - [ ] docker/compose.yaml
-- [ ] nginx/anbar.conf.example
+- [~] nginx/anbar.conf.example — L8 (loopback proxy، nosniff، buffering off سالم)
 - [ ] .github/workflows/ci.yaml
 - [ ] .github/workflows/security.yaml
 - [ ] .github/workflows/publish.yaml

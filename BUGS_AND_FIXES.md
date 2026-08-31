@@ -1,6 +1,6 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.17
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.18
 
 ## خلاصه Audit Loops (دور به دور)
 
@@ -12,9 +12,10 @@
 | #4 | v0.15.14 | B-049 (Stored XSS گالری آلبوم، HIGH) | ۱ فیکس + ۳ تست |
 | #5 | v0.15.15 | B-050 (XSS لیست فایل Mini App، HIGH) | ۱ فیکس + ۲ تست — پوشش: bot_backend/pool/harvester، mtproto_backend، ingest، cli، notify |
 | #6 | v0.15.16 | B-051 (نشتی فایل temp در DiskLRU، MED)، B-052 (login 500 با JSON غیر-object، LOW)، B-053 (مرگ حلقه prune روی خطای گذرا، LOW) | ۳ فیکس + ۶ تست — ساخت AUDIT_COVERAGE.md؛ پوشش: cache، config، crypto، main، runtime، self_healing، storage/base، api/web |
-| #7 | v0.15.17 | B-054 (نشت توکن بات و api_hash خام در پاسخ telegram-config، MED)، B-055 (500 با ردیف خراب chunk_size در .env، LOW)، B-056 (پیش‌پرکردن input با hash خام در داشبورد، LOW) | ۳ فیکس + ۴ تست — پوشش: admin.py کامل (۱۲۸۰ خط، همه endpointها)، miniapp.html کامل |
+| L7 | v0.15.17 | B-054 (نشت توکن بات و api_hash خام در پاسخ telegram-config، MED)، B-055 (500 با ردیف خراب chunk_size در .env، LOW)، B-056 (پیش‌پرکردن input با hash خام در داشبورد، LOW) | ۳ فیکس + ۴ تست — پوشش: admin.py کامل (۱۲۸۰ خط، همه endpointها)، miniapp.html کامل |
+| L8 | v0.15.18 | بدون باگ جدید — ۱۰ تست سخت‌شدنی اضافه شد (info metadata، S3 traversal sweep، header injection، log-leakage guard) | ممیزی: GET info، POST link، DELETE، S3 کامل، webauth/2FA، sweep سراسری، nginx |
 
-**جمع:** ۱۶ باگ (B-041…B-056) · تست‌ها 209 → 234 · سطح‌ها: 3×HIGH، 5×MEDIUM، 6×LOW، 2×TRIVIAL
+**جمع:** ۱۶ باگ (B-041…B-056) · تست‌ها 209 → 243 · سطح‌ها: 3×HIGH، 5×MEDIUM، 6×LOW، 2×TRIVIAL
 **درس تکرارشونده:** الگوی «innerHTML بدون escape با داده کاربر» دو بار (آلبوم + miniapp) — بعد از این، همه render pathهای جدید باید esc/escape دارند.
 **CI:** یک خطای E501 (خط طولانی) هم پس از loop #1 گرفته و فیکس شد.
 

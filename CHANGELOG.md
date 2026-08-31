@@ -4,6 +4,18 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.18] — 2026-08-31
+
+### Added
+- **Security sweep hardening (Loop #8)** — endpoint-by-endpoint security audit of `/f/{id}/info`, `POST /f/{id}/link`, `DELETE /f/{id}`, the full S3 API, the webauth/2FA session flow, plus global header-injection / path-traversal / log-leakage sweeps. Results:
+  - `/f/{id}/info` serves metadata only (no manifest/file_id/uploader key) — pinned by test.
+  - Signed links: constant-time HMAC verification, revoke-before-expiry ordering, per-object pw tags as HMAC (never plaintext), maxdl counter race window documented — all clean.
+  - S3: keys are opaque kv ids, traversal-shaped paths are refused at the router (404/405, never 500) — pinned by sweep tests.
+  - Webauth: session cookie parsing tolerates duplicate/stale cookies, every bad-cookie path guarded against 500.
+  - Header injection: Content-Disposition sanitization (v0.15.11) verified against CR/LF-smuggled filenames end-to-end.
+  - Log leakage: new static guard tests assert no `log_audit`/`print` site ever emits secret-bearing variables (passwords, tokens, sessions, HMAC secrets).
+  - nginx example reviewed: loopback-only proxying, nosniff, no TLS weaknesses.
+
 ## [0.15.17] — 2026-08-31
 
 ### Fixed
