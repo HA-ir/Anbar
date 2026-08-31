@@ -765,7 +765,11 @@ async def telegram_config_get(request: Request):
         str(s.channel_thread_id) if s.channel_thread_id else "",
     )
     mtproto_peer = env_vars.get("ANBAR_MTPROTO_PEER", s.mtproto_peer)
-    chunk_size_mb = int(env_vars.get("ANBAR_CHUNK_SIZE_MB", s.chunk_size_mb))
+    cs_raw = env_vars.get("ANBAR_CHUNK_SIZE_MB")
+    try:
+        chunk_size_mb = int(cs_raw) if cs_raw else s.chunk_size_mb
+    except ValueError:  # corrupted .env row → fall back to the live setting
+        chunk_size_mb = s.chunk_size_mb
     db = request.app.state.db
     hybrid_runtime = bool(
         runtime.get_int(db, "hybrid_enabled", 1 if s.hybrid_enabled else 0)
@@ -776,13 +780,15 @@ async def telegram_config_get(request: Request):
     return {
         "backend": backend,
         "hybrid_enabled": hybrid_enabled,
-        "bot_tokens_raw": bot_tokens_raw,
+        # B-054: full bot tokens must never leave the server — only the
+        # masked list + count. The UI edits tokens via POST (raw in, masked out).
         "bot_tokens_count": len(tokens_list),
         "bot_tokens_masked": masked_tokens,
         "channel_id": channel_id,
         "channel_thread_id": channel_thread_id,
         "api_id": api_id_raw,
-        "api_hash": api_hash_raw,
+        # B-054: raw api_hash must not leave the server either (only masked).
+        "api_hash": _mask_secret(api_hash_raw, 4),
         "api_hash_masked": _mask_secret(api_hash_raw, 4),
         "api_hash_set": bool(api_hash_raw),
         "mtproto_peer": mtproto_peer,

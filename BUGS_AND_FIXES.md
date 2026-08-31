@@ -1,6 +1,6 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.16
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.17
 
 ## خلاصه Audit Loops (دور به دور)
 
@@ -12,10 +12,32 @@
 | #4 | v0.15.14 | B-049 (Stored XSS گالری آلبوم، HIGH) | ۱ فیکس + ۳ تست |
 | #5 | v0.15.15 | B-050 (XSS لیست فایل Mini App، HIGH) | ۱ فیکس + ۲ تست — پوشش: bot_backend/pool/harvester، mtproto_backend، ingest، cli، notify |
 | #6 | v0.15.16 | B-051 (نشتی فایل temp در DiskLRU، MED)، B-052 (login 500 با JSON غیر-object، LOW)، B-053 (مرگ حلقه prune روی خطای گذرا، LOW) | ۳ فیکس + ۶ تست — ساخت AUDIT_COVERAGE.md؛ پوشش: cache، config، crypto، main، runtime، self_healing، storage/base، api/web |
+| #7 | v0.15.17 | B-054 (نشت توکن بات و api_hash خام در پاسخ telegram-config، MED)، B-055 (500 با ردیف خراب chunk_size در .env، LOW)، B-056 (پیش‌پرکردن input با hash خام در داشبورد، LOW) | ۳ فیکس + ۴ تست — پوشش: admin.py کامل (۱۲۸۰ خط، همه endpointها)، miniapp.html کامل |
 
-**جمع:** ۱۳ باگ (B-041…B-053) · تست‌ها 209 → 231 · سطح‌ها: 3×HIGH، 4×MEDIUM، 4×LOW، 2×TRIVIAL
+**جمع:** ۱۶ باگ (B-041…B-056) · تست‌ها 209 → 234 · سطح‌ها: 3×HIGH، 5×MEDIUM، 6×LOW، 2×TRIVIAL
 **درس تکرارشونده:** الگوی «innerHTML بدون escape با داده کاربر» دو بار (آلبوم + miniapp) — بعد از این، همه render pathهای جدید باید esc/escape دارند.
 **CI:** یک خطای E501 (خط طولانی) هم پس از loop #1 گرفته و فیکس شد.
+
+## v0.15.17 — 2026-08-31 (Audit Fixes — Loop #7)
+
+### B-054 · نشت توکن‌های بات و api_hash خام در `GET /api/v1/admin/telegram-config` — Severity: MEDIUM
+- **باس:** پاسخ endpoint به‌همراه نسخه‌های mask شده، `bot_tokens_raw` (کل رشته ANBAR_BOT_TOKENS) و `api_hash` خام را هم برمی‌گرداند — هر زمینه‌ای که پاسخ ادمین را ببیند (کش مرورگر، تب داشبورد، لاگ پراکسی) اعتبارنامه‌های زنده تلگرام را می‌گیرد. داشبورد هم این مقادیر خام را داخل inputها pre-fill می‌کرد (hash در فیلدی که اول password بود ولی با value assignment قابل‌دید می‌شد).
+- **فیکس:** پاسخ فقط masked tokens + count دارد؛ `api_hash` هم mask شد. UI: فیلد توکن/hash همیشه خالی با placeholder ماسک‌شده؛ ارسال فقط وقتی ادمین مقدار تایپ کند (خالی = حفظ مقدار فعلی؛ ذخیره ساده نه leak می‌کند نه wipe).
+- **تست:** ۳ تست در `test_admin_secret_exposure.py` + آپدیت `test_telegram_config.py`.
+
+### B-055 · `telegram-config` با ردیف خراب ANBAR_CHUNK_SIZE_MB → 500 — Severity: LOW
+- **باس:** `int(env_vars.get(...))` با مقدار غیرعددی در .env، ValueError هندل‌نشده → 500.
+- **فیکس:** fallback به مقدار زنده settings.
+- **تست:** `test_telegram_config_env_with_garbage_chunk_size`.
+
+### B-056 · پیش‌پرکردن فیلد API hash داشبورد با مقدار خام — Severity: LOW
+- **باس:** زیرمجموعه B-054 سمت UI — رفع شد با همان تغییر (فیلد همیشه خالی + placeholder ماسک).
+- **تست:** پوشش با تست‌های B-054.
+
+### نکات audit شده در این دور (بدون باگ)
+- `miniapp.html` کامل: auth با initData از تلگرام (بدون کلید در کد)، esc در renderList (فیکس B-050 قبلی)، upload flow با هندل خطا، جستجو/فیلتر سالم.
+- `admin.py` باقی endpointها: require_admin سراسری، s3/request puzzles، cache purge (rebuild)، auth toggle، rotate-secret (حداقل طول ۸)، settings validation (bool guard)، import backup (ValueError→400)، channel rebuild (حذف telethon leak قبلی)، folder ops (move-into-itself guard)، trash restore/purge، audit-logs، api-keys (کلید بعد از ساخت فقط یک‌بار)، link manage page (escape با html.escape + quote=True).
+- **درس ایمنی تست:** تست‌هایی که مسیر env را لمس می‌کنند باید روی tmp isolate شوند — روی هاست دیپلوی، `_get_env_file_path()` مسیر واقعی /opt/anbar/.env را برمی‌گرداند (یک تست واقعاً channel id پرود را بازنویسی کرد — ترمیم شد).
 
 ## v0.15.16 — 2026-08-31 (Audit Fixes — Loop #6)
 

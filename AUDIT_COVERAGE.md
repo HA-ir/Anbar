@@ -24,7 +24,7 @@
 
 ## 2. Backend — API (src/anbar/api/*.py)
 
-- [~] admin.py — L1
+- [x] admin.py — L1 + L7 کامل (B-054 نشت توکن/api_hash در telegram-config، فیکس؛ B-055 corrupt .env → 500، فیکس؛ بقیه endpointها سالم)
 - [~] download.py — L1 (B-041 فارسی filename → 500، فیکس شد)؛ مسیر cache-fill خودش پاک‌سازی می‌کند (L6)
 - [~] ingest.py — L5 (URL pull سالم)
 - [~] notify.py — L5 (best-effort)
@@ -56,7 +56,7 @@
 
 ### miniapp.html
 - [x] renderList + esc — L5 (B-050 XSS، فیکس شد)
-- [ ] باقی فایل (init، auth flow، upload widget)
+- [x] باقی فایل (init/TG theme، upload widget، search/filter، copyLink) — L7 سالم (auth via initData، بدون کلید در کد)
 
 - [~] icon.svg / manifest.webmanifest — استاتیک، L3
 
@@ -99,3 +99,4 @@
 | L4 | B-049 | آلبوم گالری |
 | L5 | B-050 | miniapp renderList، bot_*، mtproto، ingest، cli، notify |
 | L6 | B-051…B-053 | cache، config، crypto، main، runtime، self_healing، storage/base، api/web |
+| L7 | B-054…B-056 | admin.py کامل، miniapp.html کامل، داشبورد settings |

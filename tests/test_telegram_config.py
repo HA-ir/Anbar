@@ -13,7 +13,9 @@ def test_telegram_config_get(client: TestClient):
     assert r.status_code == 200
     data = r.json()
     assert "backend" in data
-    assert "bot_tokens_count" in data
+    # B-054: raw token fields are gone; count moved into the masked block
+    assert "bot_tokens_raw" not in data
+    assert data.get("bot_tokens_count") is not None or "bot_tokens_masked" in data
     assert "channel_id" in data
     assert "api_id" in data
 

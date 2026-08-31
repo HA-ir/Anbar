@@ -4,6 +4,16 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.17] — 2026-08-31
+
+### Fixed
+- **Raw Telegram secrets in admin config API (B-054, MEDIUM)**: `GET /api/v1/admin/telegram-config` returned the full `ANBAR_BOT_TOKENS` string and the raw `api_hash` in its JSON response (alongside the masked copies it also built). Any admin-session context — browser cache, a logged-in dashboard tab, a proxy log — captured live credentials. The response now carries only masked tokens plus the count; the raw api_hash field is masked too. The dashboard no longer pre-fills the token/hash inputs with secrets: empty field = keep current, typed value = replace, so a plain "save settings" can neither leak nor wipe stored credentials.
+- **`/telegram-config` 500 on corrupt .env row (B-055, LOW)**: `int(env_vars.get("ANBAR_CHUNK_SIZE_MB", ...))` crashed with `ValueError` → HTTP 500 when the persistent .env contained a non-numeric value. Now falls back to the live setting.
+- **Dashboard showed raw API hash in a type=text field (B-056, LOW)**: `#s_tg_api_hash` was pre-filled with the actual hash from the config response (the input had `type=password` initially but the value assignment exposed it via devtools/view-source). Now always empty with the masked hash as placeholder.
+
+### Security
+- Test-suite hardening: tests touching the telegram-config endpoint now monkeypatch the env-file path to a tmp file — on a deploy host they previously could read and even write the real `/opt/anbar/.env`.
+
 ## [0.15.16] — 2026-08-31
 
 ### Fixed

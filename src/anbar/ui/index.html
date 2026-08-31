@@ -3803,14 +3803,18 @@ async function loadTelegramConfig(){
         $("#s_tg_backend").value=r.backend||"hybrid";
       }
     }
-    if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").value=r.bot_tokens_raw||"";
-    if($("#tgTokensCount"))$("#tgTokensCount").textContent=r.bot_tokens_count?("("+r.bot_tokens_count+" active)"):"";
+    if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").value="";
+    if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").placeholder=r.bot_tokens_masked?r.bot_tokens_masked.join(" , "):"123456:ABC..., 987654:XYZ...";
+    if($("#tgTokensCount"))$("#tgTokensCount").textContent=r.bot_tokens_count?("(" + r.bot_tokens_count + " active)"):"";
     if($("#s_tg_channel_id"))$("#s_tg_channel_id").value=r.channel_id||"";
     if($("#s_tg_thread_id"))$("#s_tg_thread_id").value=r.channel_thread_id||"";
     if($("#s_tg_api_id"))$("#s_tg_api_id").value=r.api_id||"";
     if($("#s_tg_api_hash")){
-      $("#s_tg_api_hash").value=r.api_hash||"";
-      $("#s_tg_api_hash").placeholder="Telegram API Hash...";
+      // B-054: the server never returns the raw hash — keep the field empty
+      // (placeholder only) unless the admin types a new one; saving a blank
+      // or the masked value must not wipe the stored hash.
+      $("#s_tg_api_hash").value="";
+      $("#s_tg_api_hash").placeholder=r.api_hash_masked||"Telegram API Hash...";
     }
     if($("#s_tg_peer"))$("#s_tg_peer").value=r.mtproto_peer||"";
     const isAuthed = !!r.session_authorized;
@@ -3954,13 +3958,16 @@ $("#saveBtn").onclick=guardBtn($("#saveBtn"),async()=>{
   };
   const tgBody={
     backend:$("#s_tg_backend")?.value,
-    bot_tokens:$("#s_tg_bot_tokens")?.value,
     channel_id:$("#s_tg_channel_id")?.value,
     channel_thread_id:$("#s_tg_thread_id")?.value,
     api_id:$("#s_tg_api_id")?.value,
     mtproto_peer:$("#s_tg_peer")?.value,
     chunk_size_mb:+$("#s_tg_chunk_size")?.value||16
   };
+  // B-054: only send tokens/hash when the admin actually typed new ones —
+  // an empty field means "keep current", never "overwrite with empty".
+  const enteredTokens=$("#s_tg_bot_tokens")?.value?.trim();
+  if(enteredTokens)tgBody.bot_tokens=enteredTokens;
   const enteredHash=$("#s_tg_api_hash")?.value?.trim();
   if(enteredHash)tgBody.api_hash=enteredHash;
   try{
