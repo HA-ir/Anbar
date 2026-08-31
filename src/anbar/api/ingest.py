@@ -12,6 +12,7 @@ background; the UI polls `GET /api/v1/upload/url/{job_id}` for progress
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 import uuid
@@ -106,6 +107,10 @@ def _guess_content_type(headers: httpx.Headers | None, fallback: str) -> str:
 async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
     job = JOBS[job_id]
     settings = app.state.settings
+    # ARCH-02: progress mirrors into the durable jobs table when a queue is
+    # wired (real app). Tests may call _run_job directly without one.
+    jq = getattr(app.state, "job_queue", None)
+
     async with _SEM:
         try:
             timeout = httpx.Timeout(settings.ingest_read_timeout_s, connect=CONNECT_TIMEOUT)
@@ -148,6 +153,12 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                             data = await reader.read(n)
                             total_in += len(data)
                             job["bytes"] = total_in
+                            # ARCH-02: mirror progress into the durable jobs row
+                            if jq is not None:
+                                try:
+                                    jq.set_progress(job_id, done=total_in, total=job["total"])
+                                except Exception:  # noqa: BLE001
+                                    pass
                             return data
 
                     try:
@@ -169,6 +180,12 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                         "sha256": sha,
                     }
                     job["state"] = "done"
+                    # ARCH-02: mark the durable row done with the result
+                    if jq is not None:
+                        try:
+                            jq.finish(job_id, result=job["object"])
+                        except Exception:  # noqa: BLE001
+                            pass
                     # best-effort channel notification (never blocks the job)
                     import time as _t
 
@@ -191,6 +208,12 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
             log.warning("ingest %s failed: %s", job_id, e)
             job["state"] = "error"
             job["error"] = str(e)
+            # ARCH-02: mirror the failure into the durable row
+            if jq is not None:
+                try:
+                    jq.finish(job_id, error=str(e))
+                except Exception:  # noqa: BLE001
+                    pass
 
 
 @router.post("/upload/url")
@@ -218,6 +241,17 @@ async def upload_url(request: Request):
         "object": None,
         "error": None,
     }
+    # ARCH-02: persist the job row (durable) before launching the task
+    jq = getattr(request.app.state, "job_queue", None)
+    if jq is not None:
+        try:
+            jq.submit(
+                "ingest_url",
+                job_id=job_id,
+                payload={"url": url, "filename": filename},
+            )
+        except Exception:  # noqa: BLE001 — queue must never block ingest
+            log.warning("job row insert failed for %s", job_id)
     asyncio.get_running_loop().create_task(_run_job(request.app, job_id, url, filename))
     return {"job_id": job_id}
 
@@ -227,8 +261,27 @@ async def upload_url_status(request: Request, job_id: str):
     require_admin(request)
     _prune_jobs()
     job = JOBS.get(job_id)
-    if job is None:
-        raise HTTPException(404, "unknown job")
-    out = {k: v for k, v in job.items() if k != "key"}
-    out["elapsed"] = round(time.time() - job["started"], 1)
-    return out
+    if job is not None:
+        out = {k: v for k, v in job.items() if k != "key"}
+        out["elapsed"] = round(time.time() - job["started"], 1)
+        return out
+    # ARCH-02: in-memory entry is gone (restart or pruned) — fall back to the
+    # durable jobs row so the UI sees a real state instead of a 404 (§5.1).
+    jq = getattr(request.app.state, "job_queue", None)
+    if jq is not None:
+        row = jq.get(job_id)
+        if row is not None and row.get("kind") == "ingest_url":
+            result = json.loads(row["result"]) if row.get("result") else None
+            return {
+                "state": "done" if row["state"] == "done" else row["state"],
+                "bytes": row.get("progress") or 0,
+                "chunks": 0,
+                "total": row.get("total") or 0,
+                "started": row.get("created_at") or 0.0,
+                "object": result,
+                "error": row.get("error"),
+                "elapsed": round(
+                    time.time() - (row.get("created_at") or time.time()), 1
+                ),
+            }
+    raise HTTPException(404, "unknown job")

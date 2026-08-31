@@ -48,6 +48,14 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
             await app.state.backend.connect()
         app.state.cache = _build_cache(settings, db)
 
+        # ARCH-02: durable job queue (jobs table in the same SQLite DB)
+        from .jobqueue import JobQueue
+
+        JobQueue._ensure_table(db)
+        jq = JobQueue(db)
+        jq.mark_interrupted_on_boot()  # in-flight rows died with the old process
+        app.state.job_queue = jq
+
         # Hybrid support: initialize bot_pool and harvester if bot credentials exist
         app.state.bot_client = None
         app.state.bot_pool = None
@@ -101,6 +109,16 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
                     raise
                 except Exception:
                     continue
+                # ARCH-02: prune finished job rows after 1h (same TTL rule as
+                # the old in-memory JOBS dict)
+                try:
+                    jq = getattr(app.state, "job_queue", None)
+                    if jq is not None:
+                        jq.prune()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    continue
 
         async def _auto_backup_loop() -> None:
             """Periodic database snapshot push to Telegram (every 24 hours)."""
@@ -141,6 +159,9 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         prune_task = asyncio.create_task(_prune_rate_loop())
         backup_task = asyncio.create_task(_auto_backup_loop())
         yield
+        jq = getattr(app.state, "job_queue", None)
+        if jq is not None:
+            await jq.stop()
         prune_task.cancel()
         backup_task.cancel()
         if app.state.harvester is not None:

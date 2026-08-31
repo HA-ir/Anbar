@@ -25,11 +25,32 @@ def test_backup_and_system_stats(client: TestClient):
     assert len(r_bk.content) > 0
     assert "attachment; filename=\"anbar_backup_" in r_bk.headers.get("content-disposition", "")
 
-    # 4. Test backup push to telegram
+    # 4. Test backup push to telegram (ARCH-02: queued via the job queue)
     r_tg = client.post("/api/v1/admin/backup/telegram", headers=ADMIN)
     assert r_tg.status_code == 200
-    assert r_tg.json()["status"] == "ok"
-    assert "file_id" in r_tg.json()
+    tg_body = r_tg.json()
+    assert tg_body["status"] in ("ok", "queued")
+    job_id = tg_body.get("job_id")
+    if tg_body["status"] == "queued":
+        # poll the job until done (FakeBackend store is instant; bounded loop)
+        import time as _time
+
+        deadline = _time.time() + 10
+        job_row = None
+        while _time.time() < deadline:
+            r_job = client.get(f"/api/v1/admin/jobs/{job_id}", headers=ADMIN)
+            assert r_job.status_code == 200
+            job_row = r_job.json()
+            if job_row["state"] in ("done", "error"):
+                break
+            _time.sleep(0.05)
+        assert job_row is not None and job_row["state"] == "done", job_row
+        assert "file_id" in job_row["result"]
+    else:
+        assert "file_id" in tg_body
+    # last_backup_time is set by the job handler (or inline fallback)
+    r_st_probe = client.get("/api/v1/admin/system-stats", headers=ADMIN)
+    assert r_st_probe.status_code == 200
 
     # 5. Test system stats
     r_st = client.get("/api/v1/admin/system-stats", headers=ADMIN)

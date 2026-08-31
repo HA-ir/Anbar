@@ -1,6 +1,22 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.23
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.24
+
+## v0.15.24 — 2026-08-31 (Improvement Plan — ARCH-02)
+
+### ARCH-02 · صف job داخلی (SPOF عملیات سنگین) — Severity: معماری
+- **باس:** عملیات سنگین (backup به تلگرام، rebuild کانال، ingest) داخل همون request handler اجرا می‌شد؛ crash/restart وسط کار = کار گم + ادمین بی‌خبر، و هیچ صفی برای ترتیب/سقف همزمانی وجود نداشت.
+- **فیکس:**
+  - جدول `jobs` در همون SQLite (بدون وابستگی جدید): state machine کامل queued→running→done/error/interrupted/cancelled با created_at/started_at/finished_at.
+  - `JobQueue` (src/anbar/jobqueue.py): worker pool asyncio با cap per-kind (ingest_url=2 مطابق `_SEM` قبلی، backup_now=1، channel_rebuild=1)، FIFO منصفانه، `submit/set_progress/finish/get/list/cancel/delete/prune/mark_interrupted_on_boot/stop`.
+  - restart semantics: هر ردیف queued/running در بوت بعدی → `interrupted` با پیام واضح؛ shutdown هم ردیف نیمه‌کاره را صادقانه error می‌کند (دیگر ردیف phantom نمی‌ماند).
+  - ingest: ردیف durable موقع submit ساخته می‌شود؛ progress و نتیجه mirror می‌شود؛ endpoint status بعد از restart از DB fallback می‌خواند (قبلاً 404).
+  - `POST /admin/backup/telegram` و `POST /admin/channel/rebuild`: فوری `{"status":"queued","job_id":...}` برمی‌گردانند و کار در صف اجرا می‌شود؛ بدنه rebuild به `_rebuild_scan` استخراج شد. مسیر inline برای حالت بدون صف حفظ شد.
+  - API ادمین: `GET /api/v1/admin/jobs` (فیلتر state/kind)، `GET /admin/jobs/{id}`، `POST /admin/jobs/{id}/cancel` (فقط queued؛ running→409)، `DELETE /admin/jobs/{id}` (فقط finished؛ 409).
+  - UI: دکمه‌های backup و rebuild حالا job را poll می‌کنند (سقف 5 و 10 دقیقه) و نتیجه/خطای واقعی را نشان می‌دهند.
+  - prune: ردیف‌های finished بعد از 1h در prune loop موجود حذف می‌شوند.
+- **تست:** `tests/test_jobqueue.py` — ۲۰ تست (چرخه کامل، خطای handler، cap واقعی per-kind، no-handler، restart واقعی app با فایل DB مشترک → interrupted، prune/cancel/delete، API ادمین + auth، backup E2E از طریق صف). `test_backup_and_stats` برای جریان queued→poll→done به‌روز شد. کل ۳۱۲ → ۳۳۲ سبز.
+- **یادداشت‌ها:** دو باگ واقعی حین تست گرفته شد (no-handler باعث Task exception و ردیف running معلق می‌شد؛ `get()` result را parse نمی‌کرد). ZIP عمداً روی صف نرفت — streaming است و event-loop را بلاک نمی‌کند. pacing تلگرام دست‌نخورده (صف فقط ترتیب می‌دهد، ارسال همچنان در storage layer pace می‌شود). تست E2E کامل ریسکن واقعی روی سرور Falkenstein هنوز اجرا نشده.
 
 ## v0.15.23 — 2026-08-31 (Improvement Plan — ARCH-01)
 

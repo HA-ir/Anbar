@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
@@ -316,24 +317,45 @@ async def backup_download(request: Request):
 
 @router.post("/admin/backup/telegram")
 async def backup_push_telegram(request: Request):
-    """Push consistent SQLite database backup directly to Telegram storage channel."""
+    """Push consistent SQLite database backup directly to Telegram storage channel.
+
+    ARCH-02: the push runs through the durable job queue (`backup_now`, cap 1)
+    and the endpoint returns immediately with a job_id; the UI polls
+    `GET /admin/jobs/{id}` for completion.
+    """
     require_admin(request)
     db = request.app.state.db
     backend = request.app.state.backend
-    data = db.backup_bytes()
-    ts = time.strftime("%Y%m%d_%H%M%S")
-    name = f"backup_{ts}.db"
-    ref = await backend.store(data, name)
-    db.kv_set("last_backup_time", str(int(time.time())))
-    db.kv_set("last_backup_ref", ref.file_id)
-    db.log_audit("backup.telegram", actor="admin", target=name, details={"size": len(data)})
-    return {
-        "status": "ok",
-        "backup_time": int(time.time()),
-        "size": len(data),
-        "file_id": ref.file_id,
-        "message_id": ref.message_id,
-    }
+    jq = getattr(request.app.state, "job_queue", None)
+    job_id = uuid.uuid4().hex[:12]
+    if jq is None:  # queue not wired (should not happen) — run inline
+        data = db.backup_bytes()
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        name = f"backup_{ts}.db"
+        ref = await backend.store(data, name)
+        db.kv_set("last_backup_time", str(int(time.time())))
+        db.kv_set("last_backup_ref", ref.file_id)
+        db.log_audit("backup.telegram", actor="admin", target=name, details={"size": len(data)})
+        return {"status": "ok", "job_id": job_id, "file_id": ref.file_id}
+
+    async def _backup_job(jid: str, payload: dict) -> None:
+        data = db.backup_bytes()
+        jq.set_progress(jid, done=0, total=len(data))
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        name = f"backup_{ts}.db"
+        ref = await backend.store(data, name)
+        db.kv_set("last_backup_time", str(int(time.time())))
+        db.kv_set("last_backup_ref", ref.file_id)
+        db.log_audit("backup.telegram", actor="admin", target=name, details={"size": len(data)})
+        jq.finish(jid, result={
+            "size": len(data),
+            "file_id": ref.file_id,
+            "message_id": ref.message_id,
+            "backup_time": int(time.time()),
+        })
+
+    jq.submit("backup_now", job_id=job_id, handler=_backup_job)
+    return {"status": "queued", "job_id": job_id}
 
 
 @router.post("/admin/backup/import")
@@ -540,6 +562,10 @@ async def channel_rebuild(request: Request):
 
     Self-healing disaster recovery: recovers filenames, folders, manifests and files
     even if the entire local database was deleted.
+
+    ARCH-02: the scan runs through the durable job queue (`channel_rebuild`,
+    cap 1) and the endpoint returns immediately with a job_id; the UI polls
+    `GET /admin/jobs/{id}` for the recovery result.
     """
     require_admin(request)
     db = request.app.state.db
@@ -554,6 +580,24 @@ async def channel_rebuild(request: Request):
     env_secret = s.hmac_secret.get_secret_value() if s.hmac_secret else None
     active_secret = custom_secret or effective_hmac_secret(db, env_secret)
 
+    jq = getattr(request.app.state, "job_queue", None)
+    if jq is None:  # queue not wired — legacy inline path
+        res = await _rebuild_scan(backend, db, s, limit, active_secret)
+        return {"status": "ok", **res}
+
+    job_id = uuid.uuid4().hex[:12]
+
+    async def _rebuild_job(jid: str, payload: dict) -> None:
+        res = await _rebuild_scan(backend, db, s, limit, active_secret)
+        db.log_audit("channel.rebuild", actor="admin", details=res)
+        jq.finish(jid, result=res)
+
+    jq.submit("channel_rebuild", job_id=job_id, handler=_rebuild_job)
+    return {"status": "queued", "job_id": job_id}
+
+
+async def _rebuild_scan(backend, db, s, limit: int, active_secret: str | None) -> dict:
+    """Body of the channel rebuild scan (extracted for the job queue)."""
     from ..self_healing import decode_chunk_caption, decode_meta_event, rebuild_from_manifests
 
     collected_chunks: dict[str, list[dict]] = {}
@@ -594,9 +638,7 @@ async def channel_rebuild(request: Request):
         except Exception as e:
             raise HTTPException(502, f"Failed scanning MTProto channel history: {e}") from e
 
-    res = rebuild_from_manifests(collected_chunks, db, events=collected_events)
-    db.log_audit("channel.rebuild", actor="admin", details=res)
-    return {"status": "ok", **res}
+    return rebuild_from_manifests(collected_chunks, db, events=collected_events)
 
 
 @router.get("/admin/system-stats")
@@ -1360,4 +1402,78 @@ async def trash_purge_one(request: Request, obj_id: str):
     )
     db.log_audit("file.purge", actor="admin", target=obj_id)
     return {"purged": obj_id, "blobs_removed": removed}
+
+
+# ── job queue admin API (ARCH-02 §5.2) ──────────────────────────────────────
+
+
+@router.get("/admin/jobs")
+async def jobs_list(
+    request: Request, state: str | None = None, kind: str | None = None, limit: int = 50
+):
+    """List durable job rows (newest first)."""
+    require_admin(request)
+    jq = getattr(request.app.state, "job_queue", None)
+    if jq is None:
+        raise HTTPException(503, "job queue not available")
+    rows = jq.list(state=state, kind=kind, limit=limit)
+    for r in rows:
+        res = r.get("result")
+        if res and isinstance(res, str):
+            try:
+                r["result"] = json.loads(res)
+            except (json.JSONDecodeError, TypeError):
+                pass
+    return {"jobs": rows, "count": len(rows)}
+
+
+@router.get("/admin/jobs/{job_id}")
+async def jobs_get(request: Request, job_id: str):
+    """One job row with progress — the polling endpoint for queued work."""
+    require_admin(request)
+    jq = getattr(request.app.state, "job_queue", None)
+    if jq is None:
+        raise HTTPException(503, "job queue not available")
+    row = jq.get(job_id)
+    if row is None:
+        raise HTTPException(404, "unknown job")
+    res = row.get("result")
+    if res and isinstance(res, str):
+        try:
+            row["result"] = json.loads(res)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return row
+
+
+@router.post("/admin/jobs/{job_id}/cancel")
+async def jobs_cancel(request: Request, job_id: str):
+    """Cancel a queued job (running jobs are cooperative and keep running)."""
+    require_admin(request)
+    jq = getattr(request.app.state, "job_queue", None)
+    if jq is None:
+        raise HTTPException(503, "job queue not available")
+    if not jq.cancel(job_id):
+        row = jq.get(job_id)
+        if row is None:
+            raise HTTPException(404, "unknown job")
+        raise HTTPException(409, f"job is {row['state']}; only queued jobs can be cancelled")
+    db = request.app.state.db
+    db.log_audit("job.cancel", actor="admin", target=job_id)
+    return {"cancelled": job_id}
+
+
+@router.delete("/admin/jobs/{job_id}")
+async def jobs_delete(request: Request, job_id: str):
+    """Delete one finished job row (manual companion of the 1h prune)."""
+    require_admin(request)
+    jq = getattr(request.app.state, "job_queue", None)
+    if jq is None:
+        raise HTTPException(503, "job queue not available")
+    if not jq.delete(job_id):
+        row = jq.get(job_id)
+        if row is None:
+            raise HTTPException(404, "unknown job")
+        raise HTTPException(409, f"job is {row['state']}; only finished jobs can be deleted")
+    return {"deleted": job_id}
 
