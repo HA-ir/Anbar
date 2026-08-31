@@ -66,13 +66,31 @@ class DiskLRU:
         return len(self._entries)
 
     # -- mutations ----------------------------------------------------------
-    def add(self, obj_id: str, path: str, size: int) -> None:
+    def add(self, obj_id: str, path: str, size: int) -> bool:
+        """Commit a filled temp file as the cache entry for `obj_id`.
+
+        Returns True when committed, False when rejected (object larger
+        than the whole budget). In both the reject path and the
+        same-id-replace path the caller's temp file is unlinked here so
+        no orphan temp file leaks onto disk (B-051).
+        """
         if size > self._max_bytes:  # object bigger than the whole budget
-            return
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            return False
         self._evict_for(size)
-        self._entries.pop(obj_id, None)
+        old = self._entries.pop(obj_id, None)
+        if old is not None:  # replaced entry: unlink its temp file too
+            try:
+                os.unlink(old[0])
+            except OSError:
+                pass
+            self._bytes -= old[1]
         self._entries[obj_id] = (path, size, time.time())
         self._bytes += size
+        return True
 
     def remove(self, obj_id: str) -> None:
         e = self._entries.pop(obj_id, None)

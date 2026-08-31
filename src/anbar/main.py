@@ -74,8 +74,12 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
                 await asyncio.sleep(600)
                 try:
                     db.rate_prune()
-                except Exception:  # pragma: no cover - db already closed
-                    return
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    # transient errors (e.g. db busy) must not kill the loop —
+                    # a dead prune loop lets the rate_windows table grow forever
+                    continue
 
         async def _auto_backup_loop() -> None:
             """Periodic database snapshot push to Telegram (every 24 hours)."""

@@ -4,6 +4,16 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.16] — 2026-08-31
+
+### Fixed
+- **Disk LRU cache temp-file leak (B-051, MEDIUM)**: `DiskLRU.add()` silently dropped the caller's temp file when the object exceeded the whole budget, and unlinked nothing when a same-id entry was replaced (two concurrent full downloads of one object) — both leaked orphan temp files onto the ephemeral volume and, in the replace case, double-counted `_bytes` until restart. Rejected/replaced temps are now always unlinked and accounting stays exact; `add()` returns a commit bool.
+- **`/ui/login` 500 on non-object JSON (B-052, LOW)**: a JSON array/scalar body (`[1,2,3]`, `"x"`, `42`) hit `.get()` on a non-dict → unhandled `AttributeError` → 500. Now any non-object JSON body returns the normal 400 `expected JSON {key}`.
+- **Rate-window prune loop dies on transient error (B-053, LOW)**: a single exception (e.g. transient SQLite busy) returned from the background prune loop and killed it for the process lifetime, letting `rate_windows` grow unbounded. It now retries on the next tick and only exits on cancellation.
+
+### Added
+- Audit coverage map (`AUDIT_COVERAGE.md`) — per-file audit state for the whole project; loop #6 audited cache/config/crypto/main/runtime/self-healing-adjacent/web/storage-base modules (8 files clean, 3 fixes above).
+
 ## [0.15.15] — 2026-08-31
 
 ### Fixed

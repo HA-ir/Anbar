@@ -58,6 +58,8 @@ async def login(request: Request):
     limit_login(db, request, runtime.get_int(db, "rate_login", settings.rate_login_per_min))
     try:
         body = await request.json()
+        if not isinstance(body, dict):  # arrays/strings/scalars → 400, not 500
+            raise ValueError("body must be a JSON object")
     except Exception:
         raise HTTPException(400, "expected JSON {key}") from None
     key = (body or {}).get("key", "")
