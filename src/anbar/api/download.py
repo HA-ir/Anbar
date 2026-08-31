@@ -986,6 +986,14 @@ async def album_page(request: Request, token: str):
     title = data.get("title") or f"anbar · {len(items)} فایل"
     import html as _html
 
+    # v0.15.14 audit fix: item names come from stored filenames (any uploader
+    # can set them). They are interpolated into innerHTML by the gallery
+    # script, so a filename like `<img src=x onerror=...>` was stored XSS.
+    # Escape server-side, before the JSON payload is embedded.
+    for it in items:
+        it["name"] = _html.escape(str(it.get("name") or ""), quote=False)
+    title = _html.escape(title, quote=True)
+
     payload = json.dumps(items).replace("</", "<\\/")
     return HTMLResponse(
         f"""<!DOCTYPE html>

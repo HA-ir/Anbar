@@ -4,6 +4,11 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.14] — 2026-08-31
+
+### Fixed
+- **Stored XSS in Album Gallery Page (`/f/a/<token>`)**: Item filenames from the embedded JSON payload were interpolated into `innerHTML` without escaping — a filename like `<img src=x onerror=...>` executed on the public share page. Filenames (and the custom title) are now HTML-escaped server-side before the payload is embedded. Found in audit loop #4.
+
 ## [0.15.13] — 2026-08-31
 
 ### Fixed

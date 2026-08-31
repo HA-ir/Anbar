@@ -1,6 +1,13 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.13
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.14
+
+## v0.15.14 — 2026-08-31 (Audit Fixes — Loop #4)
+
+### B-049 · Stored XSS در صفحه گالری آلبوم (`/f/a/<token>`) — Severity: HIGH
+- **باس:** در صفحه عمومی آلبوم، نام فایل‌ها از JSON payload مستقیم داخل `innerHTML` تزریق می‌شد بدون escape. نام فایل ورودی دلخواه uploader است — `<img src=x onerror=alert(1)>.png` به‌عنوان stored XSS روی صفحه اشتراک عمومی اجرا می‌شد. (عنوان آلبوم escape می‌شد ولی نام‌ها نه.)
+- **فیکس:** Escape سمت سرور نام همه آیتم‌ها و عنوان قبل از embed شدن payload در HTML.
+- **تست:** ۳ تست جدید در `test_album_xss.py` (malicious filename / normal filename / title escape).
 
 ## v0.15.13 — 2026-08-31 (Audit Fixes — Loop #2)
 
