@@ -2,6 +2,18 @@
 
 > فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.24
 
+## v0.15.24 — 2026-08-31 (دیپلوی پروداکشن + E2E واقعی)
+
+### DEP-01 · دیپلوی v0.15.24 روی Falkenstein + ریسکن واقعی — Severity: ops
+- **انجام شد (2026-08-31 22:19 Tehran):**
+  - `uv lock` بعد از bump (قانون اسکیل — جلوگیری از dirty tree) → commit `aebe0d2`.
+  - بیلد `anbar:prod` (sanity: image reports `0.15.24`)، `docker compose up -d` بک‌گراند، کانتینر recreate و healthy.
+  - healthz محلی و https هر دو `version 0.15.24` ✓ · جدول `jobs` در DB پروداکشن ساخته شد (migration خودکار) ✓ · endpoint جدید `/api/v1/admin/jobs` (بدون توکن 401، با توکن `{"jobs":[],"count":0}`) ✓.
+  - **E2E واقعی backup:** `POST /admin/backup/telegram` → `{"status":"queued","job_id":...}` → poll → `state=done` با `file_id`/`message_id` واقعی (376KB به کانال ذخیره) ✓.
+  - **E2E واقعی ingest از طریق صف:** آپلود README از GitHub → `state=done`، 29668 bytes، 1 chunk، sha256 ثبت؛ دانلود فایل 200 OK؛ سپس trash ✓.
+  - **ریسکن واقعی restart:** ردیف `running` دستی در DB پروداکشن نوشته شد → `docker restart anbar-anbar-1` → state = `interrupted` با پیام «server restarted while this job was in flight» ✓ (دقیقاً مطابق طراحی §5) — سپس حذف ردیف با `DELETE /admin/jobs/{id}` ✓.
+- **بنچمارک ARCH-01 (معوقه که بسته شد):** 8MB=12.3 · 32MB=17.8 · 128MB=17.8 MB/s آپلود → **~3.4×** سقف تکی (5.2). جدول جدید در README (بخش Speed test v0.15.24).
+
 ## v0.15.24 — 2026-08-31 (Improvement Plan — ARCH-02)
 
 ### ARCH-02 · صف job داخلی (SPOF عملیات سنگین) — Severity: معماری

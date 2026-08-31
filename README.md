@@ -101,7 +101,22 @@ but inert, and the Web UI shows the cache section as disabled. This
 preserves the zero-retention guarantee: with the default configuration anbar
 writes **nothing** to disk except the SQLite metadata database.
 
-## Speed test (v0.10.8, bot backend)
+## Speed test (v0.15.24, bot backend, multi-token upload — ARCH-01 live)
+
+Measured **2026-08-31** on the production VPS (nginx + Cloudflare in front,
+`bot` backend pool, 16 MB chunk ceiling, ARCH-01 multi-token upload live) with
+[scripts/bench.py](scripts/bench.py) directly on the loopback port.
+
+| Size | Upload | Download 1st GET | Download 2nd GET |
+|------|--------|------------------|------------------|
+| 8 MB | 0.65 s — 12.3 MB/s | 1.77 s — 4.5 MB/s | 1.22 s — 6.6 MB/s |
+| 32 MB | 1.80 s — 17.8 MB/s | 5.37 s — 6.0 MB/s | 4.02 s — 8.0 MB/s |
+| 128 MB | 7.18 s — 17.8 MB/s | 23.88 s — 5.4 MB/s | 1.80 s — 71.2 MB/s |
+
+Upload with multi-token distribution holds **~18 MB/s** at 32–128 MB (vs the
+~5.2 MB/s single-token ceiling of the v0.10.8 table below — a ~3.4× gain,
+in line with the ARCH-01 design target of >3×). The 128 MB warm (2nd GET)
+row benefits from the LRU disk cache.
 
 Measured **2026-08-23** on a small VPS deployment (nginx + Cloudflare in
 front, `bot` backend, 16 MB chunk ceiling) with
