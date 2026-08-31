@@ -224,6 +224,14 @@ async def objects(request: Request, limit: int = 50, offset: int = 0):
     db = request.app.state.db
     limit = max(1, min(limit, 500))
     rows = db.list_objects(limit=limit, offset=max(0, offset))
+    # PERF-03: one cheap stat() per image row — lets the gallery use the
+    # pre-generated thumbnail instead of pulling the full object
+    from .. import thumbs
+
+    for r in rows:
+        ct = (r.get("content_type") or "").lower()
+        if ct in thumbs.SUPPORTED:
+            r["hasThumb"] = thumbs.has_thumb(request.app.state.settings, r["id"])
     return {"objects": rows, "count": len(rows)}
 
 

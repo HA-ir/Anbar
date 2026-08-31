@@ -1,6 +1,6 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.21
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.22
 
 ## v0.15.19 — 2026-08-31 (Audit Fixes — Loop #9)
 
@@ -199,3 +199,13 @@
 - **تست:** `tests/test_miniapp_session.py` — ۵ تست (امضای بد/منقضی 401، بدون توکن 503، جریان کامل admin، نقش سشن).
 
 تست: 284 → **296 passed**.
+
+## v0.15.22 — 2026-08-31 (Improvement Plan — PERF-03)
+
+### P-001 · thumbnail واقعی برای گالری (PERF-03) — Severity: PERF
+- **باس:** هر `<img>` گالری کل آبجکت را از تلگرام می‌کشید؛ گالری ۵۰ عکسی = ۵۰ دانلود کامل.
+- **فیکس:** ماژول `thumbs.py` — تولید ≤256px (JPEG/WebP) هنگام آپلود تصویر با Pillow (انتخاب کاربر)، ذخیره در `data/thumbs/`، best-effort (خرابی تصویر آپلود را نمی‌شکند). endpoint `GET /f/{id}/thumb` با همان auth matrix؛ `hasThumb` در لیست ادمین؛ گالری با fallback به object کامل؛ purge → حذف thumb.
+- **کشف حین تست:** `has_thumb` فقط `.webp` را چک می‌کرد در حالی که خروجی RGB به JPEG می‌رود؛ `list_objects` ستون `content_type` را SELECT نمی‌کرد. هر دو رفع شد.
+- **تست:** `tests/test_thumbs.py` — ۵ تست؛ کل **301 passed**.
+
+وابستگی جدید: `pillow>=12.3.0` (با تأیید کاربر). طراحی ARCH-01 (آپلود چند-توکنی) و ARCH-02 (صف job) در بخش ۴ و ۵ IMPROVEMENT_PLAN.md نوشته شد — اجرا جلسه بعد.

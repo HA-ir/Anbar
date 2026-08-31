@@ -1,9 +1,9 @@
 # Anbar — Improvement Plan (Working Record)
 
 > **Created:** 2026-08-31 11:55 (Asia/Tehran)
-> **Last update:** 2026-08-31 15:50 (Asia/Tehran)
-> **Status:** 19 از 21 مورد انجام شد — Batch 1-4 ✅ (v0.15.20) + QUAL-01 ✅ + QUAL-02 ✅. باقیمانده: ARCH-01، ARCH-02، PERF-03 (حجیمی/معماری).
-> **Baseline:** v0.15.19 @ c00fc76 — 260 tests passing. الان: 296 tests passing.
+> **Last update:** 2026-08-31 16:35 (Asia/Tehran)
+> **Status:** 20 از 21 مورد انجام شد — Batch 1-4 ✅ (v0.15.20)، QUAL-01/02 ✅ (v0.15.21)، PERF-03 ✅ (v0.15.22). باقیمانده: ARCH-01، ARCH-02 (طراحی کامل نوشته شد — اجرا جلسه بعد).
+> **Baseline:** v0.15.19 @ c00fc76 — 260 tests passing. الان: 301 tests passing.
 
 این فایل نقش working record دارد: هم پلن اولیه، هم وضعیت لحظه‌ای. بعد از هر فیکس،
 وضعیت در جدول به‌روز و یک ورودی در Change Log اضافه می‌شود.
@@ -27,7 +27,7 @@
 | ARCH-04 | audit_logs بدون retention | کیفیت کد | `src/anbar/db.py` (audit_logs) | جدول لاگ بی‌نهایت رشد می‌کند؛ prune ای برای آن نیست (فقط rate پرune می‌شود). | در `_prune_rate_loop` موجود، حذف رکوردهای audit قدیمی‌تر از 90 روز (قابل تنظیم runtime). | 🟢 quick win | ✅ Done |
 | PERF-01 | Range → دانلود کامل chunk از تلگرام | عملکرد | `src/anbar/api/download.py:_fetch_chunk_bytes` | کلیک وسط ویدیوی بزرگ = واکشی کل chunk 16MB از Telegram CDN برای پخش چند ثانیه. | micro-cache کوتاه‌عمر آخرین chunk (برای seeking)؛ بلندمدت: chunkهای کوچک‌تر برای مدیا. | 🔵 بلندمدت | ⬜ Not started |
 | PERF-02 | پاسخ‌ها gzip نمی‌شوند | عملکرد | `src/anbar/main.py` / `nginx/anbar.conf.example` | index.html 210KB خام (~52KB gzip) و هیچ GZipMiddleware یا gzip در nginx نیست؛ هر لود اولیه سنگین است. | افزودن `GZipMiddleware` (minimum_size=1000) در main.py + خطوط gzip در nginx example. | 🟢 quick win | ✅ Done |
-| PERF-03 | thumbnail ندارند previewها | عملکرد | `src/anbar/ui/index.html:2136` | هر `<img>` گالری کل آبجکت را از تلگرام می‌کشد؛ گالری ۵۰ عکسی = ۵۰ دانلود کامل. | تولید thumbnail کوچک هنگام آپلود تصویر (Pillow در sidecar که گزینه‌ای است) یا حداقل `Range` برای preview و پیش‌فرض خاموش در network کند. | 🟡 متوسط | ⬜ Not started |
+| PERF-03 | thumbnail ندارند previewها | عملکرد | `src/anbar/ui/index.html:2136` | هر `<img>` گالری کل آبجکت را از تلگرام می‌کشد؛ گالری ۵۰ عکسی = ۵۰ دانلود کامل. | تولید thumbnail کوچک هنگام آپلود تصویر (Pillow در sidecar که گزینه‌ای است) یا حداقل `Range` برای preview و پیش‌فرض خاموش در network کند. | 🟡 متوسط | ✅ Done |
 | PERF-04 | Cache-Control روی آبجکت‌ها نیست | عملکرد | `src/anbar/api/download.py` (headers) | آبجکت immutable است ولی مرورگر هر بار دوباره می‌پرسد؛ ETag/304 هست ولی برای مرور تکراری هنوز round-trip لازم است. | `Cache-Control: private, max-age=3600` روی پاسخ کامل 200 آبجکت (نه signed links عمومی پرترافیک بدون صلاحدید). | 🟢 quick win | ✅ Done |
 | UX-01 | ۱۵+ prompt()/confirm() بومی | UI-UX | `src/anbar/ui/index.html` (1668، 1942، 1977، 2595، 3385 و...) | دیالوگ‌های native در RTL/موبایل ناسازگار و ناخوانا؛ تجربه‌ی ناهمگون با modal های موجود. | مهاجرت تدریجی به modal موجود (الگوی `moveModal`)؛ شروع با rename/purge/ZK-pass. | 🟡 متوسط | ✅ Done |
 | UX-02 | سقف ۵۰ فایل در داشبورد | UI-UX | `src/anbar/ui/index.html:1829` + `admin.py:objects` (پیش‌فرض limit=50) | UI بدون پارامتر می‌خواند → بعد از ۵۰ فایل بقیه نامرئی؛ سرچ هم روی همین ۵۰ تاست. | UI: `?limit=500` + ایندیکس «نمایش N از M» + scroll-pagination ساده. | 🟢 quick win | ✅ Done |
@@ -97,3 +97,101 @@
 | 2026-08-31 14:10 | UX-01 | هر ۲۰ فراخوانی بومی `prompt()`/`confirm()` (۹ prompt + ۱۳ confirm، ۲ مورد در کامنت) با `askText()`/`askConfirm()` مبتنی بر modal جایگزین شد — RTL-safe، موبایل‌فرندلی، سازگار با تم. i18n: `ok`/`cancel`. | `node --check` (ES module) پاس؛ 284 تست سبز؛ 0 فراخوانی native باقی مانده | نکات فنی: `getClientZkPassword` و handler های حامل await → async شدند؛ keyboard-shortcut listener هم async شد. verify با `node --check` روی بدنه‌ی script به‌عنوان module. |
 | 2026-08-31 15:50 | QUAL-01 | `src/anbar/object_service.py` جدید: کلاس `ObjectService` — store (chunker + caption + harvester + checkpoint)، rollback (best-effort، هرگز raise نمی‌کند)، commit و `describe_storage_error` همگی یک‌جا. `upload.py::_store_stream/_commit` و `ingest.py::_run_job` اکنون wrapper نازک روی آن هستند؛ هر ۳ بلوک کپی‌شده حذف شد. کشف حین کار: drift واقعی بین دو کپی (caption/harvester فقط در آپلود) دقیقاً همان ریسکی بود که آیتم پیش‌بینی کرده بود. | 7 تست جدید `tests/test_object_service.py` (rollback، swallow خطای delete، چرخه checkpoint، resume، out-of-range، E2E ingest) + کل مجموعه 296 سبز | `nonlocal total_in` جاافتاده در `_JobReader` حین نوشتن تست E2E کشف و رفع شد — تست جدید همین را پوشش می‌دهد. |
 | 2026-08-31 15:50 | QUAL-02 | endpoint `POST /ui/miniapp/session` در `api/web.py`: initData با `verify_telegram_init_data` روی همه توکن‌های pool چک، rate-limit مثل login، audit (`auth.miniapp`/`auth.miniapp_denied`)، کوکی سشن admin مثل `/ui/login` (TTL همان `session_ttl`). بدون توکن بات → 503 (نه باز). miniapp: `ensureSession()` هنگام boot — اول `/ui/me`، بعد exchange با `tg.initData`؛ همه fetch ها `credentials: include`. | 5 تست جدید `tests/test_miniapp_session.py`: امضای دستکاری‌شده 401، منقضی 401، بدون توکن 503، جریان کامل → کوکی → admin objects 200، نقش admin تأیید؛ `node --check` miniapp پاس؛ کل 296 سبز | initData فقط هویت «کاربر تلگرامِ مینی‌اپ این بات» را اثبات می‌کند — نقش admin عمدی است چون miniapp ابزار owner است (همان مدل `/ui/login` که admin-key-only است). اگر بعداً miniapp عمومی شود، باید allowed-user list اضافه شود (یادداشت آینده). |
+| 2026-08-31 16:35 | PERF-03 | ماژول `src/anbar/thumbs.py`: تولید thumbnail واقعی ≤256px هنگام آپلود تصویر (Pillow — انتخاب کاربر). RGB→JPEG، RGBA→WebP، animated→فریم اول، encode در thread با سقف همزمانی ۲؛ هرگز آپلود را نمی‌شکند (best-effort). `ObjectService` chunk اول را نگه می‌دارد → `_commit` بعد از ثبت async تولید می‌کند. endpoint `GET /f/{id}/thumb` (همان auth matrix + nosniff + Cache-Control 24h). لیست ادمین پرچم `hasThumb` برمی‌گرداند (SELECT در `list_objects` ستون content_type گرفت). گالری UI از thumb استفاده می‌کند با onerror-fallback به object کامل. purge → `delete_thumb`. | ۵ تست `tests/test_thumbs.py` (تولید+سرو، 404 برای غیرتصویر/خراب + auth، لینک امضاشده، purge، پرچم hasThumb)؛ کل 301 سبز؛ node --check پاس | کشف حین کار: `has_thumb` فقط webp را چک می‌کرد در حالی که خروجی اغلب JPEG است — در تست واقعی گرفته شد. GIF متحرک و SVG از thumbnail مستثنا هستند (SVG چون Pillow decode نمی‌کند). فایل‌های موجود قبلی thumb ندارند تا آپلود مجدد — fallback به object کامل پوشش می‌دهد. |
+
+---
+
+## 4) طراحی ARCH-01 — آپلود چند-توکنی روی BotPool (اجرا: جلسه بعد)
+
+> هدف: شکستن سقف ~5.2MB/s آپلود تکی. امروز `_store_stream` همه‌ی chunk ها را از
+> `backend` (توکن اول pool) می‌فرستد؛ BotPool برای دانلود round-robin دارد ولی برای
+> آپلود استفاده نمی‌شود.
+
+### 4.1 — تغییر schema (پیش‌نیاز وابسته به هیچ چیز)
+
+- **جدول objects**: ستون سراسری `backend` باقی می‌ماند (بک‌اندِ «اصلی» آبجکت) ولی منبع حقیقت per-chunk می‌شود.
+- **Manifest JSON** (`objects.py::Manifest`): به هر chunk فیلد اختیاری `b` (backend name) اضافه می‌شود:
+  `{"i":0,"s":N,"f":"file_id","m":msg_id,"b":"bot:2"}`. خواندن manifest قدیمی (بدون `b`)
+  = همه از بک‌اند اصلی → سازگاری کامل رو به جلو؛ migration دیتابیس لازم نیست.
+- **`Chunk` dataclass**: فیلد `backend: str | None = None`.
+- **`download.py::_fetch_chunk_bytes`**: وقتی `chunk.backend` ست است، ref با همان
+  backend ساخته شود (`pool.by_name(name)`)، نه همیشه بک‌اند اصلی. fallback به اصلی در خطا.
+- **delete/purge (`_purge_object_blobs`)**: برای هر chunk با backendِ خودش حذف کند —
+  در حال حاضر همه را با بک‌اند اصلی delete می‌کند که با chunk های چند-توکنی نشتی می‌دهد.
+
+### 4.2 — الگوریتم توزیع
+
+- **انتخاب backend per-chunk** در `ObjectService`: سازنده یک `pool` (یا `None`) می‌گیرد.
+  `on_chunk` برای هر chunk جدید: `backend = pool.next()` (round-robin روی بک‌اندهای سالم pool).
+- **فیلتر سلامت**: backend هایی که FloodWait فعال دارند (از `FloodBudgetExceeded` اخیر،
+  نگه‌داری در memory با TTL) تا پایان window حذف می‌شوند؛ اگر همه مستثنا شدند → توکن اصلی.
+- **chunk_size یکسان** بین همه بک‌اندها (4MB سقف Bot API) — الان همین است، تغییر نمی‌خواهد.
+- **caption سازگار**: `encode_chunk_caption` فعلی backend-agnostic است؛ تغییری نمی‌خواهد.
+- **resume/checkpoint**: فرمت envelope فعلی به chunk فیلد `b` اضافه می‌شود؛ resume قدیمی→جدید سازگار.
+
+### 4.3 — تغییرات مسیر دانلود/حذف در صورت فقدان pool
+
+- اگر استقرار تک-توکن است (pool.size==1)، رفتار دقیقاً مثل امروز (کدِ توزیع no-op).
+- حذف chunk از backend غیراصلی وقتی آن backend down است: تلاش + log + ادامه (best-effort، مثل امروز).
+
+### 4.4 — تست‌ها (تعریف از الان)
+
+1. `test_multi_backend_distribution` — pool با ۳ FakeBackend؛ آپلود ۹ chunk → هر بک‌اند دقیقاً ۳ chunk.
+2. `test_manifest_roundtrip_with_backend` — manifest با `b` ذخیره/خوانده می‌شود؛ قدیمی بدون `b` هم خوانده می‌شود.
+3. `test_download_uses_chunk_backend` — chunk با `b:"bot:1"` از همان بک‌اند fetch می‌شود.
+4. `test_purge_deletes_from_right_backends` — حذف آبجکت چند-بک‌اندی همه blob ها را پاک می‌کند.
+5. `test_floodwait_skips_backend` — backend در FloodWait از چرخش خارج و بعد از TTL برمی‌گردد.
+6. regression: کل مجموعه + بنچمارک README (هدف: >3x throughput با ۳ توکن).
+
+### 4.5 — ترتیب اجرا (جلسه بعد)
+
+1. Chunk/manifest + خواندن سازگار (بدون تغییر رفتار) + تست ۲
+2. `pool.by_name` + دانلود per-chunk + تست ۳، ۴
+3. توزیع در ObjectService + تست ۱، ۵
+4. بنچمارک + به‌روزرسانی README
+
+## 5) طراحی ARCH-02 — صف job داخلی (اجرا: پس از ARCH-01)
+
+> هدف: عملیات سنگین (backup، rebuild، ZIP بزرگ، ingest) نباید event-loop را بلاک کنند و
+> باید از crash/restart جان سالم به قدر کافی ببرند.
+
+### 5.1 — مدل
+
+- **In-process job queue** با worker pool قابل تنظیم (`JOB_WORKERS=2` پیش‌فرض)، جدول
+  `jobs(id, kind, payload_json, state, progress, error, created_at, started_at, finished_at)`
+  در SQLite موجود — همان DB، بدون وابستگی جدید.
+- **kinds** فاز ۱: `ingest_url` (موجود، مهاجرت از JOBS dict درون حافظه)، `backup_now`، `channel_rebuild`.
+- **حافظه‌ماندگاری جزئی**: job ها در DB می‌مانند؛ بعد از restart، job های `running` → `interrupted`
+  (ادامه‌ی خودکار ندارند ولی پیام روشن به UI می‌دهند، برخلاف 404 امروزی — مکمل UX-03).
+- **concurrency قاعده‌دار**: هر kind سقف همزمانی خودش را دارد (ingest=2 مثل امروز با `_SEM`،
+  rebuild=1، backup=1) — جلوگیری از self-DDoS به تلگرام.
+- **pacing سراسری**: حلقه‌ی pacing موجود تلگرام سراسری می‌ماند؛ صف فقط ترتیب می‌دهد،
+  سرعت را `storage` کنترل می‌کند.
+
+### 5.2 — API
+
+- `GET /api/v1/admin/jobs?state=&kind=&limit=` — لیست (admin)
+- `GET /api/v1/admin/jobs/{id}` — وضعیت + progress (جایگزین نهایی endpoint job های ingest)
+- `POST /api/v1/admin/jobs/{id}/cancel` — فقط برای queued/runningِ cancelable (kind-dependent)
+- `DELETE /api/v1/admin/jobs/{id}` — حذف رکورد (همان prune ARCH-03، ولی دستی هم)
+
+### 5.3 — مهاجرت
+
+- `_run_job` اینجست به worker صف منتقل می‌شود؛ `JOBS` dict → view روی DB (compat shim
+  برای `pollIngest` فعلی UI تا UI هم مهاجرت کند؛ بعد از آن shim حذف).
+- prune (ARCH-03) روی جدول جدید با همان قاعده 1h برای done/error.
+
+### 5.4 — تست‌ها
+
+1. enqueue→run→done در DB ثبت می‌شود.
+2. restart شبیه‌سازی‌شده: running → interrupted، UI 404 نمی‌بیند.
+3. سقف همزمانی per-kind رعایت می‌شود.
+4. cancel بین chunk ها تمیز می‌ایستد (rollback از ObjectService).
+5.قاعده prune روی جدول jobs.
+
+### ریسک‌ها / نکات
+
+- SQLite + WAL الان فعال است (ascent-data-health) — نوشتن progress هر chunk باید
+  throttle شود (مثلاً هر 250ms یا هر 64 chunk) تا DB تحت فشار نرود.
+- worker ها باید `asyncio` tasks داخل همان پروسه باشند (نه subprocess) — isolation
+  واقعی پروسه‌ای خارج از scope این فاز است (آن می‌شود بحث worker=2 واقعی که فعلاً ممکن نیست).

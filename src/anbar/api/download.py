@@ -530,6 +530,45 @@ async def download(request: Request, obj_id: str):
     return StreamingResponse(stream(), status_code=status, headers=headers)
 
 
+@router.get("/{obj_id}/thumb")
+async def thumb(request: Request, obj_id: str):
+    """PERF-03: serve the pre-generated thumbnail (≤256px WebP/JPEG).
+
+    Auth mirrors the object itself (same matrix as /f/{id}). 404 when no
+    thumbnail exists — the UI falls back to the full object in that case.
+    """
+    settings = request.app.state.settings
+    db = request.app.state.db
+    from .. import thumbs
+
+    # pretty-slug resolution, same as /f/{id}
+    if not db.get_object(obj_id):
+        resolved = db.kv_get(f"slug:{obj_id}")
+        if resolved:
+            obj_id = resolved
+    limit_download(
+        db, request, obj_id, runtime.get_int(db, "rate_download", settings.rate_download_per_min)
+    )
+    row = db.get_object(obj_id)
+    if row is None:
+        raise HTTPException(404, "object not found")
+    _authenticate_download(request, obj_id)
+
+    data = thumbs.read_thumb(settings, obj_id)
+    if data is None:
+        raise HTTPException(404, "no thumbnail")
+    ct = "image/webp" if data[:4] == b"RIFF" else "image/jpeg"
+    return Response(
+        content=data,
+        media_type=ct,
+        headers={
+            "Cache-Control": "private, max-age=86400",
+            "Content-Length": str(len(data)),
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.post("/{obj_id}/link")
 async def mint_link(
     request: Request, obj_id: str, ttl: int = DEFAULT_LINK_TTL, password: str = "", max_dl: int = 0
@@ -673,6 +712,10 @@ async def delete(request: Request, obj_id: str, purge: bool = False):
     cache = getattr(request.app.state, "cache", None)
     if cache is not None:
         cache.remove(obj_id)
+    # PERF-03: the derived thumbnail is garbage once the object is gone
+    from .. import thumbs
+
+    thumbs.delete_thumb(settings, obj_id)
     return {"purged": True, "id": obj_id, "blobs_removed": deleted_blobs}
 
 

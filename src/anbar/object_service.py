@@ -48,6 +48,8 @@ class ObjectService:
         self.content_type = content_type
         self.upload_id = upload_id
         self.manifest = Manifest(chunks=[], total_size=0)
+        # PERF-03: first chunk is kept aside for thumbnail generation
+        self.first_chunk: bytes = b""
         # checkpointing is optional: the upload path resumes, ingest does not
         self.ck_key = f"{checkpoint_prefix}:{upload_id}" if upload_id else None
         self.resume_from = resume_from if self.ck_key else 0
@@ -116,6 +118,8 @@ class ObjectService:
             if self.skip_remaining > 0:
                 self.skip_remaining -= 1  # duplicate of an stored chunk: drain
                 return ""
+            if not self.first_chunk:
+                self.first_chunk = data  # PERF-03: kept for thumb generation
             chunk_idx = len(self.manifest.chunks)
             caption = encode_chunk_caption(
                 obj_id=self.upload_id or "",

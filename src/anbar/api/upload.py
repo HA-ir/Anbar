@@ -75,6 +75,19 @@ async def _commit(
         target=filename,
         details={"size": manifest.total_size, "id": obj_id},
     )
+    # PERF-03: generate the image thumbnail AFTER the object is committed —
+    # never blocks or fails the upload itself
+    from .. import thumbs
+
+    if svc.first_chunk and thumbs.SUPPORTED_OK(content_type):
+
+        async def _make_thumb() -> None:
+            try:
+                await thumbs.generate(settings, obj_id, content_type, svc.first_chunk)
+            except Exception:  # noqa: BLE001 — thumbs are best-effort
+                pass
+
+        asyncio.create_task(_make_thumb())
     base = settings.base_url.rstrip("/")
     return JSONResponse(
         {
