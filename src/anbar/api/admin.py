@@ -437,7 +437,10 @@ async def telegram_verify_code(request: Request):
                 return {
                     "ok": False,
                     "need_password": True,
-                    "message": "اکانت شما دارای رمز دومرحله‌ای (2FA) است. لطفاً رمز عبور را وارد کنید.",
+                    "message": (
+                        "اکانت شما دارای رمز دومرحله‌ای (2FA) است."
+                        " لطفاً رمز عبور را وارد کنید."
+                    ),
                 }
             await client.sign_in(password=password)
     except errors.PhoneCodeInvalidError:
