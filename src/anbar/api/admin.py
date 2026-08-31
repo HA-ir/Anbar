@@ -1351,7 +1351,13 @@ async def trash_purge_one(request: Request, obj_id: str):
     s = request.app.state.settings
     env_sec = s.hmac_secret.get_secret_value() if s.hmac_secret else None
     sec = effective_hmac_secret(db, env_sec)
-    removed = await _purge_object_blobs(request.app.state.backend, db, row, secret=sec)
+    removed = await _purge_object_blobs(
+        request.app.state.backend,
+        db,
+        row,
+        secret=sec,
+        pool=getattr(request.app.state, "bot_pool", None),
+    )
     db.log_audit("file.purge", actor="admin", target=obj_id)
     return {"purged": obj_id, "blobs_removed": removed}
 

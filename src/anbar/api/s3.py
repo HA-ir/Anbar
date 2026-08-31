@@ -216,10 +216,18 @@ async def get_object(bucket: str, key: str, request: Request):
         return Response(status_code=304, headers={"ETag": etag, "Accept-Ranges": "bytes"})
 
     async def stream_body():
+        pool = getattr(request.app.state, "bot_pool", None)
         for idx, off, n in segments:
             c = manifest.chunks[idx]
-            ref = ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=backend.name)
-            chunk_data = await backend.open(ref)
+            # ARCH-01: fetch from the holding member when it differs from the
+            # object's primary backend
+            chunk_backend = backend
+            if c.backend and pool is not None:
+                chunk_backend = pool.by_name(c.backend) or backend
+            ref = ObjectRef(
+                file_id=c.file_id, message_id=c.message_id, backend=chunk_backend.name
+            )
+            chunk_data = await chunk_backend.open(ref)
             yield chunk_data[off : off + n]
 
     headers = {
@@ -248,10 +256,17 @@ async def delete_object(bucket: str, key: str, request: Request):
     row = db.get_object(obj_id)
     if row:
         manifest = Manifest.from_json(row["manifest"])
+        pool = getattr(request.app.state, "bot_pool", None)
         for c in manifest.chunks:
+            # ARCH-01: delete from the holding member, not always the primary
+            chunk_backend = backend
+            if c.backend and pool is not None:
+                chunk_backend = pool.by_name(c.backend) or backend
             try:
-                ref = ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=backend.name)
-                await backend.delete(ref)
+                ref = ObjectRef(
+                    file_id=c.file_id, message_id=c.message_id, backend=chunk_backend.name
+                )
+                await chunk_backend.delete(ref)
             except Exception:
                 pass
         db.delete_object(obj_id)

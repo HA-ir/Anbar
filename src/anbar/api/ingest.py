@@ -137,6 +137,7 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                         settings=settings,
                         filename=fname,
                         content_type=ctype,
+                        pool=getattr(app.state, "bot_pool", None),
                     )
 
                     class _JobReader:

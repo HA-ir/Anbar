@@ -277,6 +277,7 @@ Take-away: **hybrid mode** combines the fast flood-free upload of MTProto (~12.7
 To scale Bot CDN downloads beyond Telegram's per-bot rate limitations, multiple bot tokens can be supplied via `ANBAR_BOT_TOKENS="tok1,tok2,tok3"` (or via `ANBAR_BOT_TOKEN`). When multiple bots are present:
 - All bots are added as administrators to the storage channel.
 - `BotPool` round-robins CDN chunk retrieval across the token pool.
+- **Since v0.15.23 (ARCH-01), uploads rotate across the pool too**: each chunk is stored by the next healthy member and the manifest records the holding bot (`"k"` key per chunk), so downloads, purges, ZIPs and S3 reads fetch every chunk from the exact bot that stores it. A member that blows its flood budget is skipped for 60s and rejoins afterwards; single-token and hybrid (mtproto-primary) deployments behave exactly as before.
 - Bot rate limits and 120s queue stalls are distributed across bots, drastically multiplying multi-gigabyte sustained CDN throughput.
 - If any bot encounter stalls or errors, the fast-failover immediately routes the chunk to MTProto.
 

@@ -77,7 +77,18 @@ class BotBackend(StorageBackend):
         flood_budget_s: float | None = None,
         send_timeout_s: float | None = None,
         channel_thread_id: int | None = None,
+        name: str | None = None,
     ) -> None:
+        # ARCH-01: manifest chunks record which pool member holds them, so each
+        # instance needs a distinct identity. Instance #0 keeps the legacy
+        # "bot" name (compat: single-token deployments and old refs).
+        if name is not None:
+            self.name = name
+        elif not hasattr(self, "_instance_named"):
+            self.name = "bot"
+            BotBackend._instance_named = True
+        else:
+            self.name = "bot:1"
         self.bot_token = bot_token
         self._channel = channel_id
         self._thread_id = channel_thread_id

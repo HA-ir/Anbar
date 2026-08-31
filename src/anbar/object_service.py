@@ -12,9 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any
 
-from . import runtime
 from .auth import effective_hmac_secret
 from .objects import Chunk, Manifest, chunk_stream, new_object_id, opaque_chunk_name
 from .self_healing import encode_chunk_caption
@@ -40,6 +38,7 @@ class ObjectService:
         upload_id: str | None = None,
         resume_from: int = 0,
         checkpoint_prefix: str = "upres",
+        pool=None,
     ) -> None:
         self.backend = backend
         self.db = db
@@ -48,6 +47,14 @@ class ObjectService:
         self.content_type = content_type
         self.upload_id = upload_id
         self.manifest = Manifest(chunks=[], total_size=0)
+        # ARCH-01: with a multi-member bot pool that owns the storage backend,
+        # chunks rotate across the pool members instead of pinning to token #1.
+        # Hybrid deployments (mtproto primary + bot CDN pool) never distribute:
+        # the pool does not hold the primary backend there.
+        self.pool = pool
+        self._distribute = (
+            pool is not None and pool.size > 1 and pool.contains(backend)
+        )
         # PERF-03: first chunk is kept aside for thumbnail generation
         self.first_chunk: bytes = b""
         # checkpointing is optional: the upload path resumes, ingest does not
@@ -83,7 +90,14 @@ class ObjectService:
                     # mid-upload (older than 24h) without a schema change
                     "_ts": int(time.time()),
                     "chunks": [
-                        {"s": c.size, "f": c.file_id, "m": c.message_id}
+                        {
+                            "s": c.size,
+                            "f": c.file_id,
+                            "m": c.message_id,
+                            # ARCH-01: surviving resume must re-delete/store
+                            # against the same pool member
+                            **({"k": c.backend} if c.backend else {}),
+                        }
                         for c in self.manifest.chunks
                     ],
                 },
@@ -106,7 +120,13 @@ class ObjectService:
         # pre-seed the manifest with already-stored chunks (resume)
         for i, c in enumerate(prior):
             self.manifest.chunks.append(
-                Chunk(index=i, size=c["s"], file_id=c["f"], message_id=c.get("m"))
+                Chunk(
+                    index=i,
+                    size=c["s"],
+                    file_id=c["f"],
+                    message_id=c.get("m"),
+                    backend=c.get("k"),
+                )
             )
 
         configured_sec = (
@@ -130,12 +150,33 @@ class ObjectService:
                 content_type=self.content_type,
                 secret=active_secret,
             )
-            ref = await self.backend.store(
-                data,
-                opaque_chunk_name(chunk_idx),
-                content_type=None,
-                caption=caption,
-            )
+            # ARCH-01: pick the target member for this chunk. Without an
+            # owning multi-token pool this stays `self.backend` (no-op).
+            target = self.backend
+            if self._distribute:
+                target = self.pool.next()
+            try:
+                ref = await target.store(
+                    data,
+                    opaque_chunk_name(chunk_idx),
+                    content_type=None,
+                    caption=caption,
+                )
+            except FloodBudgetExceeded:
+                if self._distribute:
+                    # rotate away from the throttled member and retry once
+                    # elsewhere; the caller's HTTP mapping (504) only fires
+                    # when every member is exhausted.
+                    self.pool.mark_flood(target.name)
+                    target = self.pool.next()
+                    ref = await target.store(
+                        data,
+                        opaque_chunk_name(chunk_idx),
+                        content_type=None,
+                        caption=caption,
+                    )
+                else:
+                    raise
             bot_fid = None
             if self.harvester and ref.message_id is not None:
                 try:
@@ -151,6 +192,10 @@ class ObjectService:
                     file_id=ref.file_id,
                     message_id=ref.message_id,
                     bot_file_id=bot_fid,
+                    # when distributing, every chunk records its holding member
+                    # (self-describing manifest); without distribution rows stay
+                    # exactly as before (no names)
+                    backend=target.name if self._distribute else None,
                 )
             )
             self._write_checkpoint()
@@ -174,12 +219,16 @@ class ObjectService:
         """Best-effort delete of every blob posted so far. Never raises."""
         deleted = 0
         for c in self.manifest.chunks:
+            # ARCH-01: each chunk is deleted from the member that holds it
+            holder = self.backend
+            if c.backend and self.pool is not None:
+                holder = self.pool.by_name(c.backend) or self.backend
             try:
-                await self.backend.delete(
+                await holder.delete(
                     ObjectRef(
                         file_id=c.file_id,
                         message_id=c.message_id,
-                        backend=self.backend.name,
+                        backend=holder.name,
                     )
                 )
                 deleted += 1
@@ -193,11 +242,15 @@ class ObjectService:
         cleanup — call `drop_checkpoint()` once the response is on its way."""
         self.manifest.total_size = sum(c.size for c in self.manifest.chunks)
         obj_id = new_object_id()
+        # ARCH-01: the row-level backend stays the object's primary (chunk #0's
+        # holder when it has no explicit name); per-chunk truth lives in the
+        # manifest, so multi-backend rows need no schema change.
+        row_backend = self.manifest.chunks[0].backend or self.backend.name
         self.db.insert_object(
             {
                 "id": obj_id,
                 "file_id": self.manifest.chunks[0].file_id,
-                "backend": self.backend.name,
+                "backend": row_backend,
                 "filename": self.filename,
                 "size": self.manifest.total_size,
                 "content_type": self.content_type or "application/octet-stream",

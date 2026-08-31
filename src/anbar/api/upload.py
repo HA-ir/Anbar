@@ -146,6 +146,8 @@ def _service_for(
         content_type=content_type,
         upload_id=upload_id,
         resume_from=resume_from,
+        # ARCH-01: multi-token uploads rotate across the pool members
+        pool=getattr(request.app.state, "bot_pool", None),
     )
 
 

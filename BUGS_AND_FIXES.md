@@ -1,6 +1,19 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.22
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.23
+
+## v0.15.23 — 2026-08-31 (Improvement Plan — ARCH-01)
+
+### ARCH-01 · آپلود چند-توکنی روی BotPool — Severity: معماری (آخرین مورد باز IMPROVEMENT_PLAN)
+- **باس:** BotPool برای دانلود round-robin داشت ولی `_store_stream` همه‌ی chunk ها را از توکن اول (`app.state.bot_client = bot_pool.primary`) می‌فرستاد؛ سقف واقعی آپلود ~5.2MB/s با وجود چند توکن.
+- **فیکس:**
+  - `Chunk.backend` جدید (کلید اختیاری `"k"` در manifest JSON). کلید `"b"` قبلاً برای `bot_file_id` اشغال بود → انحراف از طراحی اولیه (§4.1 که `"b"` را پیشنهاد داده بود) و ثبت آن در Change Log.
+  - `BotPool`: نام پایدار هر عضو (`bot`, `bot:1`, …) در ساخت، `by_name()`, `names()`, `contains()`, `mark_flood()` و `next()` با فیلتر FloodWait (TTL 60s، fallback به عضو اول وقتی همه pause هستند).
+  - `ObjectService`: با pool چند-عضویِ **مالکِ** بک‌اند اصلی، هر chunk به عضو بعدی سالم می‌رود و نامش در chunk ثبت می‌شود؛ `FloodBudgetExceeded` → عضو pause و یک retry روی عضو دیگر قبل از 504. بدون pool / تک‌عضو / hybrid (mtproto اصلی + pool بات) → رفتار قبلی دقیقاً حفظ شد (`_distribute=False`).
+  - مسیرهای دانلود per-chunk از عضو نگهدارنده: `_fetch_chunk_bytes` (streaming + range)، ZIP (`fetch_chunk`)، S3 GET و DELETE، rollback و `_purge_object_blobs` (پارامتر جدید `pool`; call sites در download.py و admin.py سیم شد).
+  - checkpoint آپلود (`upres:`) حالا `"k"` هر chunk را هم حمل می‌کند؛ resume چند-توکنی درست ادامه می‌دهد.
+- **تست:** `tests/test_arch01_multi_backend.py` — ۱۱ تست: نام‌گذاری پایدار اعضا + by_name/contains، roundtrip manifest با `"k"` (و دست‌نخوردن `"b"`)، توزیع دقیق ۹ chunk روی ۳ عضو، تک‌عضو = رفتار legacy، hybrid توزیع نمی‌کند، FloodWait skip + انقضای TTL، purge و rollback از عضو درست، resume با حفظ نام اعضا، دانلود route-level از عضو نگهدارنده. کل مجموعه ۳۰۱ → ۳۱۲ سبز.
+- **یادداشت:** بنچمارک واقعی >3x روی سرور Falkenstein (با ۳ توکن واقعی) هنوز اجرا نشده؛ بخش بنچمارک README فقط قابلیت را مستند کرده — اعداد بعد از تست تولیدی اضافه می‌شود.
 
 ## v0.15.19 — 2026-08-31 (Audit Fixes — Loop #9)
 

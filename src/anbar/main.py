@@ -64,6 +64,9 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
                 flood_budget_s=settings.flood_budget_s,
                 send_timeout_s=settings.send_timeout_s,
             )
+            # ARCH-01: when the bot pool IS the storage backend (backend=bot),
+            # meta/event traffic rides the primary member — matching chunk #0's
+            # holder, which keeps legacy file_id refs (row["file_id"]) valid.
             app.state.bot_client = app.state.bot_pool.primary
             app.state.harvester = BotHarvester(tokens[0], settings.channel_id, db=db)
             await app.state.harvester.start()

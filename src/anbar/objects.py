@@ -41,6 +41,8 @@ class Chunk:
     file_id: str = ""  # filled by the storage layer
     message_id: int | None = None  # bot backend: channel message holding the blob
     bot_file_id: str | None = None  # hybrid: bot-harvested file_id for CDN download
+    backend: str | None = None  # ARCH-01: pool member that holds this chunk;
+    # None = the object's primary backend (compat with pre-ARCH-01 manifests)
 
 
 @dataclass
@@ -60,6 +62,9 @@ class Manifest:
                 "f": c.file_id,
                 **({"m": c.message_id} if c.message_id is not None else {}),
                 **({"b": c.bot_file_id} if c.bot_file_id is not None else {}),
+                # "k" = per-chunk backend name (ARCH-01). "b" was already taken
+                # by bot_file_id, so the design-doc key moved from "b" to "k".
+                **({"k": c.backend} if c.backend else {}),
             }
             for c in self.chunks
         ]
@@ -78,6 +83,7 @@ class Manifest:
                     file_id=c["f"],
                     message_id=c.get("m"),
                     bot_file_id=c.get("b"),
+                    backend=c.get("k"),
                 )
                 for c in d["chunks"]
             ],
