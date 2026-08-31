@@ -357,12 +357,29 @@ async def download(request: Request, obj_id: str):
     else:
         disposition = "attachment"
 
-    base_fn = os.path.basename(row["filename"]) or row["filename"]
+    # v0.15.11 audit fix: sanitize the header value — non-latin1 bytes would
+    # 500 inside starlette (filename.encode("latin-1")), and CR/LF or quotes
+    # would break/inject the header. RFC 5987: ASCII fallback + filename*
+    # with percent-encoded UTF-8 so Persian (and any unicode) names survive.
+    from urllib.parse import quote
+
+    raw_fn = os.path.basename(row["filename"] or "") or (row["filename"] or "file")
+    ascii_fn = raw_fn.encode("ascii", "replace").decode("ascii").replace('"', "_")
+    ascii_fn = ascii_fn.replace("\r", "_").replace("\n", "_")
+    utf8_fn = quote(raw_fn, safe="")
+    if utf8_fn == ascii_fn and '"' not in ascii_fn:
+        disposition_value = f'{disposition}; filename="{ascii_fn}"'
+    else:
+        disposition_value = (
+            f'{disposition}; filename="{ascii_fn}"; filename*=UTF-8\'\'{utf8_fn}'
+        )
     headers = {
         "Content-Length": str(length),
         "Content-Type": resolved_ct or "application/octet-stream",
-        "Content-Disposition": f'{disposition}; filename="{base_fn}"',
+        "Content-Disposition": disposition_value,
         "Accept-Ranges": "bytes",
+        # v0.15.11 audit fix: prevent MIME-sniffing XSS on user-uploaded files
+        "X-Content-Type-Options": "nosniff",
     }
     if etag:
         headers["ETag"] = etag
@@ -615,7 +632,7 @@ async def qr(request: Request, obj_id: str):
     )
 
 
-@router.delete("/{obj_id}")
+@router.delete("/{obj_id:path}")
 async def delete(request: Request, obj_id: str, purge: bool = False):
     """Trash an object (soft delete) — or destroy it with ?purge=true.
 
@@ -655,7 +672,7 @@ async def delete(request: Request, obj_id: str, purge: bool = False):
     return {"purged": True, "id": obj_id, "blobs_removed": deleted_blobs}
 
 
-@router.patch("/{obj_id}")
+@router.patch("/{obj_id:path}")
 async def rename(request: Request, obj_id: str):
     """Rename an object (metadata only; blobs untouched). Admin/owner only."""
     db = request.app.state.db

@@ -4,6 +4,29 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.12] — 2026-08-31
+
+### Fixed
+- **Content-Disposition Header Sanitization (RFC 5987)**: Unicode filenames (e.g. Persian) no longer crash the download endpoint with a 500 (`latin-1` encode error); the header now carries an ASCII fallback plus a percent-encoded `filename*` parameter, and CR/LF/quote characters can no longer break or inject headers.
+- **`X-Content-Type-Options: nosniff`** on all `/f/{id}` download responses to eliminate MIME-sniffing XSS on user-uploaded files.
+- **Telethon Client Leak in MTProto Auth**: `send-code` / `verify-code` now always disconnect the temporary Telegram client (`finally`), including the `need_password` and invalid-code paths — failed attempts no longer keep live MTProto sockets open.
+- **Typed MTProto Auth Errors**: Specific Persian error messages for invalid/expired OTP code, invalid phone number, wrong 2FA password, and FloodWait (HTTP 429) instead of raw exception dumps.
+- **UI: Double-Init Guard**: `initTgAuthUI()` no longer re-binds `onclick` handlers every time the settings drawer opens (single init).
+- **UI: Stale `session_set` Check**: Telegram auth status box now keys only on the server-provided `session_authorized` field (the `r.session_set` field never existed on the API).
+
+### Changed
+- UI: minor cleanup — duplicate semicolon after `newFolderBtn` guard wrapper; consistent `$()` selector in the folder-creation guard.
+
+## [0.15.11] — 2026-08-31
+
+### Added
+- **Telegram MTProto Interactive Auth (UI + API)**: In-browser OTP login flow (`/admin/telegram/send-code`, `/admin/telegram/verify-code`, `/admin/telegram/logout`) with 2FA password support, persisting the authorized session to `cfg_tg_session` — no more manual `anbarctl login`.
+- **Path-Encoded Delete/Rename**: `DELETE` and `PATCH /f/{obj_id:path}` now accept object ids containing slashes (folder-scoped ids).
+- **UI: Double-Submit Guards**: `guardBtn()` wrapper on destructive/async buttons (logout, delete, bulk ZIP, secret rotate/set, new folder) preventing double clicks.
+- **UI: Select-All Reflection**: the select-all button now highlights (`.view-on`) and toggles its label (همه/هیچ) when every visible file is selected.
+- **UI: Channel Rebuild Feedback**: progress toast, restored button state, and automatic list refresh + breadcrumb reset after a channel rebuild.
+- **UI: Telegram Auth Boxes**: connected (green) vs. login-form states driven by the Telegram config endpoint.
+
 ## [0.15.7] — 2026-08-29
 
 ### Fixed

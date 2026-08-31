@@ -348,6 +348,145 @@ async def backup_import(request: Request, file: UploadFile):
         raise HTTPException(500, detail=f"Database restore failed: {e}") from e
 
 
+
+
+# ── Telegram MTProto Interactive Auth (v0.15.8) ──────────────────────────────
+@router.post("/admin/telegram/send-code")
+async def telegram_send_code(request: Request):
+    """Initiate Telegram login by sending OTP code to user's phone number."""
+    require_admin(request)
+    db = request.app.state.db
+    s = request.app.state.settings
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    phone = (body or {}).get("phone", "").strip()
+    if not phone:
+        raise HTTPException(400, "Phone number is required")
+
+    api_id = s.api_id
+    api_hash = s.api_hash
+    if not api_id or not api_hash:
+        raise HTTPException(400, "Telegram API ID and API Hash must be configured first")
+
+    from telethon import TelegramClient, errors
+    from telethon.sessions import StringSession
+
+    session = StringSession()
+    client = TelegramClient(session, api_id, api_hash)
+    await client.connect()
+    try:
+        sent = await client.send_code_request(phone)
+        db.kv_set("tg_temp_phone_hash", sent.phone_code_hash)
+        db.kv_set("tg_temp_session", session.save())
+        db.kv_set("tg_temp_phone", phone)
+        return {
+            "ok": True,
+            "message": "کد تأیید به تلگرام شما ارسال شد",
+            "phone_code_hash": sent.phone_code_hash,
+        }
+    except errors.PhoneNumberInvalidError:
+        raise HTTPException(400, "شماره تلفن نامعتبر است") from None
+    except errors.FloodWaitError as e:
+        raise HTTPException(429, f"تلاش زیاد؛ {e.seconds} ثانیه دیگر دوباره امتحان کنید") from None
+    except Exception as e:
+        raise HTTPException(500, f"Failed sending code: {e}") from e
+    finally:
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
+
+
+@router.post("/admin/telegram/verify-code")
+async def telegram_verify_code(request: Request):
+    """Verify OTP code (and optional 2FA password) and persist authorized session."""
+    require_admin(request)
+    db = request.app.state.db
+    s = request.app.state.settings
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    code = (body or {}).get("code", "").strip()
+    password = (body or {}).get("password", "").strip()
+    phone = (body or {}).get("phone", "").strip() or db.kv_get("tg_temp_phone") or ""
+    phone_code_hash = (
+        (body or {}).get("phone_code_hash", "").strip()
+        or db.kv_get("tg_temp_phone_hash")
+        or ""
+    )
+    temp_session_str = db.kv_get("tg_temp_session") or ""
+
+    if not code or not phone or not phone_code_hash or not temp_session_str:
+        raise HTTPException(400, "Missing required verification data")
+
+    from telethon import TelegramClient, errors
+    from telethon.sessions import StringSession
+
+    session = StringSession(temp_session_str)
+    client = TelegramClient(session, s.api_id, s.api_hash)
+    await client.connect()
+    try:
+        try:
+            await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
+        except errors.SessionPasswordNeededError:
+            if not password:
+                return {
+                    "ok": False,
+                    "need_password": True,
+                    "message": "اکانت شما دارای رمز دومرحله‌ای (2FA) است. لطفاً رمز عبور را وارد کنید.",
+                }
+            await client.sign_in(password=password)
+    except errors.PhoneCodeInvalidError:
+        raise HTTPException(400, "کد وارد شده اشتباه یا منقضی است") from None
+    except errors.PhoneCodeExpiredError:
+        raise HTTPException(400, "کد وارد شده منقضی شده است؛ کد جدید بگیرید") from None
+    except errors.PhoneNumberInvalidError:
+        raise HTTPException(400, "شماره تلفن نامعتبر است") from None
+    except errors.PasswordHashInvalidError:
+        raise HTTPException(400, "رمز دو مرحله‌ای اشتباه است") from None
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"Verification failed: {e}") from e
+    finally:
+        # v0.15.11 audit fix: the old code leaked the connected telethon client
+        # on the need_password / code-invalid paths — every failed attempt
+        # kept a live MTProto socket. Disconnect exactly once, always.
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
+
+    final_session_str = session.save()
+    db.kv_set("cfg_tg_session", final_session_str)
+
+    db.log_audit("auth.telegram_mtproto", actor="admin", details={"phone": phone})
+    return {"ok": True, "message": "سشن MTProto با موفقیت ساخته و متصل شد"}
+
+
+@router.post("/admin/telegram/logout")
+async def telegram_logout(request: Request):
+    """Log out from Telegram MTProto session and remove credentials."""
+    require_admin(request)
+    db = request.app.state.db
+    db.kv_set("cfg_tg_session", "")
+    db.kv_set("tg_temp_session", "")
+    db.kv_set("tg_temp_phone", "")
+    db.kv_set("tg_temp_phone_hash", "")
+    backend = request.app.state.backend
+    if hasattr(backend, "_client") and hasattr(backend._client, "disconnect"):
+        try:
+            await backend._client.disconnect()
+        except Exception:
+            pass
+    db.log_audit("auth.telegram_mtproto_logout", actor="admin")
+    return {"ok": True, "message": "از تلگرام خارج شدید"}
+
+
 @router.post("/admin/channel/rebuild")
 async def channel_rebuild(request: Request):
     """Scan Telegram storage channel history and reconstruct SQLite objects.
@@ -645,6 +784,13 @@ async def telegram_config_get(request: Request):
         "api_hash_set": bool(api_hash_raw),
         "mtproto_peer": mtproto_peer,
         "chunk_size_mb": chunk_size_mb,
+        "session_authorized": (
+            bool(db.kv_get("cfg_tg_session"))
+            or (
+                hasattr(request.app.state.backend, "_client")
+                and getattr(request.app.state.backend, "_connected", False)
+            )
+        ),
     }
 
 
@@ -952,7 +1098,7 @@ async def trash_list(request: Request):
     return {"items": items, "count": len(items)}
 
 
-@router.post("/admin/trash/{obj_id}/restore")
+@router.post("/admin/trash/{obj_id:path}/restore")
 async def trash_restore(request: Request, obj_id: str):
     require_admin(request)
     ok = request.app.state.db.restore_object(obj_id)
@@ -1112,7 +1258,7 @@ async def object_copy(request: Request):
     return {"status": "copied", "object": res}
 
 
-@router.delete("/admin/trash/{obj_id}")
+@router.delete("/admin/trash/{obj_id:path}")
 async def trash_purge_one(request: Request, obj_id: str):
     """Permanently destroy one trashed object (blobs + metadata) now."""
     from ..api.download import _purge_object_blobs

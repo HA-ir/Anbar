@@ -192,7 +192,7 @@ body:not(.select-mode) .selbox{display:none !important}
 body.select-mode .selbox{display:block !important}
 .gcell .selbox{position:absolute;top:8px;inset-inline-start:8px;z-index:5;width:18px;height:18px;cursor:pointer}
 tbody tr .selbox{cursor:pointer}
-#selectModeBtn.view-on{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 0 0 3px var(--brand-soft)}
+#selectModeBtn.view-on,#selAllBtn.view-on{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 0 0 3px var(--brand-soft)}
 /* date cell RTL styling */
 .date-cell{font-size:12.5px;color:var(--tx2);white-space:nowrap;direction:rtl;text-align:right;unicode-bidi:embed}
 html[dir="ltr"] .date-cell{direction:ltr;text-align:left}
@@ -791,6 +791,39 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     <!-- Telegram & MTProto Configuration (v0.14.1) -->
     <div class="sec">
       <h3 data-i18n="secTgConfig">پیکربندی تلگرام و متغیرها (.env)</h3>
+      
+      <!-- Telegram MTProto Authentication Box -->
+      <div id="tgAuthConnectedBox" style="display:none;background:var(--ok-soft);border:1.5px solid var(--ok);border-radius:12px;padding:14px;margin-top:8px;align-items:center;justify-content:space-between;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold">✓</div>
+          <div>
+            <div style="font-weight:700;font-size:13.5px;color:var(--ok)">لاگین تلگرام فعال است</div>
+            <small style="color:var(--tx2);font-size:11.5px">کلاینت MTProto متصل و مجاز می‌باشد</small>
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost" id="btnTgLogout" style="border-color:var(--err);color:var(--err);font-size:12px;padding:6px 12px;white-space:nowrap">خروج از تلگرام</button>
+      </div>
+
+      <div id="tgAuthLoginForm" class="set-row" style="flex-direction:column;align-items:stretch;gap:8px;background:var(--bg3);border:1.5px solid var(--line2);border-radius:10px;padding:12px;margin-top:6px">
+        <div style="font-weight:600;font-size:13px;color:var(--tx);display:flex;align-items:center;gap:6px">
+          🔑 <span>احراز هویت کلاینت MTProto تلگرام</span>
+        </div>
+        <small style="color:var(--tx2);font-size:11.5px">برای اسکن خودکار و بازسازی تاریخچه کانال بدون نیاز به ورود دستی سشن</small>
+        <div style="display:flex;gap:6px">
+          <input type="tel" id="s_tg_phone" placeholder="+98912..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
+          <button type="button" class="btn btn-ghost" id="btnTgSendCode" style="font-size:12px;padding:7px 12px;white-space:nowrap">ارسال کد</button>
+        </div>
+        <div id="tgOtpRow" style="display:none;flex-direction:column;gap:8px;margin-top:4px">
+          <div style="display:flex;gap:6px">
+            <input type="text" id="s_tg_code" placeholder="کد دریافتی از تلگرام (OTP)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
+            <button type="button" class="btn btn-primary" id="btnTgVerifyCode" style="font-size:12px;padding:7px 14px;white-space:nowrap">تأیید و اتصال</button>
+          </div>
+          <div id="tg2faRow" style="display:none">
+            <input type="password" id="s_tg_2fa_pw" placeholder="رمز عبور دو مرحله‌ای (2FA Password)" style="width:100%;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
+          </div>
+        </div>
+      </div>
+
       <div class="set-row col">
         <div class="lab"><span data-i18n="tgBackendLab">نوع بک‌اند ذخیره‌سازی</span><small data-i18n="tgBackendSub">استراتژی هیبریدی (توصیه‌شده)، MTProto یا Bot</small></div>
         <select id="s_tg_backend" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
@@ -817,7 +850,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgApiIdLab">Telegram API ID (ANBAR_API_ID)</span></div>
-        <input type="text" id="s_tg_api_id" placeholder="27755251" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        <input type="text" id="s_tg_api_id" placeholder="12345678" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
       </div>
       <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
         <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
@@ -830,6 +863,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="lab"><span data-i18n="tgPeerLab">MTProto Peer (ANBAR_MTPROTO_PEER)</span></div>
         <input type="text" id="s_tg_peer" data-i18n-ph="tgPeerPh" placeholder="me یا -100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
       </div>
+
       <div class="set-row">
         <div class="lab"><span data-i18n="tgChunkLab">حجم هر چانک (MB)</span><small data-i18n="tgChunkSub">حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto</small></div>
         <input type="number" min="1" max="49" id="s_tg_chunk_size" style="direction:ltr;width:80px">
@@ -1204,7 +1238,7 @@ const I18N={
   manageB:"مدیریت لینک", manageT:"مدیریت لینک", linkT:"اشتراک‌گذاری",
   mgSaveB:"ذخیره و ساخت لینک جدید", mgDone:"لینک جدید ساخته شد — لینک قبلی ابطال شد:",
   mgPwWarn:"این لینک بدون رمز و بدون سقف دانلود برای همه باز می‌شود — تأیید؟ برای ادامه رمز بگذار یا دوباره ذخیره کن.",
-  renameT:"تغییر نام", renameOk:"نام تغییر کرد", selAll:"همه", selNone:"هیچ",
+  renameT:"تغییر نام", renameOk:"نام تغییر کرد", mgTtl:"انقضای لینک", selAll:"همه", selNone:"هیچ",
   delSel:"حذف", nSelected:"انتخاب‌شده",
   moveSel:"انتقال", movePrompt:"مسیر پوشهٔ مقصد را وارد کنید (خالی = ریشه):",
   movedOk:"انتقال شد", skippedOk:"به‌خاطر تداخل نام رد شد", moveFileQ:"انتقال فایل به کجا؟",
@@ -1349,7 +1383,7 @@ const I18N={
   manageB:"Manage link", manageT:"Manage link", linkT:"Share",
   mgSaveB:"Save & mint new link", mgDone:"New link created — previous one revoked:",
   mgPwWarn:"This link will be open to everyone with no password and no download cap. Set a password or save again to confirm.",
-  renameT:"Rename", renameOk:"Renamed", selAll:"All", selNone:"None",
+  renameT:"Rename", renameOk:"Renamed", mgTtl:"Link expiry", selAll:"All", selNone:"None",
   delSel:"Delete", nSelected:"selected",
   moveSel:"Move", movePrompt:"Destination folder path (empty = root):",
   movedOk:"moved", skippedOk:"skipped (name clash)", moveFileQ:"Move file to…",
@@ -1515,12 +1549,11 @@ async function boot(){
       history.replaceState(null,"",location.pathname);
     }
   }catch(e){}
+  try{
+    const me=await api("/ui/me");
+    if(me&&me.authed){authed=true;showApp();return;}
+  }catch(e){}
   if(_apiKey){
-    try{
-      const me=await api("/ui/me");
-      if(me&&me.authed){authed=true;showApp();return;}
-    }catch(e){}
-    // key stored but invalid — clear it
     _apiKey="";localStorage.removeItem("anbar-key");
   }
   showLogin();
@@ -1562,11 +1595,11 @@ $("#loginForm").onsubmit=async ev=>{
 $("#eyeBtn").onclick=()=>{
   const i=$("#keyInput");i.type=i.type==="password"?"text":"password";
 };
-$("#outBtn").onclick=async()=>{
+$("#outBtn").onclick=guardBtn($("#outBtn"),async()=>{
   try{await api("/ui/logout",{method:"POST"})}catch(e){}
   _apiKey="";localStorage.removeItem("anbar-key");
   authed=false;showLogin();toast(t("logoutOk"));
-};
+});
 
 /* ================= files ================= */
 let files=[];
@@ -1651,7 +1684,7 @@ function updateBreadcrumb() {
     }, 40);
   }
 }
-$("#newFolderBtn").onclick = async () => {
+$("#newFolderBtn").onclick = guardBtn($("#newFolderBtn"), async () => {
   const name = prompt(t("newFolderPrompt"));
   if (!name) return;
   const cleanName = name.replace(/[\/\\?%*:|"<>]/g, "").trim();
@@ -1667,7 +1700,7 @@ $("#newFolderBtn").onclick = async () => {
   } catch(e) {
     toast(e.message, "err");
   }
-};
+});
 
 function visibleFiles() {
   let list = files;
@@ -2273,6 +2306,16 @@ function updateSelBar(){
   const n=selSet.size;
   bar.style.display=n?"flex":"none";
   if(n)$("#selCnt").textContent=n+" "+t("nSelected");
+  updateSelAllBtn();
+}
+function updateSelAllBtn(){
+  const allBtn=$("#selAllBtn");
+  if(!allBtn)return;
+  const list=visibleFiles();
+  const all=selectMode&&list.length>0&&selSet.size>=list.length;
+  allBtn.classList.toggle("view-on",all);
+  allBtn.dataset.i18n=all?"selNone":"selAll";
+  allBtn.textContent=t(allBtn.dataset.i18n);
 }
 $("#selAllBtn").onclick=()=>{
   if(!selectMode)setSelectMode(true);
@@ -2282,7 +2325,7 @@ $("#selAllBtn").onclick=()=>{
   renderRows();
   updateSelBar();
 };
-$("#selDelBtn").onclick=async()=>{
+$("#selDelBtn").onclick=guardBtn($("#selDelBtn"),async()=>{
   if(!selSet.size)return;
   if(!confirm(t("delSel")+" ("+selSet.size+")؟"))return;
   const folders=[...selSet].filter(id=>String(id).startsWith("folder:"));
@@ -2299,14 +2342,14 @@ $("#selDelBtn").onclick=async()=>{
   // delete selected individual files
   for(const id of realIds){
     try{
-      await api("/f/"+id,{method:"DELETE"});
+      await api("/f/"+encodeURIComponent(id),{method:"DELETE"});
       ok++;
     }catch(e){toast(e.message,"err");}
   }
   selSet.clear();
   toast(ok+" ✓");
   refresh();
-};
+});
 /* bulk move: files via the move endpoint, folder markers via folder rename */
 $("#selMoveBtn").onclick=()=>{
   if(!selSet.size)return;
@@ -2320,7 +2363,7 @@ $("#selShareBtn").onclick=()=>{
   openShareOpts(null); // reuse the options form; shareTarget=null marks bulk
 };
 /* bulk ZIP: stream the selection as one archive */
-$("#selZipBtn").onclick=async()=>{
+$("#selZipBtn").onclick=guardBtn($("#selZipBtn"),async()=>{
   if(!selSet.size)return;
   const ids=[...selSet].filter(id=>!String(id).startsWith("folder:"));
   if(!ids.length){toast(t("zipFilesOnly"),"err");return;}
@@ -2337,7 +2380,7 @@ $("#selZipBtn").onclick=async()=>{
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),30000);
   }catch(e){toast(e.message,"err");}
-};
+});
 $("#shareOpts").addEventListener("submit",async ev=>{
   // bulk branch runs only when nothing is targeted
   if(shareTarget||!selSet.size)return;
@@ -2473,7 +2516,7 @@ $("#manageForm").onsubmit=async ev=>{
     await api("/api/v1/admin/links/"+mgTarget.obj_id+"/revoke/"+mgTarget.exp,{method:"POST"});
     let q="ttl="+ttl+(pw?"&password="+encodeURIComponent(pw):"")+(max?"&max_dl="+max:"");
     if(mgTarget.slug)q+="&slug="+encodeURIComponent(mgTarget.slug);
-    const j=await api("/f/"+mgTarget.obj_id+"/link?"+q,{method:"POST"});
+    const j=await api("/f/"+encodeURIComponent(mgTarget.obj_id)+"/link?"+q,{method:"POST"});
     $("#mgUrl").textContent=j.pretty_url||j.url;
     $("#mgOut").style.display="block";
     toast(t("linkRevoked"));
@@ -2484,14 +2527,14 @@ $("#mgCopy").onclick=async()=>{
   try{await navigator.clipboard.writeText($("#mgUrl").textContent);toast(t("copied"));}
   catch(e){toast("copy failed","err");}
 };
-$("#mgRevoke").onclick=async()=>{
+$("#mgRevoke").onclick=guardBtn($("#mgRevoke"),async()=>{
   if(!mgTarget)return;
   try{
     await api("/api/v1/admin/links/"+mgTarget.obj_id+"/revoke/"+mgTarget.exp,{method:"POST"});
     $("#manageModal").classList.remove("on");
     toast(t("linkRevoked"));openLinks();
   }catch(e){toast(e.message,"err");}
-};
+});
 
 /* ── trash (v0.10) ── */
 async function refreshTrashBadge(){
@@ -2520,12 +2563,12 @@ async function openTrash(){
          +'<button class="btn btn-ghost trst" data-id="'+esc(o.id)+'" style="width:auto;padding:5px 12px;font-size:11.5px">'+esc(t("restore"))+'</button>'
          +'<button class="btn btn-warn trpg" data-id="'+esc(o.id)+'" style="width:auto;padding:5px 12px;font-size:11.5px">'+esc(t("purge"))+'</button>';
        d.querySelector(".trst").onclick=async()=>{
-         try{await api("/api/v1/admin/trash/"+o.id+"/restore",{method:"POST"});toast(t("restored"));openTrash();refreshTrashBadge();refresh();}
+         try{await api("/api/v1/admin/trash/"+encodeURIComponent(o.id)+"/restore",{method:"POST"});toast(t("restored"));openTrash();refreshTrashBadge();refresh();}
          catch(e){toast(e.message,"err");}
        };
        d.querySelector(".trpg").onclick=async()=>{
          if(!confirm(t("purge")+" — "+(o.filename||o.id)+"؟"))return;
-         try{await api("/api/v1/admin/trash/"+o.id,{method:"DELETE"});toast(t("purged"));openTrash();refreshTrashBadge();}
+         try{await api("/api/v1/admin/trash/"+encodeURIComponent(o.id),{method:"DELETE"});toast(t("purged"));openTrash();refreshTrashBadge();}
          catch(e){toast(e.message,"err");}
        };
        box.appendChild(d);
@@ -2536,16 +2579,16 @@ async function openTrash(){
 $("#trashBtn").onclick=openTrash;
 $("#trashClose").onclick=()=>$("#trashModal").classList.remove("on");
 $("#trashModal").onclick=e=>{if(e.target.id==="trashModal")$("#trashModal").classList.remove("on");};
-$("#trashEmptyBtn").onclick=async()=>{
+$("#trashEmptyBtn").onclick=guardBtn($("#trashEmptyBtn"),async()=>{
  if(!confirm(t("trashEmpty")+"؟"))return;
  try{
    const r=await api("/api/v1/admin/trash");
    for(const o of (r.items||[])){
-     await api("/api/v1/admin/trash/"+o.id,{method:"DELETE"});
+     await api("/api/v1/admin/trash/"+encodeURIComponent(o.id),{method:"DELETE"});
    }
    toast(t("purged"));openTrash();refreshTrashBadge();
  }catch(e){toast(e.message,"err");}
-};
+});
 
 async function renameObj(o){
   const currentBase=o.displayName||(o.filename?o.filename.split("/").pop():o.id);
@@ -2554,7 +2597,7 @@ async function renameObj(o){
   const clean=name.trim().replace(/[\\/?%*:|"<>]/g,"");
   if(!clean||clean===currentBase)return;
   try{
-    await api("/f/"+o.id,{method:"PATCH",body:JSON.stringify({filename:clean})});
+    await api("/f/"+encodeURIComponent(o.id),{method:"PATCH",body:JSON.stringify({filename:clean})});
     toast(t("renameOk"));refresh();
   }catch(e){toast(e.message,"err");}
 }
@@ -2804,12 +2847,12 @@ function openShareOpts(o){
   }
   $("#shareOptsModal").classList.add("on");
 }
-$("#fmRename").onclick=async()=>{
+$("#fmRename").onclick=guardBtn($("#fmRename"),async()=>{
   if(!fmObj)return;
   const o=fmObj;
   $("#fmClose").onclick();
   await renameObj(o);
-};
+});
 
 async function shareLink(o,opts){
   opts=opts||{};
@@ -2818,7 +2861,7 @@ async function shareLink(o,opts){
   if(opts.max>0)q+="&max_dl="+opts.max;
   if(opts.slug)q+="&slug="+encodeURIComponent(opts.slug);
   try{
-    const r=await api("/f/"+o.id+"/link?"+q,{method:"POST"});
+    const r=await api("/f/"+encodeURIComponent(o.id)+"/link?"+q,{method:"POST"});
     // pretty link first when a slug was minted
     $("#linkUrl").textContent=r.pretty_url||r.url;
     const sub=$("#linkS");
@@ -2828,7 +2871,7 @@ async function shareLink(o,opts){
     if(r.max_downloads){bits.push("⬇ "+r.max_downloads);}
     if(bits.length)sub.textContent+="  "+bits.join(" ");
     const qr=$("#linkQr");
-    qr.src="/f/"+o.id+"/qr?_="+Date.now();
+    qr.src="/f/"+encodeURIComponent(o.id)+"/qr?_="+Date.now();
     qr.style.display="block";
     $("#linkModal").classList.add("on");
   }catch(e){toast(e.message,"err");}
@@ -2861,6 +2904,8 @@ document.addEventListener("keydown",e=>{
     $("#shareOptsModal")?.classList.remove("on");
     $("#linkModal")?.classList.remove("on");
     $("#trashModal")?.classList.remove("on");
+    $("#manageModal")?.classList.remove("on");
+    $("#linksModal")?.classList.remove("on");
     $("#drawer")?.classList.remove("on");
     $("#scrim")?.classList.remove("on");
     return;
@@ -2929,7 +2974,7 @@ $("#linkModal").onclick=e=>{if(e.target.id==="linkModal")$("#linkModal").classLi
 async function delObj(o){
   if(!confirm(t("delQ")))return;
   try{
-    await api("/f/"+o.id,{method:"DELETE"});
+    await api("/f/"+encodeURIComponent(o.id),{method:"DELETE"});
     toast(t("delOk"));refresh();
   }catch(e){toast(t("delFail")+": "+e.message,"err");}
 }
@@ -3452,12 +3497,103 @@ async function retryItem(id){
   renderQueue();pump();
 }
 
+/* double-submit guard (v0.15.11): disables the button while its async handler runs */
+function guardBtn(btn,fn){
+  return async (...args)=>{
+    if(btn.disabled)return;
+    btn.disabled=true;
+    try{await fn(...args);}finally{btn.disabled=false;}
+  };
+}
+
 /* ================= settings drawer ================= */
 const drawer=$("#drawer"),scrim=$("#scrim");
 $("#setBtn").onclick=openDrawer;
 $("#setClose").onclick=closeDrawer;
 scrim.onclick=closeDrawer;
+
+/* ── MTProto Interactive Auth UI logic ── */
+let _tgPhoneCodeHash = "";
+function initTgAuthUI() {
+  const btnSend = document.getElementById("btnTgSendCode");
+  if (btnSend) {
+    btnSend.onclick = async () => {
+      const phoneInp = document.getElementById("s_tg_phone");
+      const phone = phoneInp ? phoneInp.value.trim() : "";
+      if (!phone) { toast("شماره موبایل را وارد کنید", "err"); return; }
+      btnSend.disabled = true;
+      toast("در حال ارسال کد تأیید تلگرام...");
+      try {
+        const r = await api("/api/v1/admin/telegram/send-code", {
+          method: "POST",
+          body: JSON.stringify({ phone })
+        });
+        _tgPhoneCodeHash = r.phone_code_hash || "";
+        const otpRow = document.getElementById("tgOtpRow");
+        if (otpRow) otpRow.style.display = "flex";
+        toast(r.message || "کد تأیید به تلگرام شما ارسال شد");
+      } catch (err) {
+        toast(err.message, "err");
+      } finally {
+        btnSend.disabled = false;
+      }
+    };
+  }
+
+  const btnVerify = document.getElementById("btnTgVerifyCode");
+  if (btnVerify) {
+    btnVerify.onclick = async () => {
+      const codeInp = document.getElementById("s_tg_code");
+      const pwInp = document.getElementById("s_tg_2fa_pw");
+      const code = codeInp ? codeInp.value.trim() : "";
+      const password = pwInp ? pwInp.value : "";
+      if (!code) { toast("کد دریافتی از تلگرام را وارد کنید", "err"); return; }
+      btnVerify.disabled = true;
+      toast("در حال اعتبارسنجی...");
+      try {
+        const r = await api("/api/v1/admin/telegram/verify-code", {
+          method: "POST",
+          body: JSON.stringify({
+            code,
+            password,
+            phone_code_hash: _tgPhoneCodeHash
+          })
+        });
+        if (r.need_password) {
+          const faRow = document.getElementById("tg2faRow");
+          if (faRow) faRow.style.display = "block";
+          toast(r.message, "warn");
+          return;
+        }
+        toast(r.message || "سشن با موفقیت ساخته شد");
+        const otpRow = document.getElementById("tgOtpRow");
+        if (otpRow) otpRow.style.display = "none";
+        await loadTelegramConfig();
+      } catch (err) {
+        toast(err.message, "err");
+      } finally {
+        btnVerify.disabled = false;
+      }
+    };
+  }
+
+  const btnLogout = document.getElementById("btnTgLogout");
+  if (btnLogout) {
+    btnLogout.onclick = async () => {
+      if (!confirm("آیا مایلید از سشن تلگرام خارج شوید؟")) return;
+      try {
+        await api("/api/v1/admin/telegram/logout", { method: "POST" });
+        toast("از تلگرام خارج شدید");
+        await loadTelegramConfig();
+      } catch (err) {
+        toast(err.message, "err");
+      }
+    };
+  }
+}
+
 function openDrawer(){
+  if(!openDrawer._tgAuthInit){ initTgAuthUI(); openDrawer._tgAuthInit = true; }
   drawer.classList.add("on");scrim.classList.add("on");
   loadSettings();renderKeys();
 }
@@ -3623,15 +3759,25 @@ $("#btnPushTgBackup").onclick=async()=>{
 $("#btnChannelRebuild").onclick=async()=>{
   if(!confirm(t("channelRebuildConfirm")))return;
   const btn=$("#btnChannelRebuild");
-  btn.disabled=true;btn.style.opacity=".5";
-  toast(t("channelRebuilding"));
+  const origText = btn.innerHTML;
+  btn.disabled=true;btn.style.opacity=".6";
+  btn.innerHTML = "⏳ " + t("channelRebuilding");
+  toast("⏳ " + t("channelRebuilding"));
   try{
     const res=await api("/api/v1/admin/channel/rebuild",{method:"POST"});
-    toast(t("channelRebuildDone")+": "+(res.recovered_objects||0)+" "+t("files"));
+    toast("✅ " + t("channelRebuildDone") + ": " + (res.recovered_objects || 0) + " " + t("files"));
+    closeDrawer();
+    curFolderPrefix="";
+    updateBreadcrumb();
     await loadSystemStats();
-    refresh();
-  }catch(e){toast(e.message,"err");}
-  finally{btn.disabled=false;btn.style.opacity="";}
+    await refresh();
+  }catch(e){
+    toast("❌ " + (e.message || "خطا در بازسازی"), "err");
+  }finally{
+    btn.disabled=false;
+    btn.style.opacity="";
+    btn.innerHTML = origText;
+  }
 };
 function syncHashToggleBtn(){
   const btn=$("#s_tg_hash_toggle");
@@ -3643,6 +3789,9 @@ function syncHashToggleBtn(){
   btn.classList.toggle("btn-ghost",!isVis);
   btn.style.borderColor=isVis?"var(--brand)":"";
 }
+
+
+
 async function loadTelegramConfig(){
   try{
     const r=await api("/api/v1/admin/telegram-config");
@@ -3663,6 +3812,13 @@ async function loadTelegramConfig(){
       $("#s_tg_api_hash").placeholder="Telegram API Hash...";
     }
     if($("#s_tg_peer"))$("#s_tg_peer").value=r.mtproto_peer||"";
+    const isAuthed = !!r.session_authorized;
+    const boxConnected = document.getElementById("tgAuthConnectedBox");
+    const boxLogin = document.getElementById("tgAuthLoginForm");
+    if (boxConnected && boxLogin) {
+      boxConnected.style.display = isAuthed ? "flex" : "none";
+      boxLogin.style.display = isAuthed ? "none" : "flex";
+    }
     if($("#s_tg_chunk_size"))$("#s_tg_chunk_size").value=r.chunk_size_mb||16;
     syncHashToggleBtn();
   }catch(e){}
@@ -3716,7 +3872,7 @@ $("#btnToggleSecretVis").onclick=()=>{
   const inp=$("#s_enc_secret");
   if(inp)inp.type=inp.type==="password"?"text":"password";
 };
-$("#btnSetCustomSecret").onclick=async()=>{
+$("#btnSetCustomSecret").onclick=guardBtn($("#btnSetCustomSecret"),async()=>{
   const sec=$("#s_enc_secret")?.value?.trim();
   if(!sec){toast(t("keyPh"),"err");return;}
   if(sec.length<8){toast("Secret must be at least 8 characters","err");return;}
@@ -3728,8 +3884,8 @@ $("#btnSetCustomSecret").onclick=async()=>{
     });
     toast(t("secretUpdated"));
   }catch(e){toast(e.message,"err");}
-};
-$("#btnRotateSecret").onclick=async()=>{
+});
+$("#btnRotateSecret").onclick=guardBtn($("#btnRotateSecret"),async()=>{
   if(!confirm(t("rotateSecretConfirm")))return;
   try{
     const r=await api("/api/v1/admin/auth/rotate-secret",{
@@ -3739,7 +3895,7 @@ $("#btnRotateSecret").onclick=async()=>{
     if($("#s_enc_secret"))$("#s_enc_secret").value=r.hmac_secret||"";
     toast(t("secretRotated"));
   }catch(e){toast(e.message,"err");}
-};
+});
 const swZk = $("#swClientZk");
 if (swZk) {
   swZk.onclick = () => {
@@ -3774,7 +3930,7 @@ if (passInputZk) {
     sessionStorage.setItem("anbar-client-zk-pass", clientZkPass);
   };
 }
-$("#saveBtn").onclick=async()=>{
+$("#saveBtn").onclick=guardBtn($("#saveBtn"),async()=>{
   const dv=$("#s_def_view");
   if(dv&&dv.value!==viewMode){
     viewMode=dv.value;
@@ -3817,7 +3973,7 @@ $("#saveBtn").onclick=async()=>{
     toast(t("saved"));
     refresh();
   }catch(e){toast(e.message,"err");}
-};
+});
 $("#purgeBtn").onclick=async()=>{
   try{
     await api("/api/v1/admin/cache/purge",{method:"POST"});
@@ -3845,7 +4001,7 @@ async function renderKeys(){
     el.appendChild(d);
   }
 }
-$("#mkKeyBtn").onclick=async()=>{
+$("#mkKeyBtn").onclick=guardBtn($("#mkKeyBtn"),async()=>{
   const name=$("#newKeyName").value.trim();
   try{
     const r=await api("/api/v1/admin/api-keys",{method:"POST",body:JSON.stringify({name})});
@@ -3857,7 +4013,7 @@ $("#mkKeyBtn").onclick=async()=>{
     $("#linkModal").classList.add("on");
     renderKeys();
   }catch(e){toast(e.message,"err");}
-};
+});
 
 
 /* go */
