@@ -4,6 +4,15 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.19] — 2026-08-31
+
+### Fixed
+- **Path traversal in offline recovery tool (B-057, HIGH)**: `scripts/recover.py` wrote recovered files to `out_path / clean_name` where `clean_name` came straight from the Telegram caption. A poisoned/compromised channel dump with a caption like `/etc/evil.txt` or `../../evil.sh` could write outside the recovery directory (arbitrary write as the invoking user — relevant precisely in the disaster-recovery scenario where the input is untrusted). Filenames are now basenamed (mirroring the server-side `api/ingest.py` behaviour), empty/`.`/`..` names fall back to `recovered_<id>.bin`, and the final destination is re-verified to stay inside `out_path` via `resolve()` + `is_relative_to`.
+- **Secrets in Docker build context (B-058, HIGH)**: there was no `.dockerignore`, and `docker/compose.yaml` builds with `context: ..` — so every build (local compose, CI smoke, GHCR publish) shipped the entire repo to the Docker daemon: `.env` (admin/API keys), `data/` (SQLite), `secrets/` (MTProto session), plus `.git` and `.venv`. A `.dockerignore` now excludes all secret-bearing and heavy paths (verified: full image build + healthz smoke pass).
+
+### Added
+- **Loop #9 audit coverage**: all 10 remaining `index.html` segments audited clean (login, file list/gallery, upload+resume+ZK flow, folder nav/breadcrumbs/popstate, settings/i18n/theme, MTProto drawer, ZIP export, modals, admin dashboard/audit logs, JS helpers), infrastructure audited (Dockerfile, compose, 3 CI workflows, all bench scripts), `scripts/recover.py` audited+fixed, direct tests added for `ratelimit.py` (window/retry-after/keyed buckets) and `qrcode.py` (realistic signed-link SVG, oversized-payload error, finder-pattern sanity) — both had zero direct coverage before. Test count 243 → 260.
+
 ## [0.15.18] — 2026-08-31
 
 ### Added

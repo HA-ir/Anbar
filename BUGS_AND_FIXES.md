@@ -1,6 +1,22 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.18
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.19
+
+## v0.15.19 — 2026-08-31 (Audit Fixes — Loop #9)
+
+### B-057 · Path traversal در ابزار بازیابی آفلاین (recover.py) — Severity: HIGH
+- **باس:** `recover_files()` مسیر خروجی را `out_path / clean_name` می‌ساخت در حالی که `clean_name` مستقیم از caption تلگرام می‌آمد. caption مثل `/etc/evil.txt` یا `../../evil.sh` از پوشه خروجی خارج می‌شد (نوشتن دلخواه در سناریویی که ورودی‌اش — دامپ کانال — باید غیرقابل‌اعتماد فرض شود).
+- **فیکس:** basename با `PurePosixPath` (هم‌سان با `api/ingest.py` سمت سرور)، fallback به `recovered_<id>.bin` برای نام خالی/`.`/`..`، و بازبینی containment نهایی با `resolve()` + `is_relative_to()`.
+- **تست:** `tests/test_v01519_audit.py` — ۸ حالت نام مخرب، بازیابی end-to-end با caption مسیردار (فایل باید داخل out_dir بنویسد)، caption `..` → fallback.
+
+### B-058 · Secrets در Docker build context — Severity: HIGH
+- **باس:** `.dockerignore` وجود نداشت و `docker/compose.yaml` با `context: ..` بیلد می‌کند → هر بیلد (compose محلی، CI smoke، publish GHCR) کل ریپو از جمله `.env` (کلیدهای admin/API)، `data/`، `secrets/` (سشن MTProto)، `.git` و `.venv` را به دیمون داکر می‌فرستاد.
+- **فیکس:** افزودن `.dockerignore` — حذف همه مسیرهای حامل secret و سنگین. (نکته: `*.md` حذف نشد چون Dockerfile `README.md` را COPY می‌کند.)
+- **تست:** build کامل ایمیج + healthz smoke (پاس: `{"status":"ok"}`)؛ CI موجود build را پوشش می‌دهد.
+
+### A-020 · پوشش تست gapها (Loop #9)
+- تست مستقیم برای `ratelimit.py` (پنجره ثابت، Retry-After، باکت جدا per-obj، هش شدن کلید در upload، limit=0) و `qrcode.py` (SVG لینک واقعی ۱۷۴ کاراکتری، خطای تمیز payload طولانی، sanity فایندر الگو) — قبلاً هر دو صفر تست مستقیم بودند. تست‌ها 243 → 260.
+
 
 ## خلاصه Audit Loops (دور به دور)
 
@@ -14,8 +30,9 @@
 | #6 | v0.15.16 | B-051 (نشتی فایل temp در DiskLRU، MED)، B-052 (login 500 با JSON غیر-object، LOW)، B-053 (مرگ حلقه prune روی خطای گذرا، LOW) | ۳ فیکس + ۶ تست — ساخت AUDIT_COVERAGE.md؛ پوشش: cache، config، crypto، main، runtime، self_healing، storage/base، api/web |
 | L7 | v0.15.17 | B-054 (نشت توکن بات و api_hash خام در پاسخ telegram-config، MED)، B-055 (500 با ردیف خراب chunk_size در .env، LOW)، B-056 (پیش‌پرکردن input با hash خام در داشبورد، LOW) | ۳ فیکس + ۴ تست — پوشش: admin.py کامل (۱۲۸۰ خط، همه endpointها)، miniapp.html کامل |
 | L8 | v0.15.18 | بدون باگ جدید — ۱۰ تست سخت‌شدنی اضافه شد (info metadata، S3 traversal sweep، header injection، log-leakage guard) | ممیزی: GET info، POST link، DELETE، S3 کامل، webauth/2FA، sweep سراسری، nginx |
+| L9 | v0.15.19 | B-057 (Path traversal در recover.py، HIGH)، B-058 (secrets در build context داکر، HIGH) | ۲ فیکس + ۱۴ تست — پوشش کامل: ۱۰ قطعه index.html، زیرساخت (Dockerfile/compose/CI/bench)، recover.py، gap-analysis تست‌ها — پوشش دور ۱۰۰٪ |
 
-**جمع:** ۱۶ باگ (B-041…B-056) · تست‌ها 209 → 243 · سطح‌ها: 3×HIGH، 5×MEDIUM، 6×LOW، 2×TRIVIAL
+**جمع:** ۱۸ باگ (B-041…B-058) · تست‌ها 209 → 260 · سطح‌ها: 5×HIGH، 5×MEDIUM، 6×LOW، 2×TRIVIAL
 **درس تکرارشونده:** الگوی «innerHTML بدون escape با داده کاربر» دو بار (آلبوم + miniapp) — بعد از این، همه render pathهای جدید باید esc/escape دارند.
 **CI:** یک خطای E501 (خط طولانی) هم پس از loop #1 گرفته و فیکس شد.
 

@@ -21,7 +21,7 @@ import ctypes.util
 import hashlib
 import json
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 # ==========================================
@@ -286,6 +286,11 @@ def recover_files(
             
             file_data = bytes(assembled_bytes)
 
+            # L9 (B-057): filename from Telegram caption — never let it escape
+            # out_path (absolute paths, "..", leading "/"). Mirror server-side
+            # basename behaviour (api/ingest.py), then re-verify containment.
+            fn = PurePosixPath(fn.replace("\\", "/")).name or ""
+            clean_name = fn
             if file_data.startswith(b"ANBAR_ZK1"):
                 if not client_passphrase:
                     print(f"⚠️ File '{fn}' is client-encrypted but no password given.")
@@ -293,10 +298,13 @@ def recover_files(
                 else:
                     file_data = decrypt_client_zk(file_data, client_passphrase)
                     clean_name = fn[:-4] if fn.endswith(".enc") else fn
-            else:
-                clean_name = fn
 
-            dest_file = out_path / clean_name
+            if not clean_name or clean_name in (".", ".."):
+                clean_name = f"recovered_{obj_id}.bin"
+            dest_file = (out_path / clean_name).resolve()
+            if not dest_file.is_relative_to(out_path.resolve()):
+                errors.append(f"Object {obj_id}: refusing unsafe path '{clean_name}'")
+                continue
             dest_file.parent.mkdir(parents=True, exist_ok=True)
             with open(dest_file, "wb") as f:
                 f.write(file_data)

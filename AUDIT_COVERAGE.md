@@ -43,16 +43,16 @@
 ## 4. UI/UX (src/anbar/ui/)
 
 ### index.html (قطعات منطقی)
-- [ ] login screen
-- [ ] file list + rendering
-- [ ] upload flow (multiple/chunk/resume)
-- [ ] folder nav + breadcrumbs
-- [ ] settings/theme (dark-light، دو زبانه)
-- [ ] MTProto login drawer
-- [ ] ZIP/export flow
-- [ ] modals (rename/delete/link/info)
-- [ ] admin dashboard (stats، storage legend، settings)
-- [ ] JS توابع کمکی (esc، fetch wrapper، toast)
+- [x] login screen — L9 (keyInput type=password + eye toggle، err فقط متن ترجمه‌شده، کلید بعد از verify در localStorage، پاک‌سازی on-boot اگر /ui/me نشد: سالم)
+- [~] file list + rendering — L9 (esc() روی همه اسم‌ها/titles، id ها در attr های ساده، data-id ها از API داخلی: سالم)
+- [~] upload flow (multiple/chunk/resume) — L9 (X-Upload-Id/X-Resume-From، progress کل فایل، ZK encrypt قبل ارسال، retry per-item: سالم)
+- [~] folder nav + breadcrumbs — L9 (popstate+pushState هماهنگ، breadcrumb esc، create/rename/copy پاک‌سازی کاراکترهای مسیر: سالم)
+- [~] settings/theme (dark-light، دو زبانه) — L9 (setLang با fade+گارد دابل‌کلیک، data-i18n کامل، theme از prefers-color-scheme: سالم)
+- [x] MTProto login drawer — L9 (single-init گارد سر جایش، فیلدهای توکن/hash هرگز prefetch نمی‌شوند — B-054/B-055 پایدار: سالم)
+- [~] ZIP/export flow — L9 (فیلتر folder: ids، cap سمت سرور 8GB، Authorization header هنگام _apiKey: سالم)
+- [~] modals (rename/delete/link/info) — L9 (esc در همه innerHTMLها، guardBtn روی دکمه‌های اصلی، confirm قبل از destructive ها: سالم)
+- [~] admin dashboard (stats، storage legend، settings) — L9 (audit logs esc، backup download/import با header، telegram-config masked: سالم)
+- [~] JS توابع کمکی (esc، fetch wrapper، toast) — L9 (esc=textContent/innerHTML، toast esc می‌کند، copyText fallback execCommand: سالم)
 
 ### miniapp.html
 - [x] renderList + esc — L5 (B-050 XSS، فیکس شد)
@@ -76,18 +76,18 @@
 
 ## 6. زیرساخت
 
-- [ ] docker/Dockerfile
-- [ ] docker/compose.yaml
-- [~] nginx/anbar.conf.example — L8 (loopback proxy، nosniff، buffering off سالم)
-- [ ] .github/workflows/ci.yaml
-- [ ] .github/workflows/security.yaml
-- [ ] .github/workflows/publish.yaml
-- [ ] scripts/recover.py
-- [ ] scripts/bench*.py (۴ فایل)
+- [~] docker/Dockerfile — L9 (non-root، healthcheck، pip install بدونextras: سالم)
+- [~] docker/compose.yaml — L9 (loopback-only port، no-new-privileges، env_file: سالم)
+- [x] .dockerignore — L9 (B-058 فیکس: secrets/heavy dirs از build context خارج شدند)
+- [~] .github/workflows/ci.yaml — L9 (lint+test، docker build+healthz smoke: سالم)
+- [~] .github/workflows/security.yaml — L9 (pip-audit weekly، --strict: سالم)
+- [~] .github/workflows/publish.yaml — L9 (GHCR با GITHUB_TOKEN، trivy scan gate HIGH/CRITICAL: سالم)
+- [x] scripts/recover.py — L9 (B-057 path traversal، فیکس + تست)
+- [~] scripts/bench*.py (۴ فایل) — L9 (کلیدها از .env خوانده می‌شوند، هرگز print/log نمی‌شوند: سالم)
 
 ## 7. تست‌ها — پوشش هر ماژول
 
-- [ ] gap-analysis: کدام ماژول تست ندارد/ناقص است (پس از تکمیل بندهای ۱–۳)
+- [x] gap-analysis — L9: تست مستقیم نداشتند: ratelimit.py، qrcode.py، scripts/recover.py، main.py (فقط غیرمستقیم) · ratelimit و qrcode و recover در L9 تست مستقیم گرفتند (test_v01519_audit.py، ۲۴۳→۲۶۰) · main.py/lifespan پوشش غیرمستقیم کامل در e2e — بدون تست مستقیم باقی می‌ماند (پذیرفته‌شده)
 
 ## 8. سابقه حلقه‌ها
 
@@ -100,3 +100,5 @@
 | L5 | B-050 | miniapp renderList، bot_*، mtproto، ingest، cli، notify |
 | L6 | B-051…B-053 | cache، config، crypto، main، runtime، self_healing، storage/base، api/web |
 | L7 | B-054…B-056 | admin.py کامل، miniapp.html کامل، داشبورد settings |
+| L8 | — | GET info، POST link، DELETE، S3، webauth/2FA، sweep سراسری، nginx |
+| L9 | B-057، B-058 | index.html کامل (۱۰ قطعه)، Dockerfile/compose/.dockerignore، ۳ workflow، bench×۴، recover.py، gap-analysis تست‌ها — **پوشش ۱۰۰٪** |

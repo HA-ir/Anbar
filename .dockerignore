@@ -1,0 +1,23 @@
+# L9 (B-058): keep secrets & heavy dirs out of the Docker build context.
+# docker/compose.yaml uses `context: ..`, CI/Publish use `context: .` —
+# without this file the whole repo (.env, data/, secrets/, .git, .venv)
+# is tarred and sent to the Docker daemon on every build.
+.git
+.venv
+.env
+.env.*
+!.env.example
+data/
+secrets/
+*.session
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+docs/
+nginx/
+scripts/
+tests/
+.github/
+# *.md intentionally NOT excluded: Dockerfile COPYs pyproject.toml + README.md
