@@ -1,10 +1,10 @@
 # Anbar — Improvement Plan (Working Record)
 
 > **Created:** 2026-08-31 11:55 (Asia/Tehran)
-> **Last update:** 2026-08-31 23:17 (Asia/Tehran)
-> **Status:** 23 از 23 مورد انجام شد ✅ — همه موارد بسته شد. PERF-01 (v0.15.25) آخرین آیتم بود: micro-cache seeking پیاده‌سازی + تست شد؛ دیپلوی پروداکشن پس از تأیید کاربر.
+> **Last update:** 2026-08-31 23:59 (Asia/Tehran)
+> **Status:** 23 از 23 مورد انجام شد ✅ — همه موارد بسته شد. PERF-01 (v0.15.25) آخرین آیتم بود: micro-cache seeking پیاده‌سازی + تست + دیپلوی پروداکشن + E2E واقعی (ALL PASS).
 > **Baseline:** v0.15.19 @ c00fc76 — 260 tests passing. الان: 348 tests passing.
-> **پروداکشن:** dl.amiri-dev.ir = **v0.15.24** @ aebe0d2 (دیپلوی 2026-08-31 22:19 Tehran، healthz تأیید، ریسکن restart هم پاس شد). بنچمارک ARCH-01 هم گرفته شد (~3.4×).
+> **پروداکشن:** dl.amiri-dev.ir = **v0.15.25** @ 64e55ce (دیپلوی 2026-08-31 23:5x Tehran؛ healthz محلی/https هر دو 0.15.25؛ E2E seek-cache روی پروداکشن ۲۱/۲۱ PASS — hits=2/entries=2 بعد از دو seek، purge → entries صفر).
 
 این فایل نقش working record دارد: هم پلن اولیه، هم وضعیت لحظه‌ای. بعد از هر فیکس،
 وضعیت در جدول به‌روز و یک ورودی در Change Log اضافه می‌شود.

@@ -13,6 +13,7 @@
   - `remove_object(obj_id)` در مسیرهای trash و purge → chunk های آبجکت حذف‌شده از RAM هم می‌روند.
   - آمار `chunk_cache` (enabled/entries/bytes/hits/misses) در `GET /admin/status`.
 - **تست:** `tests/test_seek_cache.py` — ۱۶ تست. Unit: roundtrip، شمارش miss، بودجه صفر = خاموش، chunk oversized، eviction LRU، مقاومت با touch، TTL expiry، replace هم‌کلید، remove_object، close. E2E با شمارنده FakeBackend: دو seek متوالی در یک chunk → `open_calls` فقط +1 (قبلاً +2)، درستی بایت‌ها روی مرز chunk‌ها و انتهای فایل، گزارش status، override=0 → هر seek می‌رود بک‌اند، delete → entries صفر. کل ۳۳۲ → **۳۴۸ سبز**؛ ruff روی فایل‌های تغییر یافته تمیز.
+- **دیپلوی + E2E پروداکشن (2026-08-31 23:5x Tehran):** بیلد `anbar:prod` (sanity 0.15.25)؛ `docker compose up -d`؛ healthz محلی و https هر دو `0.15.25`. E2E واقعی روی loopback با payload تصادفی 40MB (3 chunk): baseline status → seek_cache_mb زنده 32→48 → آپلود → seek A (chunk0، miss) → seek B (chunk0، **RAM hit**) → seek مرزی روی درز chunk0/chunk1 → بایت‌ها دقیق در هر سه → status: `hits=2, misses=2, entries=2, bytes=33554432` → purge → `entries=0` + 404. **۲۱/۲۱ PASS**؛ knob به 32 برگردانده شد؛ آبجکت تست purged.
 - **یادداشت‌ها:** ۱۶ خطای ruff در فایل‌های خارج از این تغییر (scripts/bench_10g_hybrid.py و…) از قبل وجود داشتند — عمداً دست نخوردند تا این commit تک‌موضوعی بماند. نکته بلندمدتِ «chunk کوچک‌تر برای مدیا» همچنان ایده آینده است و به این فیکس وابسته نیست.
 
 ## v0.15.24 — 2026-08-31 (دیپلوی پروداکشن + E2E واقعی)
