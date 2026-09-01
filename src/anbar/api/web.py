@@ -151,7 +151,14 @@ async def miniapp_session(request: Request):
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
 @router.get("/ui", response_class=HTMLResponse, include_in_schema=False)
 async def index(request: Request):
-    return HTMLResponse(_render())
+    # BUG-v0.15.26b: the UI was served with no Cache-Control, so browsers
+    # heuristically cached the HTML — after a deploy, users kept running the
+    # OLD app JS (e.g. folder ZIP/share buttons with no handlers attached:
+    # "does not work" reports that vanish on hard-refresh). Force revalidate.
+    return HTMLResponse(
+        _render(),
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
 
 
 @router.get("/manifest.webmanifest", include_in_schema=False)

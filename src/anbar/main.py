@@ -113,6 +113,13 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
                 except Exception:
                     continue
                 try:
+                    # BUG-v0.15.26b: reap expired album tokens (they carry _ts)
+                    db.kv_prune_prefix("album:", max_age_s=86400 * 31)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    continue
+                try:
                     db.audit_prune()
                 except asyncio.CancelledError:
                     raise

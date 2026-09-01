@@ -997,6 +997,16 @@ async def album_create(request: Request):
     if not ids or not isinstance(ids, list):
         raise HTTPException(400, "ids[] required")
     title = str(body.get("title") or "").strip()[:120]
+    # BUG-v0.15.26b: albums used to live forever with 30-day file signatures.
+    # Optional ttl (seconds, 0 = never) — default 86400 (24h). The token is
+    # stored with an `_ts` marker so the periodic kv prune reaps expired ones.
+    try:
+        ttl = int(body.get("ttl", 86400))
+    except (TypeError, ValueError):
+        raise HTTPException(422, "ttl must be integer seconds") from None
+    if ttl < 0:
+        raise HTTPException(422, "ttl must be >= 0")
+    now = int(time.time())
     clean = []
     for oid in [str(i) for i in ids][:100]:
         row = db.get_object(str(oid))
@@ -1011,7 +1021,9 @@ async def album_create(request: Request):
             {
                 "ids": [c["id"] for c in clean],
                 "title": title,
-                "created_at": int(time.time()),
+                "created_at": now,
+                "_ts": now,
+                "exp": now + ttl if ttl > 0 else 0,
             },
             separators=(",", ":"),
         ),
@@ -1036,6 +1048,20 @@ async def album_page(request: Request, token: str):
             status_code=404,
         )
     data = json.loads(raw)
+    # BUG-v0.15.26b: honor the album TTL — an expired album returns the same
+    # "gone" page (0 = never expires).
+    album_exp = int(data.get("exp") or 0)
+    if album_exp and int(time.time()) >= album_exp:
+        return HTMLResponse(
+            '<!DOCTYPE html><html lang="fa" dir="rtl"><head>'
+            '<meta charset="utf-8"><title>anbar</title></head>'
+            '<body style="font-family:sans-serif;text-align:center;'
+            'padding-top:20vh;color:#889">این لینک منقضی شده است.'
+            "</body></html>",
+            status_code=410,
+        )
+    # per-file download signatures live as long as the album itself
+    sig_exp = album_exp if album_exp else int(data["created_at"]) + 86400 * 30
     items = []
     for oid in data.get("ids", []):
         row = db.get_object(oid)
@@ -1070,13 +1096,13 @@ async def album_page(request: Request, token: str):
                 "size": row["size"],
                 "sig": sign(
                     oid,
-                    int(data["created_at"]) + 86400 * 30,
+                    sig_exp,
                     effective_hmac_secret(
                         db,
                         settings.hmac_secret.get_secret_value() if settings.hmac_secret else None,
                     ),
                 ),
-                "exp": int(data["created_at"]) + 86400 * 30,
+                "exp": sig_exp,
             }
         )
     title = data.get("title") or f"anbar · {len(items)} فایل"

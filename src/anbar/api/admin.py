@@ -828,35 +828,38 @@ def _read_env_dict(path: Path) -> dict[str, str]:
 
 
 def _write_env_dict(path: Path, updates: dict[str, str]) -> bool:
+    if not path.exists():
+        lines: list[str] = []
+    else:
+        lines = path.read_text(encoding="utf-8").splitlines()
+
+    seen = set()
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            k = stripped.split("=", 1)[0].strip()
+            if k in updates:
+                new_lines.append(f"{k}={updates[k]}")
+                seen.add(k)
+                continue
+        new_lines.append(line)
+
+    for k, v in updates.items():
+        if k not in seen and v is not None:
+            new_lines.append(f"{k}={v}")
+
+    content = "\n".join(new_lines) + "\n"
+    import logging
+    import os
+    import tempfile
+
+    log = logging.getLogger("anbar.admin")
+
+    # Atomic write (v0.15.20, SEC-04): a crash mid-write must never leave
+    # a truncated .env — the service would not start after a restart.
+    # Write to a temp file in the same directory, fsync, then os.replace.
     try:
-        if not path.exists():
-            lines = []
-        else:
-            lines = path.read_text(encoding="utf-8").splitlines()
-
-        seen = set()
-        new_lines = []
-        for line in lines:
-            stripped = line.strip()
-            if stripped and not stripped.startswith("#") and "=" in stripped:
-                k = stripped.split("=", 1)[0].strip()
-                if k in updates:
-                    new_lines.append(f"{k}={updates[k]}")
-                    seen.add(k)
-                    continue
-            new_lines.append(line)
-
-        for k, v in updates.items():
-            if k not in seen and v is not None:
-                new_lines.append(f"{k}={v}")
-
-        # Atomic write (v0.15.20, SEC-04): a crash mid-write must never leave
-        # a truncated .env — the service would not start after a restart.
-        # Write to a temp file in the same directory, fsync, then os.replace.
-        import os
-        import tempfile
-
-        content = "\n".join(new_lines) + "\n"
         fd, tmp_name = tempfile.mkstemp(
             prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
         )
@@ -879,11 +882,41 @@ def _write_env_dict(path: Path, updates: dict[str, str]) -> bool:
                 pass
             raise
         return True
-    except OSError as exc:
-        import logging
-
-        logging.getLogger("anbar.admin").warning("Could not write .env file (%s): %s", path, exc)
-        return False
+    except OSError as atomic_exc:
+        # BUG-v0.15.27: the atomic path needs a writable *directory* and a
+        # rename-able target. In the prod container /opt/anbar/.env is a
+        # bind-mounted single file inside a root-owned dir, so mkstemp
+        # (EACCES) and os.replace (EBUSY) both fail — silently dropping
+        # every settings/token write while the endpoint still reported ok.
+        # Fallback: in-place rewrite (O_TRUNC + write + fsync) — not atomic
+        # against a simultaneous crash, but works on bind mounts.
+        if not path.exists():
+            log.warning("Could not write .env file (%s): %s", path, atomic_exc)
+            return False
+        try:
+            _backup = path.with_suffix(path.suffix + ".bak")
+            try:
+                _backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+            except OSError:
+                pass  # backup is best-effort
+            fd_fb = os.open(path, os.O_WRONLY | os.O_TRUNC)
+            try:
+                with os.fdopen(fd_fb, "w", encoding="utf-8") as f:
+                    f.write(content)
+                    f.flush()
+                    os.fsync(f.fileno())
+            except BaseException:
+                # best effort: restore the backup so no data is lost
+                try:
+                    _backup.replace(path)
+                except OSError:
+                    pass
+                raise
+            log.info("Wrote %s in-place (atomic write failed: %s)", path, atomic_exc)
+            return True
+        except OSError as exc:
+            log.warning("Could not write .env file (%s): %s", path, exc)
+            return False
 
 
 @router.get("/admin/telegram-config")
@@ -988,6 +1021,38 @@ async def telegram_config_update(request: Request):
         if first_token:
             updates["ANBAR_BOT_TOKEN"] = first_token
 
+    if "bot_add_token" in body:
+        # BUG-v0.15.26b: add ONE bot token without retyping the others —
+        # the raw list never leaves the server; masked values from the UI
+        # (containing "•") are ignored so a stale row can't corrupt a token.
+        add_val = str(body["bot_add_token"]).strip()
+        if add_val and "•" not in add_val:
+            current = _read_env_dict(env_path).get("ANBAR_BOT_TOKENS", "")
+            toks = [t.strip() for t in current.split(",") if t.strip()]
+            if add_val not in toks:
+                toks.append(add_val)
+                updates["ANBAR_BOT_TOKENS"] = ", ".join(toks)
+                if not updates.get("ANBAR_BOT_TOKEN"):
+                    updates["ANBAR_BOT_TOKEN"] = toks[0]
+
+    if "bot_remove_index" in body:
+        # remove one token by its index in the masked list (0-based)
+        try:
+            ridx = int(body["bot_remove_index"])
+        except (TypeError, ValueError):
+            raise HTTPException(422, "bot_remove_index must be an integer") from None
+        current = _read_env_dict(env_path).get("ANBAR_BOT_TOKENS", "")
+        toks = [t.strip() for t in current.split(",") if t.strip()]
+        if 0 <= ridx < len(toks):
+            toks.pop(ridx)
+            updates["ANBAR_BOT_TOKENS"] = ", ".join(toks)
+            if toks:
+                updates["ANBAR_BOT_TOKEN"] = toks[0]
+            else:
+                updates["ANBAR_BOT_TOKEN"] = ""
+        else:
+            raise HTTPException(404, "token index out of range")
+
     if "channel_id" in body:
         cid = str(body["channel_id"]).strip()
         updates["ANBAR_CHANNEL_ID"] = cid
@@ -1020,8 +1085,12 @@ async def telegram_config_update(request: Request):
         except ValueError:
             raise HTTPException(422, "chunk_size_mb must be integer") from None
 
-    _write_env_dict(env_path, updates)
-    return {"status": "ok", "updated_keys": list(updates.keys())}
+    if updates and not _write_env_dict(env_path, updates):
+        # BUG-v0.15.27: a silent persist failure used to return ok with the
+        # requested keys listed as updated — the UI showed a success toast
+        # while the change was lost on restart. Surface the real failure.
+        raise HTTPException(500, f"could not persist settings to {env_path}")
+    return {"status": "ok", "updated_keys": list(updates.keys()), "persisted": bool(updates)}
 
 
 @router.post("/admin/links/revoke-all")

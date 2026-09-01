@@ -148,10 +148,13 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .qitem.fail .qbar i{background:var(--err)}
 .qstat{font-size:11.5px;color:var(--tx2);margin-top:6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .qstat .err{color:var(--err);font-weight:500}
-/* BUG-v0.15.26: cancel button for in-flight/queued uploads */
-.qcancel{width:auto;padding:3px 10px;font-size:11.5px;border:1px solid var(--line2);border-radius:8px;
-  color:var(--tx2);background:var(--bg3);flex:none}
-.qcancel:hover{border-color:var(--err);color:var(--err);background:var(--err-soft)}
+/* BUG-v0.15.26b: cancel must read as a destructive action — red by default.
+   BUG-v0.15.27: must also beat .btn-ghost (defined later, same specificity,
+   was overriding color/border back to grey). Single-class selector lost the
+   cascade war; use .btn.qcancel (0,2,0) to outrank .btn-ghost (0,1,0). */
+.qcancel.btn{width:auto;padding:3px 10px;font-size:11.5px;border:1px solid var(--err);border-radius:8px;
+  color:var(--err);background:transparent;flex:none}
+.qcancel.btn:hover{color:#fff;background:var(--err);border-color:var(--err)}
 .qitem.canceled .qbar i{background:var(--tx3)}
 /* filter bar */
 .filterbar{display:flex;gap:10px;margin-bottom:14px}
@@ -280,9 +283,9 @@ tbody tr:hover{background:var(--hover)}
 tbody tr.selected td{background:var(--brand-soft)}
 tbody tr.selected .fname .fn{color:var(--brand)}
 .gcell.selected{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}
-.gcell.selected::after{content:"✓";position:absolute;inset-inline-end:8px;bottom:8px;width:20px;height:20px;
-  border-radius:50%;background:var(--brand);color:#fff;font-size:12px;font-weight:700;
-  display:flex;align-items:center;justify-content:center;z-index:2}
+/* BUG-v0.15.26b: the ::after "✓" corner badge was a duplicate of the selbox
+   checkbox (one tick at the top, a second tick at the bottom) — removed.
+   Selection is now shown by the checkbox + border highlight only. */
 .gcell.drag-over, tbody tr.drag-over td{background:var(--brand-soft) !important;outline:2px dashed var(--brand)}
 /* ============ markdown preview styling ============ */
 .md-wrap{padding:14px 16px;background:var(--bg2);color:var(--tx);font-size:13px;line-height:1.65;border-radius:10px;max-height:380px;overflow-y:auto;direction:auto;text-align:start;border:1px solid var(--line)}
@@ -872,8 +875,14 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
           <span data-i18n="tgTokensLab">توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)</span>
           <small id="tgTokensCount" style="color:var(--brand);font-weight:600"></small>
         </div>
-        <textarea id="s_tg_bot_tokens" rows="2" placeholder="123456:ABC..., 987654:XYZ..." style="width:100%;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:ui-monospace,monospace;font-size:12px;direction:ltr;resize:vertical" spellcheck="false"></textarea>
-        <small data-i18n="tgTokensSub" style="color:var(--tx3);font-size:11.5px">چند توکن را با کاما جدا کنید (برای چرخش و افزایش سرعت).</small>
+        <!-- BUG-v0.15.26b: per-token list (masked) with add/remove — the old
+             textarea forced retyping ALL tokens to add just one -->
+        <div id="tgTokensList" style="display:flex;flex-direction:column;gap:5px"></div>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="s_tg_bot_add" data-i18n-ph="tgAddTokenPh" placeholder="توکن بات جدید (123456:ABC-DEF...)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
+          <button type="button" class="btn btn-ghost" id="btnTgTokenAdd" data-i18n="tgAddToken" style="white-space:nowrap;font-size:12px;padding:7px 12px">+ افزودن</button>
+        </div>
+        <small data-i18n="tgTokensSub" style="color:var(--tx3);font-size:11.5px">هر توکن جدا اضافه/حذف می‌شود — نیازی به واردکردن دوباره بقیه نیست. اعمال بعد از ذخیره + ری‌استارت.</small>
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgChannelLab">شناسه کانال (ANBAR_CHANNEL_ID)</span></div>
@@ -1202,6 +1211,10 @@ const I18N={
   tgPeerLab:"MTProto Peer (ANBAR_MTPROTO_PEER)",
   tgChunkLab:"حجم هر چانک (MB)",
   tgChunkSub:"حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto",
+  tgAddToken:"+ افزودن", tgAddTokenPh:"توکن بات جدید (123456:ABC-DEF...)",
+  tgTokensEmpty:"هیچ توکنی ثبت نشده", tgTokenRemove:"حذف این توکن",
+  tgTokenAdded:"توکن اضافه شد", tgTokenRemoved:"توکن حذف شد",
+  tgTokenNeedVal:"توکن را وارد کنید", tgTokenDup:"این توکن قبلاً اضافه شده",
   showHash:"👁 نمایش", hideHash:"🙈 پنهان",
   tgAuthOnT:"لاگین تلگرام فعال است", tgAuthOnS:"کلاینت MTProto متصل و مجاز می‌باشد",
   tgAuthLogout:"خروج از تلگرام", tgAuthLoginT:"احراز هویت کلاینت MTProto تلگرام",
@@ -1268,6 +1281,7 @@ const I18N={
   shareSel:"اشتراک", zipDl:"دانلود ZIP",
   folderZipQ:"دانلود ZIP از کل پوشه؟", folderZipStart:"در حال ساخت ZIP از پوشه…",
   albumOk:"لینک آلبوم ساخته شد", albumSub:"یک لینک برای همه فایل‌ها — گالری عمومی با دانلود تکی",
+  albumTtl:"انقضا",
   linksT:"لینک‌های فعال", linksS:"همه لینک‌های ساخته‌شده — امکان ابطال فوری",
   revokeAllLinks:"ابطال همه",
   revokeAllConfirm:"آیا از ابطال تمام لینک‌های فعال مطمئن هستید؟ پس از این کار، تمام لینک‌های اشتراک عمومی بلافاصله منقضی می‌شوند.",
@@ -1356,6 +1370,10 @@ const I18N={
   tgPeerLab:"MTProto Peer (ANBAR_MTPROTO_PEER)",
   tgChunkLab:"Chunk Size (MB)",
   tgChunkSub:"Max 19 for Bot, max 49 for MTProto",
+  tgAddToken:"+ Add", tgAddTokenPh:"New bot token (123456:ABC-DEF...)",
+  tgTokensEmpty:"No tokens configured", tgTokenRemove:"Remove this token",
+  tgTokenAdded:"Token added", tgTokenRemoved:"Token removed",
+  tgTokenNeedVal:"Enter a token", tgTokenDup:"Token already in the list",
   showHash:"👁 Show", hideHash:"🙈 Hide",
   tgAuthOnT:"Telegram login active", tgAuthOnS:"MTProto client connected and authorized",
   tgAuthLogout:"Sign out of Telegram", tgAuthLoginT:"Telegram MTProto Client Auth",
@@ -1422,6 +1440,7 @@ const I18N={
   shareSel:"Share", zipDl:"Download ZIP",
   folderZipQ:"Download this folder as ZIP?", folderZipStart:"Building folder ZIP…",
   albumOk:"Album link created", albumSub:"One link for all files — public gallery with per-file download",
+  albumTtl:"Expires in",
   linksT:"Active links", linksS:"Every minted link — revoke instantly",
   revokeAllLinks:"Revoke All",
   revokeAllConfirm:"Are you sure you want to revoke all active share links? All existing public links will stop working immediately.",
@@ -2543,15 +2562,40 @@ $("#shareOpts").addEventListener("submit",async ev=>{
   /* v0.10.4: one ALBUM link for the whole selection (gallery page) */
   try{
     const j=await api("/f/album",{method:"POST",
-      body:JSON.stringify({ids:[...selSet]})});
+      body:JSON.stringify({ids:[...selSet],ttl:ttl})});
     $("#linkT_h").textContent=t("albumOk")+" ("+j.count+")";
-    $("#linkS").textContent=t("albumSub");
+    $("#linkS").textContent=t("albumSub")+" — "+t("albumTtl")+": "+humanTtl(ttl||365*86400*100);
     $("#linkUrl").textContent=j.url;
     const qr=$("#linkQr");
     qr.src="/f/"+[...selSet][0]+"/qr?_="+Date.now();
     qr.style.display="block";
     $("#linkModal").classList.add("on");
     return;
+  }catch(e){toast(e.message,"err");}
+},{once:false});
+/* BUG-v0.15.26b: folder share branch — one ALBUM link for every file under
+   the folder, honoring the TTL chosen in the same modal. (Albums are public
+   galleries, so a password does not apply; the link expires after TTL.) */
+$("#shareOpts").addEventListener("submit",async ev=>{
+  if(!shareTarget||!String(shareTarget).startsWith("folder:"))return;
+  ev.preventDefault();
+  const prefix=String(shareTarget).slice("folder:".length);
+  const ttlRaw=parseInt($("#shareTtl").value);
+  const ttl=Number.isFinite(ttlRaw)&&ttlRaw>=0?ttlRaw:86400;
+  shareTarget=null;
+  $("#shareOptsModal").classList.remove("on");
+  const ids=collectFolderIds(prefix);
+  if(!ids.length){toast(t("shareFilesOnly"),"err");return;}
+  try{
+    const j=await api("/f/album",{method:"POST",
+      body:JSON.stringify({ids:ids,ttl:ttl})});
+    $("#linkT_h").textContent=t("albumOk")+" ("+j.count+")";
+    $("#linkS").textContent=t("albumSub")+" — "+t("albumTtl")+": "+humanTtl(ttl||365*86400*100);
+    $("#linkUrl").textContent=j.url;
+    const qr=$("#linkQr");
+    qr.src="/f/"+ids[0]+"/qr?_="+Date.now();
+    qr.style.display="block";
+    $("#linkModal").classList.add("on");
   }catch(e){toast(e.message,"err");}
 },{once:false});
 /* ── links manager (v0.10) ── */
@@ -3693,8 +3737,8 @@ async function downloadFolderZip(prefix){
   if(!ids.length){toast(t("zipFilesOnly"),"err");return;}
   toast(t("folderZipStart"));
   try{
-    const r=await fetch("/f/zip",{method:"POST",
-      headers:{"Content-Type":"application/json"},
+    const r=await fetch("/f/zip",{method:"POST",credentials:"same-origin",
+      headers:{"Content-Type":"application/json",...(_apiKey?{"Authorization":"Bearer "+_apiKey}:{})},
       body:JSON.stringify({ids:ids})});
     if(!r.ok){throw new Error((await r.json()).detail||r.status);}
     const blob=await r.blob();
@@ -3706,20 +3750,16 @@ async function downloadFolderZip(prefix){
     setTimeout(()=>URL.revokeObjectURL(a.href),30000);
   }catch(e){toast(e.message,"err");}
 }
-async function shareFolder(prefix){
+/* BUG-v0.15.26b: folder share now reuses the share-options modal (password /
+   TTL), then mints one ALBUM link for the whole folder with that TTL.
+   shareTarget="folder:<prefix>" marks the folder branch of the submit handler. */
+function shareFolder(prefix){
   const ids=collectFolderIds(prefix);
   if(!ids.length){toast(t("shareFilesOnly"),"err");return;}
-  try{
-    const j=await api("/f/album",{method:"POST",
-      body:JSON.stringify({ids:ids})});
-    $("#linkT_h").textContent=t("albumOk")+" ("+j.count+")";
-    $("#linkS").textContent=t("albumSub");
-    $("#linkUrl").textContent=j.url;
-    const qr=$("#linkQr");
-    qr.src="/f/"+ids[0]+"/qr?_="+Date.now();
-    qr.style.display="block";
-    $("#linkModal").classList.add("on");
-  }catch(e){toast(e.message,"err");}
+  /* BUG-v0.15.26b fix: openShareOpts(null) overwrote shareTarget after it was
+     set, so the folder branch never ran (it even mis-shared the bulk
+     selection instead). Open the modal directly and keep the folder target. */
+  openShareOpts("folder:"+prefix);
 }
 
 /* double-submit guard (v0.15.11): disables the button while its async handler runs */
@@ -4060,6 +4100,56 @@ $("#s_tg_hash_toggle").onclick=()=>{
   syncHashToggleBtn();
 };
 
+/* ── BUG-v0.15.26b: per-token bot list (masked) with add/remove ──
+   Tokens never leave the server raw: add posts ONE raw token
+   (bot_add_token), remove posts the masked row's index
+   (bot_remove_index). The UI list is display-only. */
+let _tgTokenMasked=[];
+function renderTgTokens(masked){
+  _tgTokenMasked=masked||[];
+  const box=$("#tgTokensList");
+  if(!box)return;
+  if(!_tgTokenMasked.length){
+    box.innerHTML='<small style="color:var(--tx3);font-size:11.5px">'+esc(t("tgTokensEmpty"))+'</small>';
+    return;
+  }
+  box.innerHTML="";
+  _tgTokenMasked.forEach((m,i)=>{
+    const row=document.createElement("div");
+    row.style.cssText="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:6px 10px";
+    row.innerHTML='<span style="flex:1;direction:ltr;text-align:left;font-family:ui-monospace,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(m)+'</span>'
+      +'<button type="button" class="btn btn-ghost" data-i="'+i+'" title="'+esc(t("tgTokenRemove"))+'" style="width:auto;padding:3px 9px;font-size:11.5px;border-color:var(--err);color:var(--err)">✕</button>';
+    row.querySelector("button").onclick=async()=>{
+      try{
+        await api("/api/v1/admin/telegram-config",{method:"POST",body:JSON.stringify({bot_remove_index:i})});
+        toast(t("tgTokenRemoved"));
+        const rr=await api("/api/v1/admin/telegram-config");
+        renderTgTokens(rr.bot_tokens_masked||[]);
+        if($("#tgTokensCount"))$("#tgTokensCount").textContent=rr.bot_tokens_count?("(" + rr.bot_tokens_count + " active)"):"";
+      }catch(e){toast(e.message,"err");}
+    };
+    box.appendChild(row);
+  });
+}
+async function addTgToken(){
+  const inp=$("#s_tg_bot_add");
+  const val=inp?inp.value.trim():"";
+  if(!val){toast(t("tgTokenNeedVal"),"err");return;}
+  if(_tgTokenMasked.some(m=>m===val)){toast(t("tgTokenDup"),"err");return;}
+  try{
+    await api("/api/v1/admin/telegram-config",{method:"POST",body:JSON.stringify({bot_add_token:val})});
+    if(inp)inp.value="";
+    toast(t("tgTokenAdded"));
+    const rr=await api("/api/v1/admin/telegram-config");
+    renderTgTokens(rr.bot_tokens_masked||[]);
+    if($("#tgTokensCount"))$("#tgTokensCount").textContent=rr.bot_tokens_count?("(" + rr.bot_tokens_count + " active)"):"";
+  }catch(e){toast(e.message,"err");}
+}
+if($("#btnTgTokenAdd"))$("#btnTgTokenAdd").onclick=addTgToken;
+if($("#s_tg_bot_add"))$("#s_tg_bot_add").addEventListener("keydown",ev=>{
+  if(ev.key==="Enter"){ev.preventDefault();addTgToken();}
+});
+
 
 
 async function loadTelegramConfig(){
@@ -4075,6 +4165,8 @@ async function loadTelegramConfig(){
     if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").value="";
     if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").placeholder=r.bot_tokens_masked?r.bot_tokens_masked.join(" , "):"123456:ABC..., 987654:XYZ...";
     if($("#tgTokensCount"))$("#tgTokensCount").textContent=r.bot_tokens_count?("(" + r.bot_tokens_count + " active)"):"";
+    /* BUG-v0.15.26b: render the masked token list with per-row remove */
+    renderTgTokens(r.bot_tokens_masked||[]);
     if($("#s_tg_channel_id"))$("#s_tg_channel_id").value=r.channel_id||"";
     if($("#s_tg_thread_id"))$("#s_tg_thread_id").value=r.channel_thread_id||"";
     if($("#s_tg_api_id"))$("#s_tg_api_id").value=r.api_id||"";
@@ -4105,13 +4197,10 @@ $("#swPreview").onclick=()=>{
   renderRows();
   toast(t("saved"));
 };
-$("#s_tg_hash_toggle").onclick=()=>{
-  const inp=$("#s_tg_api_hash");
-  if(inp){
-    inp.type=inp.type==="password"?"text":"password";
-    syncHashToggleBtn();
-  }
-};
+/* BUG-v0.15.26b: a SECOND handler for #s_tg_hash_toggle further down used to
+   overwrite the masked-reveal handler (last .onclick wins), so the button
+   flipped the input type on an always-empty field and appeared dead.
+   The single handler (with reveal support) lives next to syncHashToggleBtn. */
 $("#swAuth").onclick=async()=>{
   const sw=$("#swAuth");sw.style.opacity=".5";
   try{
@@ -4236,10 +4325,14 @@ $("#saveBtn").onclick=guardBtn($("#saveBtn"),async()=>{
   };
   // B-054: only send tokens/hash when the admin actually typed new ones —
   // an empty field means "keep current", never "overwrite with empty".
-  const enteredTokens=$("#s_tg_bot_tokens")?.value?.trim();
+  // BUG-v0.15.26b: the textarea is gone (per-token add/remove applies
+  // immediately); guard against the removed element without breaking save.
+  const tokEl=document.getElementById("s_tg_bot_tokens");
+  const enteredTokens=tokEl?tokEl.value.trim():"";
   if(enteredTokens)tgBody.bot_tokens=enteredTokens;
   const enteredHash=$("#s_tg_api_hash")?.value?.trim();
-  if(enteredHash)tgBody.api_hash=enteredHash;
+  // never save the revealed masked value back
+  if(enteredHash&&!enteredHash.includes("•"))tgBody.api_hash=enteredHash;
   try{
     const r1 = await api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify(body)});
     curSettings=r1.settings;
