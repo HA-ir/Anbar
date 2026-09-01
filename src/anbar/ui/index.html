@@ -148,6 +148,12 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .qitem.fail .qbar i{background:var(--err)}
 .qstat{font-size:11.5px;color:var(--tx2);margin-top:6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .qstat .err{color:var(--err);font-weight:500}
+/* BUG-v0.15.28: the percent label lives in a fixed-width span so its text
+   (12% → 100%) can't resize the row; the cancel button is hard-anchored to
+   the END of .qstat via margin-left:auto. Previously the % text sat between
+   status and button: every re-render of a wider/narrower percentage shifted
+   the space-between middle child → button visibly jiggled left/right. */
+.qstat .qpct{display:inline-block;min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
 /* BUG-v0.15.26b: cancel must read as a destructive action — red by default.
    BUG-v0.15.27: must also beat .btn-ghost (defined later, same specificity,
    was overriding color/border back to grey). Single-class selector lost the
@@ -882,7 +888,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
           <input type="text" id="s_tg_bot_add" data-i18n-ph="tgAddTokenPh" placeholder="توکن بات جدید (123456:ABC-DEF...)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
           <button type="button" class="btn btn-ghost" id="btnTgTokenAdd" data-i18n="tgAddToken" style="white-space:nowrap;font-size:12px;padding:7px 12px">+ افزودن</button>
         </div>
-        <small data-i18n="tgTokensSub" style="color:var(--tx3);font-size:11.5px">هر توکن جدا اضافه/حذف می‌شود — نیازی به واردکردن دوباره بقیه نیست. اعمال بعد از ذخیره + ری‌استارت.</small>
+        <small data-i18n="tgTokensSub" style="color:var(--tx3);font-size:11.5px">هر توکن جداگانه اضافه/حذف می‌شود (برای چرخش و افزایش سرعت) — نیازی به جداکردن با کاما نیست. اعمال بعد از ذخیره + ری‌استارت.</small>
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgChannelLab">شناسه کانال (ANBAR_CHANNEL_ID)</span></div>
@@ -1203,7 +1209,7 @@ const I18N={
   tgBackendMtproto:"MTProto (کلاینت مستقیم تلگرام)",
   tgBackendBot:"Bot API (مخزن بات‌های تلگرام)",
   tgTokensLab:"توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)",
-  tgTokensSub:"چند توکن را با کاما جدا کنید (برای چرخش و افزایش سرعت).",
+  tgTokensSub:"هر توکن جداگانه اضافه/حذف می‌شود (برای چرخش و افزایش سرعت) — نیازی به جداکردن با کاما نیست.",
   tgChannelLab:"شناسه کانال (ANBAR_CHANNEL_ID)",
   tgThreadLab:"شناسه تاپیک / ترد (اختیاری)",
   tgApiIdLab:"Telegram API ID (ANBAR_API_ID)",
@@ -1215,7 +1221,7 @@ const I18N={
   tgTokensEmpty:"هیچ توکنی ثبت نشده", tgTokenRemove:"حذف این توکن",
   tgTokenAdded:"توکن اضافه شد", tgTokenRemoved:"توکن حذف شد",
   tgTokenNeedVal:"توکن را وارد کنید", tgTokenDup:"این توکن قبلاً اضافه شده",
-  showHash:"👁 نمایش", hideHash:"🙈 پنهان",
+  showHash:"👁 نمایش", hideHash:"🙈 پنهان", hashNotSet:"هش تنظیم نشده است",
   tgAuthOnT:"لاگین تلگرام فعال است", tgAuthOnS:"کلاینت MTProto متصل و مجاز می‌باشد",
   tgAuthLogout:"خروج از تلگرام", tgAuthLoginT:"احراز هویت کلاینت MTProto تلگرام",
   tgAuthLoginS:"برای اسکن خودکار و بازسازی تاریخچه کانال بدون نیاز به ورود دستی سشن",
@@ -1362,7 +1368,7 @@ const I18N={
   tgBackendMtproto:"MTProto (Direct Telegram Client)",
   tgBackendBot:"Bot API (Bots Pool)",
   tgTokensLab:"Bot API Tokens (ANBAR_BOT_TOKENS)",
-  tgTokensSub:"Separate multiple tokens with commas for rotation.",
+  tgTokensSub:"Tokens are added and removed one by one (for rotation & speed) — no comma-separating needed.",
   tgChannelLab:"Channel ID (ANBAR_CHANNEL_ID)",
   tgThreadLab:"Topic / Thread ID (optional)",
   tgApiIdLab:"Telegram API ID (ANBAR_API_ID)",
@@ -1374,7 +1380,7 @@ const I18N={
   tgTokensEmpty:"No tokens configured", tgTokenRemove:"Remove this token",
   tgTokenAdded:"Token added", tgTokenRemoved:"Token removed",
   tgTokenNeedVal:"Enter a token", tgTokenDup:"Token already in the list",
-  showHash:"👁 Show", hideHash:"🙈 Hide",
+  showHash:"👁 Show", hideHash:"🙈 Hide", hashNotSet:"API hash is not configured",
   tgAuthOnT:"Telegram login active", tgAuthOnS:"MTProto client connected and authorized",
   tgAuthLogout:"Sign out of Telegram", tgAuthLoginT:"Telegram MTProto Client Auth",
   tgAuthLoginS:"For automatic channel scans & rebuilds without a manual session",
@@ -1655,6 +1661,7 @@ function mediaUrl(o){
   if(!o||!o.id)return"";
   return"/f/"+encodeURIComponent(o.id)+(_apiKey?"?k="+encodeURIComponent(_apiKey):"");
 }
+let _sessionReLoginDone=false;
 async function api(path,opt={}){
   const hdrs={};
   if(opt.body&&!(opt.body instanceof FormData))hdrs["Content-Type"]="application/json";
@@ -1663,6 +1670,19 @@ async function api(path,opt={}){
   if(!r.ok){
     let msg=r.status;
     try{msg=(await r.json()).detail||msg}catch(e){}
+    /* BUG-v0.15.28: a 401 on an admin-API call while a stored key exists
+       usually means the session cookie expired. Re-login once (mints a fresh
+       cookie) so subsequent <img>/<video>/download URLs work again instead
+       of every preview silently 401-ing. */
+    if(r.status===401&&_apiKey&&!_sessionReLoginDone&&!opt.body&&!opt.method&&typeof path==="string"&&!path.includes("/login")){
+      _sessionReLoginDone=true;
+      try{
+        const rr=await fetch("/ui/login",{method:"POST",credentials:"same-origin",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({key:_apiKey})});
+        if(rr.ok){_sessionReLoginDone=false;}
+      }catch(e){}
+    }
     throw new Error(typeof msg==="string"?msg:JSON.stringify(msg));
   }
   return r.status===204?null:r.json();
@@ -1686,7 +1706,21 @@ async function boot(){
     const me=await api("/ui/me");
     if(me&&me.authed){authed=true;showApp();return;}
   }catch(e){}
+  /* BUG-v0.15.28: session cookie expired but the key is still in
+     localStorage → the app used to drop to showLogin() AND wipe the stored
+     key. Worse, in the field a 401-only session state left the UI authed
+     (Bearer still valid for /api) while every <img>/<video>/download href
+     (?k= with the ADMIN key) got 401 — the reported "previews broken,
+     downloads fail" (SEC-02 removed admin-key ?k= in v0.15.20). Fix: with a
+     stored key, silently re-login once to mint a fresh cookie; only show the
+     login form when that fails or there is no stored key. */
   if(_apiKey){
+    try{
+      const r=await fetch("/ui/login",{method:"POST",credentials:"same-origin",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({key:_apiKey})});
+      if(r.ok){authed=true;showApp();return;}
+    }catch(e){}
     _apiKey="";localStorage.removeItem("anbar-key");
   }
   showLogin();
@@ -3450,10 +3484,13 @@ function renderQueue(){
       +'<div class="qbar"><i style="width:'+it.prog+'%"></i></div>'
       +'<div class="qstat"><span>'+(it.state==="fail"?'<span class="err">'+esc(it.err||"")+'</span>'
         :it.state==="canceled"?t("tCanceled"):it.state==="done"?t("tDone"):it.state==="up"?t("tUp"):t("uploading"))
-        +'</span>'
-      +((it.state==="up"||it.state==="wait")?'<button class="btn-ghost btn qcancel" data-id="'+it.id+'">'+esc(t("tCancel"))+'</button>':'')
+      +'</span>'
+      /* BUG-v0.15.28: stable row layout — percent span is fixed-width (CSS
+         .qpct) and the cancel button anchors to the row end; the percent text
+         resizing can no longer push the button left/right (user-reported jiggle). */
+      +((it.state==="up"||it.state==="wait")?'<button class="btn-ghost btn qcancel" data-id="'+it.id+'" style="margin-left:auto">'+esc(t("tCancel"))+'</button>':'')
       +(it.state==="fail"?'<button class="btn-ghost btn qretry" data-id="'+it.id+'" style="padding:3px 10px;font-size:11.5px">'+esc(t("retry"))+'</button>'
-        :'<span>'+(it.state==="up"?Math.floor(it.prog)+"%":"")+'</span>')+'</div>';
+        :'<span class="qpct">'+(it.state==="up"?Math.floor(it.prog)+"%":"")+'</span>')+'</div>';
     q.appendChild(d);
   }
   q.querySelectorAll(".qretry").forEach(b=>{
@@ -4081,21 +4118,37 @@ function syncHashToggleBtn(){
   btn.style.borderColor=isVis?"var(--brand)":"";
 }
 /* BUG-v0.15.26: the show/hide button "didn't work" because the field is kept
-   empty (B-054 — the raw hash never leaves the server), so toggling input
-   type had nothing to reveal. Now toggling reveals the MASKED value
-   (e.g. abcd••••wxyz) — enough to verify which hash is configured without
-   exposing the secret. Masked values are rejected server-side on save
-   (they contain "•"), so revealing can never overwrite the stored hash. */
-let _tgApiHashMasked="";
-$("#s_tg_hash_toggle").onclick=()=>{
+   empty (B-054 — the raw hash never leaves the server in the listing), so
+   toggling input type had nothing to reveal.
+   BUG-v0.15.28: the user reported it STILL shows dots, not the hash. Now the
+   toggle fetches the RAW hash from the dedicated admin-only endpoint
+   (GET /admin/telegram-config/reveal-api-hash — audited per click) and shows
+   it; hiding re-blanks the field. A typed-but-unsaved new hash is preserved.
+   Masked values are rejected server-side on save (they contain "•"), so the
+   revealed value can never be accidentally saved back over the stored hash
+   unless the admin edits it deliberately. */
+let _tgApiHashRaw="";   // last revealed raw hash (client-side only)
+$("#s_tg_hash_toggle").onclick=async()=>{
   const inp=$("#s_tg_api_hash");
   if(!inp)return;
   if(inp.type==="password"){
     inp.type="text";
-    if(!inp.value.trim()&&_tgApiHashMasked)inp.value=_tgApiHashMasked;
+    const typed=inp.value.trim();
+    if(typed&&!typed.includes("•")){_tgApiHashRaw=typed;}   // admin typed a new one
+    if(!typed||typed===_tgApiHashMasked){
+      try{
+        const r=await api("/api/v1/admin/telegram-config/reveal-api-hash");
+        _tgApiHashRaw=r.api_hash||"";
+        inp.value=_tgApiHashRaw;
+        if(!_tgApiHashRaw)toast(t("hashNotSet"),"warn");
+      }catch(e){toast(e.message,"err");}
+    }else{
+      inp.value=_tgApiHashRaw||typed;
+    }
   }else{
     inp.type="password";
-    if(inp.value.trim()===_tgApiHashMasked)inp.value="";
+    // hide: blank the field unless the admin typed a fresh hash themselves
+    if(inp.value.trim()===_tgApiHashRaw)inp.value="";
   }
   syncHashToggleBtn();
 };
@@ -4163,7 +4216,9 @@ async function loadTelegramConfig(){
       }
     }
     if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").value="";
-    if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").placeholder=r.bot_tokens_masked?r.bot_tokens_masked.join(" , "):"123456:ABC..., 987654:XYZ...";
+    /* BUG-v0.15.28: the comma-joined textarea is gone — tokens are one-per-row
+       in the list below. Drop the comma-joined placeholder too. */
+    if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").placeholder="123456:ABC-DEF...";
     if($("#tgTokensCount"))$("#tgTokensCount").textContent=r.bot_tokens_count?("(" + r.bot_tokens_count + " active)"):"";
     /* BUG-v0.15.26b: render the masked token list with per-row remove */
     renderTgTokens(r.bot_tokens_masked||[]);
@@ -4177,6 +4232,7 @@ async function loadTelegramConfig(){
       $("#s_tg_api_hash").value="";
       $("#s_tg_api_hash").placeholder=r.api_hash_masked||"Telegram API Hash...";
       _tgApiHashMasked=r.api_hash_masked||"";   // BUG-v0.15.26: for reveal toggle
+      _tgApiHashRaw="";                          // BUG-v0.15.28: stale reveal is dropped on reload
     }
     if($("#s_tg_peer"))$("#s_tg_peer").value=r.mtproto_peer||"";
     const isAuthed = !!r.session_authorized;

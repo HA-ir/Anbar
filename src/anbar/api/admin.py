@@ -1093,6 +1093,28 @@ async def telegram_config_update(request: Request):
     return {"status": "ok", "updated_keys": list(updates.keys()), "persisted": bool(updates)}
 
 
+@router.get("/admin/telegram-config/reveal-api-hash")
+async def telegram_config_reveal_api_hash(request: Request):
+    """BUG-v0.15.28: return the RAW Telegram API hash to the admin only.
+
+    B-054 keeps the raw hash out of the listing response (it is fetched by
+    every drawer open); this dedicated endpoint is called only when the admin
+    explicitly clicks "reveal", it requires the admin key, and every call is
+    audit-logged. The UI never persists the revealed value (masked values are
+    rejected on save) and the field is re-blanked on close.
+    """
+    require_admin(request)
+    settings = request.app.state.settings
+    env_vars = _read_env_dict(_get_env_file_path())
+    raw = env_vars.get("ANBAR_API_HASH") or settings.api_hash or ""
+    request.app.state.db.log_audit(
+        "cfg.reveal_api_hash",
+        actor="admin",
+        ip=request.client.host if request.client else None,
+    )
+    return {"api_hash": raw, "set": bool(raw)}
+
+
 @router.post("/admin/links/revoke-all")
 async def links_revoke_all(request: Request):
     """Revoke all registered links immediately."""
