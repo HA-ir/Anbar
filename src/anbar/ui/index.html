@@ -1709,19 +1709,14 @@ async function boot(){
       history.replaceState(null,"",location.pathname);
     }
   }catch(e){}
-  try{
-    const me=await api("/ui/me");
-    if(me&&me.authed){authed=true;showApp();return;}
-  }catch(e){}
-  /* BUG-v0.15.28: session cookie expired but the key is still in
-     localStorage → the app used to drop to showLogin() AND wipe the stored
-     key. Worse, in the field a 401-only session state left the UI authed
-     (Bearer still valid for /api) while every media URL got 401 — the
-     reported "previews broken, downloads fail". v0.15.30: media URLs no
-     longer carry any key at all (SEC-02), so a live cookie is the ONLY
-     thing they need. Fix: with a stored key, silently re-login once to
-     mint a fresh cookie; only show the login form when that fails or there
-     is no stored key. */
+  /* BUG-v0.15.31 (the REAL "previews/downloads broken" root cause):
+     api("/ui/me") sends the Bearer header from localStorage, so whoami()
+     returns authed even when the session COOKIE is expired/missing.
+     boot() then showed the app — the API panel worked (Bearer) while EVERY
+     keyless media URL (<img>/<video>/<a download>) 401-ed, because those
+     requests carry no Bearer, only the cookie. Fix: /ui/me alone is NOT
+     enough to enter the app. When a stored key exists, always (re)login to
+     mint a fresh cookie first; only show the login form when that fails. */
   if(_apiKey){
     try{
       const r=await fetch("/ui/login",{method:"POST",credentials:"same-origin",
@@ -1731,6 +1726,10 @@ async function boot(){
     }catch(e){}
     _apiKey="";localStorage.removeItem("anbar-key");
   }
+  try{
+    const me=await api("/ui/me");
+    if(me&&me.authed){authed=true;showApp();return;}
+  }catch(e){}
   showLogin();
 }
 function showLogin(){$("#loginWrap").style.display="flex";$("#app").classList.remove("on");}
@@ -2970,7 +2969,13 @@ async function openFileModal(o){
     pv.innerHTML='<div class="fm-fallback" style="display:flex;flex-direction:column;gap:6px;align-items:center"><span>'+esc((extOf(o.filename)||"FILE").toUpperCase())+'</span><span style="font-size:11.5px;font-weight:400;color:var(--tx3);text-transform:none">'+esc(t("previewOffNotice"))+'</span></div>';
   }else if(kind==="image"){
     pv.classList.add("has");
-    pv.innerHTML='<img loading="lazy" src="'+url+'" alt="">';
+    /* BUG-v0.15.31: loading="lazy" on the modal image is a DEADLOCK — the
+       .fm-preview flex container gives the img a 0×0 layout box until it
+       loads, and a lazy image with a zero-size box NEVER starts loading
+       (IntersectionObserver never intersects a 0×0 box). Result: every
+       preview and every download in the modal silently hung. The modal
+       image is the actively-opened file — eager is correct here. */
+    pv.innerHTML='<img src="'+url+'" alt="">';
   }else if(kind==="video"){
     pv.classList.add("has");
     pv.innerHTML='<video src="'+url+'" controls preload="metadata" playsinline style="max-height:360px;width:100%;border-radius:10px"></video>';
