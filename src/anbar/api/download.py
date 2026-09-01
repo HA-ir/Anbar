@@ -1179,7 +1179,7 @@ text-decoration:none}}
   <a class="lbdl" id="lbdl" download>دانلود</a>
 </div>
 <script>
-const ITEMS = JSON.parse(__PAYLOAD__);
+const ITEMS = __PAYLOAD__;
 const grid = document.getElementById('grid');
 function fmt(n){{
   if(n>=1073741824)return (n/1073741824).toFixed(1)+' GB';
