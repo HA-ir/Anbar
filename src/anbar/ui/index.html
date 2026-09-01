@@ -2625,7 +2625,10 @@ $("#shareOpts").addEventListener("submit",async ev=>{
   const ttl=Number.isFinite(ttlRaw)&&ttlRaw>=0?ttlRaw:86400;
   shareTarget=null;
   $("#shareOptsModal").classList.remove("on");
-  const ids=collectFolderIds(prefix);
+  /* BUG-v0.15.33: ids come from the server (authoritative), not the stale
+     client cache — a freshly-filled folder no longer reports "no files". */
+  let ids=await serverFolderIds(prefix);
+  if(ids===null) ids=collectFolderIds(prefix);
   if(!ids.length){toast(t("shareFilesOnly"),"err");return;}
   try{
     const j=await api("/f/album",{method:"POST",
@@ -3782,10 +3785,23 @@ function collectFolderIds(prefix){
     return fn.startsWith(p)&&!o.isFolder&&fn!==p;
   }).map(o=>o.id);
 }
+/* BUG-v0.15.33: folder ZIP/share used the client's stale files[] cache, so a
+   freshly-filled folder could report "no files" (misleading toast) and refuse
+   the action. Server-side prefix lookup is now authoritative. */
+async function serverFolderIds(prefix){
+  try{
+    const p=(prefix||"").replace(/\/+$/,"");
+    const r=await api("/api/v1/admin/objects?limit=500&prefix="+encodeURIComponent(p));
+    const rows=r.objects||[];
+    return rows.filter(o=>!(o.filename||"").endsWith("/")||(o.filename||"")!==(p+"/"))
+               .map(o=>o.id);
+  }catch(e){ return null; }
+}
 async function downloadFolderZip(prefix){
-  const ids=collectFolderIds(prefix);
-  if(!ids.length){toast(t("zipFilesOnly"),"err");return;}
   toast(t("folderZipStart"));
+  let ids=await serverFolderIds(prefix);
+  if(ids===null) ids=collectFolderIds(prefix); // fallback to cache if API failed
+  if(!ids.length){toast(t("zipFilesOnly"),"err");return;}
   try{
     const r=await fetch("/f/zip",{method:"POST",credentials:"same-origin",
       headers:{"Content-Type":"application/json",...(_apiKey?{"Authorization":"Bearer "+_apiKey}:{})},
@@ -3804,11 +3820,9 @@ async function downloadFolderZip(prefix){
    TTL), then mints one ALBUM link for the whole folder with that TTL.
    shareTarget="folder:<prefix>" marks the folder branch of the submit handler. */
 function shareFolder(prefix){
-  const ids=collectFolderIds(prefix);
-  if(!ids.length){toast(t("shareFilesOnly"),"err");return;}
-  /* BUG-v0.15.26b fix: openShareOpts(null) overwrote shareTarget after it was
-     set, so the folder branch never ran (it even mis-shared the bulk
-     selection instead). Open the modal directly and keep the folder target. */
+  /* BUG-v0.15.33: open the modal first; the id lookup now happens in the
+     submit handler (server-backed). The pre-check here stays as a fast path
+     but is no longer the gatekeeper. */
   openShareOpts("folder:"+prefix);
 }
 

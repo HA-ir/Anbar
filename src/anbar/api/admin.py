@@ -250,10 +250,23 @@ async def rotate_secret(request: Request):
 
 
 @router.get("/admin/objects")
-async def objects(request: Request, limit: int = 50, offset: int = 0):
-    """List stored objects (newest first). Admin key required."""
+async def objects(
+    request: Request, limit: int = 50, offset: int = 0, prefix: str = ""
+):
+    """List stored objects (newest first). Admin key required.
+
+    BUG-v0.15.33: optional `prefix` filter — folder ZIP/share used to build
+    their id list from the UI's stale 500-row cache, so a freshly-filled
+    folder could report "no files" and refuse zip/share. Server-side prefix
+    lookup (list_objects_by_prefix) is authoritative and unbounded.
+    """
     require_admin(request)
     db = request.app.state.db
+    if prefix:
+        rows = db.list_objects_by_prefix(prefix.rstrip("/") + "/")
+        rows = [r for r in rows if r["filename"] != prefix.rstrip("/") + "/"]
+        rows = rows[: max(1, min(limit, 500))]
+        return {"objects": rows, "count": len(rows)}
     limit = max(1, min(limit, 500))
     rows = db.list_objects(limit=limit, offset=max(0, offset))
     # PERF-03: one cheap stat() per image row — lets the gallery use the
