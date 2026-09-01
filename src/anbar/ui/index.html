@@ -631,9 +631,6 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       <button class="btn btn-ghost" id="newFolderBtn" style="width:auto;padding:8px 11px" data-i18n-title="newFolder" title="پوشه جدید">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
       </button>
-      <button class="btn btn-ghost" id="upFolderBtn" style="width:auto;padding:8px 11px" data-i18n-title="upFolder" title="آپلود پوشه">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 11v6M9 14l3-3 3 3"/></svg>
-      </button>
       <button class="btn btn-ghost" id="viewBtn" style="width:auto;padding:8px 11px" title="gallery">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       </button>
@@ -888,7 +885,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
           <input type="text" id="s_tg_bot_add" data-i18n-ph="tgAddTokenPh" placeholder="توکن بات جدید (123456:ABC-DEF...)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
           <button type="button" class="btn btn-ghost" id="btnTgTokenAdd" data-i18n="tgAddToken" style="white-space:nowrap;font-size:12px;padding:7px 12px">+ افزودن</button>
         </div>
-        <small data-i18n="tgTokensSub" style="color:var(--tx3);font-size:11.5px">هر توکن جداگانه اضافه/حذف می‌شود (برای چرخش و افزایش سرعت) — نیازی به جداکردن با کاما نیست. اعمال بعد از ذخیره + ری‌استارت.</small>
+        <small data-i18n="tgTokensSub" style="color:var(--tx3);font-size:11.5px">اعمال بعد از ذخیره + ری‌استارت.</small>
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgChannelLab">شناسه کانال (ANBAR_CHANNEL_ID)</span></div>
@@ -1209,7 +1206,7 @@ const I18N={
   tgBackendMtproto:"MTProto (کلاینت مستقیم تلگرام)",
   tgBackendBot:"Bot API (مخزن بات‌های تلگرام)",
   tgTokensLab:"توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)",
-  tgTokensSub:"هر توکن جداگانه اضافه/حذف می‌شود (برای چرخش و افزایش سرعت) — نیازی به جداکردن با کاما نیست.",
+  tgTokensSub:"اعمال بعد از ذخیره + ری‌استارت.",
   tgChannelLab:"شناسه کانال (ANBAR_CHANNEL_ID)",
   tgThreadLab:"شناسه تاپیک / ترد (اختیاری)",
   tgApiIdLab:"Telegram API ID (ANBAR_API_ID)",
@@ -1368,7 +1365,7 @@ const I18N={
   tgBackendMtproto:"MTProto (Direct Telegram Client)",
   tgBackendBot:"Bot API (Bots Pool)",
   tgTokensLab:"Bot API Tokens (ANBAR_BOT_TOKENS)",
-  tgTokensSub:"Tokens are added and removed one by one (for rotation & speed) — no comma-separating needed.",
+  tgTokensSub:"Applied after save + restart.",
   tgChannelLab:"Channel ID (ANBAR_CHANNEL_ID)",
   tgThreadLab:"Topic / Thread ID (optional)",
   tgApiIdLab:"Telegram API ID (ANBAR_API_ID)",
@@ -3398,6 +3395,9 @@ async function pollIngest(jobId){
 }
 
 /* ================= upload ================= */
+/* v0.15.34: toolbar "upload folder" button removed (upload section covers it);
+   whole-folder picking stays available via right-click/long-press on the
+   dropzone. upFolderBtn may be absent — guarded below. */
 const drop=$("#drop"),fileInput=$("#fileInput"),dirInput=$("#dirInput"),upFolderBtn=$("#upFolderBtn");
 let queue=[],uploading=false;
 drop.onclick=()=>fileInput.click();
@@ -3502,9 +3502,10 @@ function renderQueue(){
         :it.state==="canceled"?t("tCanceled"):it.state==="done"?t("tDone"):it.state==="up"?t("tUp"):t("uploading"))
       +'</span>'
       /* BUG-v0.15.28: stable row layout — percent span is fixed-width (CSS
-         .qpct) and the cancel button anchors to the row end; the percent text
-         resizing can no longer push the button left/right (user-reported jiggle). */
-      +((it.state==="up"||it.state==="wait")?'<button class="btn-ghost btn qcancel" data-id="'+it.id+'" style="margin-left:auto">'+esc(t("tCancel"))+'</button>':'')
+         .qpct); BUG-v0.15.34: .qstat is flex space-between, so status text sits
+         at the START and the cancel/retry button lands CENTERED between the
+         status and the percent label (user request: cancel in the middle). */
+      +((it.state==="up"||it.state==="wait")?'<button class="btn-ghost btn qcancel" data-id="'+it.id+'">'+esc(t("tCancel"))+'</button>':'')
       +(it.state==="fail"?'<button class="btn-ghost btn qretry" data-id="'+it.id+'" style="padding:3px 10px;font-size:11.5px">'+esc(t("retry"))+'</button>'
         :'<span class="qpct">'+(it.state==="up"?Math.floor(it.prog)+"%":"")+'</span>')+'</div>';
     q.appendChild(d);
