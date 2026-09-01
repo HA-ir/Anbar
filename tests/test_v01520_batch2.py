@@ -95,10 +95,15 @@ def test_range_response_has_no_cache_control(client: TestClient):
     assert "cache-control" not in r.headers
 
 
-# ── SEC-02: admin key rejected via ?k= ──────────────────────────────────
+# ── SEC-02 (reverted in v0.15.28 per user decision) ─────────────────────
+# The owner explicitly wants the UI's ?k=<admin-key> media URLs to work:
+# every preview (<img>/<video>) and the download button emit
+# /f/<id>?k=<admin key>, and after a session-cookie expiry these all 401'd
+# ("no previews, downloads fail"). The admin key is the owner's own secret;
+# honoring it in ?k= restores the pre-v0.15.20 behavior.
 
 
-def test_admin_key_in_query_string_rejected(client: TestClient):
+def test_admin_key_in_query_string_accepted(client: TestClient):
     # settings fixture: admin key is "test-admin-key" (conftest default env)
     r = client.get(
         "/api/v1/admin/objects?limit=1",
@@ -110,9 +115,9 @@ def test_admin_key_in_query_string_rejected(client: TestClient):
         content=b"S" * 16,
         headers={**UP, "X-File-Name": "sec2.bin", "Content-Type": "application/octet-stream"},
     ).json()
-    # same admin key via ?k= must NOT grant download
+    # admin key via ?k= GRANTS download again (v0.15.28 owner decision)
     r2 = client.get(f"/f/{obj['id']}?k=test-admin-key")
-    assert r2.status_code == 401
+    assert r2.status_code == 200
 
 
 def test_uploader_key_in_query_string_still_accepted(client: TestClient):
