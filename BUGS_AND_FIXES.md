@@ -1,6 +1,39 @@
 # Anbar — Bugs & Fixes (Cumulative)
 
-> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.26
+> فایل تجمیعی باگ‌ها و فیکس‌ها. آخرین به‌روزرسانی: 2026-08-31 — نسخه v0.15.27
+
+## v0.15.27 — 2026-08-31 (E2E Verification Follow-up — 5 reported bugs)
+
+### FIX-01 · دکمه لغو آپلود قرمز نشده بود — Severity: UI (رگرسیون v0.15.26)
+- **باس:** فیکس UX-01 برای دکمه لغو (`.qcancel`) رنگ قرمز داشت، ولی selector تک‌کلاسه `.qcancel` با specificity برابرِ `.btn-ghost` (خط 184، بعداً در فایل) در جنگ cascade می‌باخت؛ رنگ و border دوباره خاکستری می‌شد (`rgb(90,101,120)` اندازه‌گیری شد در E2E).
+- **فیکس (ui/index.html):** selector به `.qcancel.btn` (specificity 0,2,0) ارتقا یافت تا از `.btn-ghost` (0,1,0) بالاتر باشد. hover هم اصلاح شد.
+- **Verify (E2E واقعی):** رنگ computed دکمه = `rgb(220,38,38)` = `--err` ✓؛ کلیک → state `canceled` + `xhr.abort` ✓.
+
+### FIX-02 · ذخیره‌نشدن تنظیمات/توکن‌ها در پروداکشن — Severity: Critical
+- **باس:** در پروداکشن `/opt/anbar/.env` یک فایل bind-mount تک‌فایلی داخل دایرکتوری root-owned است؛ مسیر atomic نوشتن (mkstemp در همان دایرکتوری + `os.replace`) با **EACCES** (ساخت temp در دایرکتوری 755 روت) و سپس **EBUSY** (rename روی bind-mount) شکست می‌خورد. `_write_env_dict` ساکت `False` برمی‌گرداند ولی endpoint همچنان `{"status":"ok","updated_keys":[...]}` می‌داد → UI «ذخیره شد» نشان می‌داد، تغییرات بعد از restart پرت می‌شدند. (لاگ: هر توکن اضافه‌شده از UI عملاً هیچ‌وقت persist نمی‌شد.)
+- **فیکس (api/admin.py):**
+  - `_write_env_dict`: مسیر atomic حفظ شد (SEC-04)؛ در failure به fallback **in-place rewrite** (O_TRUNC + write + fsync + بکاپ .bak) می‌رود که روی bind-mount کار می‌کند. اگر آن هم شکست بخورد `False` برمی‌گردد.
+  - `POST /admin/telegram-config`: وقتی persist شکست می‌خورد حالا **HTTP 500** برمی‌گرداند (قبلاً ok دروغین). پاسخ موفق شامل `persisted: true` است.
+- **Verify (E2E پروداکشن):** افزودن توکن تستی → `persisted:true` + شمارش 3 + کلید واقعاً در `/opt/anbar/.env` روی host ظاهر شد ✓؛ حذف همان توکن → شمارش 2 و کلید از فایل پاک شد ✓؛ index خارج از محدوده → 404 ✓؛ تست unit جدید نوشتن روی .env شبه-bind-mount (EBUSY+دایرکتوری غیرقابل‌نوشتن) ✓.
+
+### FIX-03 · چشمک API Hash (نمایش/مخفی) — Severity: UX — ✅ سالم بود
+- **بررسی E2E:** دکمه `s_tg_hash_toggle` موجود و سیم‌کشی‌شده است؛ `password → text → password` به‌درستی toggle می‌شود (سه اسنپ‌شات computed type). باگ گزارش‌شده بازتولید نشد — احتمالاً اثر بصریِ خالی‌بودن مقدار (وقتی hash ذخیره نشده، input خالی است و toggle دیده نمی‌شود که «کاری کرد»). بدون تغییر کد.
+
+### FIX-04 · لیست توکن‌های ربات + شمارنده — Severity: UX — ✅ سالم بود + باگ ریشه‌ای FIX-02
+- **بررسی E2E:** لیست `#tgTokensList` با ردیف masked + دکمه حذف هر توکن رندر می‌شود؛ شمارنده `(N active)` زنده آپدیت می‌شود (2→3→2 در add/remove واقعی UI). textarea قدیمی حذف شده و input «افزودن تکی» کار می‌کند.
+- **اما ریشه «ثبت نشدن»:** همان FIX-02 بود — توکن به لیست UI اضافه می‌شد ولی persist ساکت شکست می‌خورد. الان واقعاً در `.env` می‌نشیند.
+
+### FIX-05 · تیک تکراری select-mode — Severity: UI — ✅ سالم بود
+- **بررسی E2E:** قانون `.gcell.selected::after` (منبع تیک دوبل) دیگر در هیچ stylesheet وجود ندارد (`False`)؛ انتخاب واقعی یک فایل در گالری → فقط یک checkbox تیک می‌خورد و هیچ badge ::after روی کارت انتخاب‌شده رندر نمی‌شود (badges = `[]`).
+
+### FIX-06 · انقضای لینک آلبوم/پوشه — Severity: Medium (رگرسیون v0.15.26b)
+- **باس:** آلبوم‌های ساخته‌شده از اشتراک پوشه `ttl` را نادیده می‌گرفتند: توکن آلبوم با ttl درست ذخیره می‌شد ولی `exp` per-item ها همیشه `now + 30d` (امضای قدیمی) بود؛ صفحه آلبوم بعد از 30 روز لینک‌های مرده می‌داد در حالی که توکن زنده بود (یا برعکس با ttl=0 امضا نمی‌شد).
+- **فیکس (api/download.py):** `exp` per-item = `now + ttl` (0 = هرگز)؛ آلبوم منقضی → **410 Gone** با پیام فارسی؛ 404 برای توکن ناموجود حفظ شد.
+- **Verify (E2E پروداکشن):** اشتراک پوشه «e2e UX folder» با ttl=86400 → صفحه آلبوم 200 با 2 آیتم، هر دو `exp ≈ 24h` ✓ (قبلاً 30d ثابت)؛ تست‌های unit: default 24h، ttl=0 (>30d)، ttl=600، منقضی→410 ✓.
+
+### تست‌ها
+- `tests/test_v01527_fixes.py` (جدید، ۹ تست): fallback بنویس on-bind-mount، افزودن کلید جدید، endpoint fail-loud 500، endpoint ok با fallback، add-token flow، آلبوم ttl پیش‌فرض/صفر/سفارشی/منقضی.
+- کل سوئیت: **360 passed** — ruff clean — deploy واقعی روی dl.amiri-dev.ir (v0.15.27 @ c132f6d).
 
 ## v0.15.26 — 2026-08-31 (UX Fixes — گزارش کاربر)
 
