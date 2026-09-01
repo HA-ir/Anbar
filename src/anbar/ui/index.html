@@ -400,7 +400,10 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 .toast.err i{background:var(--err)}
 @keyframes toastin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 /* link modal */
-.modal{position:fixed;inset:0;z-index:150;display:none;align-items:center;justify-content:center;
+/* BUG-v0.15.35: modals must sit ABOVE gallery cards — a card with its 3-dot
+   menu open gets .menu-open (z-index:999), and opening share/rename from that
+   menu left the class on the card, so the z-index:150 modal rendered UNDER it. */
+.modal{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;
   background:rgba(8,12,20,.5);padding:20px}
 .modal.on{display:flex}
 .modal-card{background:var(--bg2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);
@@ -836,7 +839,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       <!-- Telegram MTProto Authentication Box -->
       <div id="tgAuthConnectedBox" style="display:none;background:var(--ok-soft);border:1.5px solid var(--ok);border-radius:12px;padding:14px;margin-top:8px;align-items:center;justify-content:space-between;gap:12px">
         <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:32px;height:32px;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold">✓</div>
+          <div style="width:32px;height:32px;min-width:32px;flex:none;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold;line-height:1">✓</div>
           <div>
             <div style="font-weight:700;font-size:13.5px;color:var(--ok)" data-i18n="tgAuthOnT">لاگین تلگرام فعال است</div>
             <small style="color:var(--tx2);font-size:11.5px" data-i18n="tgAuthOnS">کلاینت MTProto متصل و مجاز می‌باشد</small>
@@ -867,7 +870,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
 
       <div class="set-row col">
         <div class="lab"><span data-i18n="tgBackendLab">نوع بک‌اند ذخیره‌سازی</span><small data-i18n="tgBackendSub">استراتژی هیبریدی (توصیه‌شده)، MTProto یا Bot</small></div>
-        <select id="s_tg_backend" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
+        <select id="s_tg_backend" data-dirty-key="backend" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
           <option value="hybrid" data-i18n="tgBackendHybrid">🚀 Hybrid (MTProto + Bot CDN)</option>
           <option value="mtproto" data-i18n="tgBackendMtproto">MTProto (Direct Client)</option>
           <option value="bot" data-i18n="tgBackendBot">Bot API (Bots Pool)</option>
@@ -882,38 +885,38 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
              textarea forced retyping ALL tokens to add just one -->
         <div id="tgTokensList" style="display:flex;flex-direction:column;gap:5px"></div>
         <div style="display:flex;gap:6px">
-          <input type="text" id="s_tg_bot_add" data-i18n-ph="tgAddTokenPh" placeholder="توکن بات جدید (123456:ABC-DEF...)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
+          <input type="text" id="s_tg_bot_add" data-dirty-key="bot_add_token" data-i18n-ph="tgAddTokenPh" placeholder="توکن بات جدید (123456:ABC-DEF...)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
           <button type="button" class="btn btn-ghost" id="btnTgTokenAdd" data-i18n="tgAddToken" style="white-space:nowrap;font-size:12px;padding:7px 12px">+ افزودن</button>
         </div>
         <small data-i18n="tgTokensSub" style="color:var(--tx3);font-size:11.5px">اعمال بعد از ذخیره + ری‌استارت.</small>
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgChannelLab">شناسه کانال (ANBAR_CHANNEL_ID)</span></div>
-        <input type="text" id="s_tg_channel_id" placeholder="-100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        <input type="text" id="s_tg_channel_id" data-dirty-key="channel_id" placeholder="-100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgThreadLab">شناسه تاپیک / ترد (اختیاری)</span></div>
-        <input type="text" id="s_tg_thread_id" placeholder="123..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        <input type="text" id="s_tg_thread_id" data-dirty-key="channel_thread_id" placeholder="123..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgApiIdLab">Telegram API ID (ANBAR_API_ID)</span></div>
-        <input type="text" id="s_tg_api_id" placeholder="12345678" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        <input type="text" id="s_tg_api_id" data-dirty-key="api_id" placeholder="12345678" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
       </div>
       <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
         <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
           <span data-i18n="tgApiHashLab">Telegram API Hash (ANBAR_API_HASH)</span>
           <button type="button" class="btn btn-ghost" id="s_tg_hash_toggle" style="width:auto;padding:2px 8px;font-size:11px">👁 نمایش / پنهان</button>
         </div>
-        <input type="password" id="s_tg_api_hash" placeholder="••••••••••••••••••••••••••••••••" style="width:100%;direction:ltr;font-family:ui-monospace,monospace;font-size:12px">
+        <input type="password" id="s_tg_api_hash" data-dirty-key="api_hash" placeholder="••••••••••••••••••••••••••••••••" style="width:100%;direction:ltr;font-family:ui-monospace,monospace;font-size:12px">
       </div>
       <div class="set-row">
         <div class="lab"><span data-i18n="tgPeerLab">MTProto Peer (ANBAR_MTPROTO_PEER)</span></div>
-        <input type="text" id="s_tg_peer" data-i18n-ph="tgPeerPh" placeholder="me یا -100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        <input type="text" id="s_tg_peer" data-dirty-key="mtproto_peer" data-i18n-ph="tgPeerPh" placeholder="me یا -100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
       </div>
 
       <div class="set-row">
         <div class="lab"><span data-i18n="tgChunkLab">حجم هر چانک (MB)</span><small data-i18n="tgChunkSub">حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto</small></div>
-        <input type="number" min="1" max="49" id="s_tg_chunk_size" style="direction:ltr;width:80px">
+        <input type="number" min="1" max="49" id="s_tg_chunk_size" data-dirty-key="chunk_size_mb" style="direction:ltr;width:80px">
       </div>
     </div>
 
@@ -980,6 +983,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
   </div>
   <div class="drawer-foot">
     <button class="btn btn-primary" style="width:auto" id="saveBtn" data-i18n="save">ذخیره</button>
+    <button class="btn btn-warn" style="width:auto;display:none" id="restartBtn" data-i18n="restartNow">⟳ ری‌استارت</button>
   </div>
 </aside>
 
@@ -1291,9 +1295,10 @@ const I18N={
   allLinksRevoked:"تمام لینک‌های فعال با موفقیت باطل شدند",
   trashT:"سطل بازیافت", trashS:"موارد تا ۷ روز قابل بازیابی‌اند، بعد خودکار حذف می‌شوند.",
   trashEmpty:"خالی کردن سطل", restore:"بازیابی", purge:"حذف",
+  restartNow:"⟳ ری‌استارت", restartQ:"سرویس ری‌استارت شود؟ چند ثانیه قطع می‌شود.", restarting:"در حال ری‌استارت…", restarted:"سرویس با تنظیمات جدید بالا آمد",
   ftAll:"همه انواع", ftImage:"عکس", ftVideo:"ویدیو", ftAudio:"صدا",
   ftPdf:"PDF", ftOther:"سایر", noLinks:"هنوز لینکی نساخته‌ای",
-  noTrash:"سطل خالی است", revoked:"ابطال شد", expired:"منقضی",
+  noTrash:"سطل خالی است", trashAlreadyEmpty:"سطل زباله خالی است — چیزی برای خالی کردن نیست", revoked:"ابطال شد", expired:"منقضی",
   linkRevoked:"لینک ابطال شد", restored:"بازیابی شد", purged:"حذف شد",
   zipStart:"در حال ساخت ZIP…", open:"باز کردن", revokeB:"ابطال لینک",
   manageB:"مدیریت لینک", manageT:"مدیریت لینک", linkT:"اشتراک‌گذاری",
@@ -1450,9 +1455,10 @@ const I18N={
   allLinksRevoked:"All active share links have been revoked",
   trashT:"Trash", trashS:"Items stay restorable for 7 days, then purge automatically.",
   trashEmpty:"Empty trash", restore:"Restore", purge:"Delete",
+  restartNow:"⟳ Restart", restartQ:"Restart the service? It will be down for a few seconds.", restarting:"Restarting…", restarted:"Service is back up with the new settings",
   ftAll:"All types", ftImage:"Images", ftVideo:"Videos", ftAudio:"Audio",
   ftPdf:"PDF", ftOther:"Other", noLinks:"No links yet",
-  noTrash:"Trash is empty", revoked:"Revoked", expired:"Expired",
+  noTrash:"Trash is empty", trashAlreadyEmpty:"Trash is already empty — nothing to empty", revoked:"Revoked", expired:"Expired",
   linkRevoked:"Link revoked", restored:"Restored", purged:"Deleted",
   zipStart:"Building ZIP…", open:"Open", revokeB:"Revoke link",
   manageB:"Manage link", manageT:"Manage link", linkT:"Share",
@@ -1579,6 +1585,10 @@ function askText(title,defValue){
   return new Promise(resolve=>{
     const wrap=document.createElement("div");
     wrap.className="modal on";
+    /* BUG-v0.15.35: a gallery card with its 3-dot menu open holds .menu-open
+       (z-index:999) — any modal/dialog must clear it or it renders above us. */
+    document.querySelectorAll(".gcell.menu-open").forEach(c=>c.classList.remove("menu-open"));
+    document.querySelectorAll(".gmenu-pop.on").forEach(p=>p.classList.remove("on"));
     wrap.innerHTML='<div class="modal-card" style="max-width:340px;width:100%">'
       +'<h3 style="font-size:14.5px">'+esc(title)+'</h3>'
       +'<input id="__askInp" type="text" autocomplete="off" style="width:100%;margin:12px 0 16px;padding:10px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13.5px">'
@@ -1597,16 +1607,20 @@ function askText(title,defValue){
     setTimeout(()=>inp.focus(),30);
   });
 }
-function askConfirm(text){
-  return new Promise(resolve=>{
-    const wrap=document.createElement("div");
-    wrap.className="modal on";
-    wrap.innerHTML='<div class="modal-card" style="max-width:340px;width:100%">'
-      +'<p style="margin:4px 0 18px;font-size:13.5px;color:var(--tx);white-space:pre-wrap">'+esc(text)+'</p>'
-      +'<div style="display:flex;gap:8px;justify-content:flex-start">'
-      +'<button id="__askYes" class="btn" style="padding:8px 18px">'+esc(t("ok"))+'</button>'
-      +'<button id="__askNo" class="btn-ghost btn" style="padding:8px 14px">'+esc(t("cancel"))+'</button>'
-      +'</div></div>';
+function askConfirm(text,opts){
+ opts=opts||{};
+ return new Promise(resolve=>{
+   const wrap=document.createElement("div");
+   wrap.className="modal on";
+   /* BUG-v0.15.35: clear .menu-open (z-index:999) so the dialog isn't covered */
+   document.querySelectorAll(".gcell.menu-open").forEach(c=>c.classList.remove("menu-open"));
+   document.querySelectorAll(".gmenu-pop.on").forEach(p=>p.classList.remove("on"));
+   wrap.innerHTML='<div class="modal-card" style="max-width:340px;width:100%">'
+     +'<p style="margin:4px 0 18px;font-size:13.5px;color:var(--tx);white-space:pre-wrap">'+esc(text)+'</p>'
+     +'<div style="display:flex;gap:8px;justify-content:flex-start">'
+     +'<button id="__askYes" class="btn" style="padding:8px 18px'+(opts.danger?';background:var(--err);border-color:var(--err);color:#fff':'')+'">'+esc(t("ok"))+'</button>'
+     +'<button id="__askNo" class="btn-ghost btn" style="padding:8px 14px">'+esc(t("cancel"))+'</button>'
+     +'</div></div>';
     document.body.appendChild(wrap);
     const done=v=>{wrap.remove();resolve(v);};
     wrap.querySelector("#__askYes").onclick=()=>done(true);
@@ -2065,11 +2079,21 @@ function renderRows(){
   wrap.querySelectorAll(".gallery").forEach(g=>g.remove());
   const nm0=$("#noMatch");
   if(files.length&&!list.length){
+    /* BUG-v0.15.35: in gallery mode an empty folder must keep the gallery
+       chrome — the old code fell back to the bare table wrapper (list look).
+       Render the empty-note inside a .gallery container so the CSS
+       :has(.gallery) rules (no thead, transparent plate) still apply. */
     let nm=nm0;
     if(!nm){const d=document.createElement("div");d.id="noMatch";d.className="empty";
       wrap.appendChild(d);nm=d;}
     nm.innerHTML='<p>'+esc(curFolderPrefix ? t("emptyFolder") : t("noMatch"))+'</p>';
     nm.style.display="block";
+    if(viewMode==="gallery"){
+      nm.classList.add("gallery");
+      nm.style.gridColumn="";
+    } else {
+      nm.classList.remove("gallery");
+    }
     tb.innerHTML="";
     if(selBar)updateSelBar();
     return;
@@ -2322,7 +2346,14 @@ function renderGallery(list){
   tb.innerHTML="";
   const wrap=$("#tblWrap");
   wrap.querySelectorAll(".gallery").forEach(g=>g.remove());
-  if(!list.length)return;
+  if(!list.length){
+    /* BUG-v0.15.35: empty folder in gallery mode — re-tag the visible
+       #noMatch empty-note as a .gallery item so the gallery chrome
+       (transparent plate, hidden thead) stays instead of list look. */
+    const nm=$("#noMatch");
+    if(nm&&nm.style.display!=="none"){nm.classList.add("gallery");nm.style.gridColumn="";}
+    return;
+  }
   const g=document.createElement("div");
   g.className="gallery";
   const MV_ICON='<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg>';
@@ -2661,16 +2692,17 @@ async function openLinks(){
      d.className="keyrow lnk-row";
      const badge=L.revoked?'<span class="tag bot lk-badge" style="background:var(--err-soft);color:var(--err)">'+esc(t("revoked"))+'</span>'
        :L.expired?'<span class="tag bot lk-badge">'+esc(t("expired"))+'</span>'
-       :'<span class="tag mtproto lk-badge">'+humanTtl(L.exp-Math.floor(Date.now()/1000))+'</span>';
-     // rebuild the share URL: pretty slug when present, else signed form
+       :'<span class="tag mtproto lk-badge">'+(L.album?'🖼 ':'')+humanTtl((L.exp||Math.floor(Date.now()/1000)+1)-Math.floor(Date.now()/1000))+'</span>';
+     /* BUG-v0.15.35: shared-album rows (album:true) link to /f/a/<token> */
      let href;
-     if(L.slug&&!L.revoked)href=location.origin+"/f/"+encodeURIComponent(L.slug)+"?sig="+(L.sig||"")+"&exp="+L.exp;
+     if(L.album&&L.slug)href=location.origin+"/f/a/"+encodeURIComponent(L.slug);
+     else if(L.slug&&!L.revoked)href=location.origin+"/f/"+encodeURIComponent(L.slug)+"?sig="+(L.sig||"")+"&exp="+L.exp;
      else href=location.origin+"/f/"+encodeURIComponent(L.obj_id)+"?sig="+(L.sig||"")+"&exp="+L.exp;
      d.innerHTML='<div class="lnk-main">'
        +'<div class="kn" style="direction:ltr;text-align:left;overflow:hidden;text-overflow:ellipsis">'
        +esc((L.filename||L.obj_id))+(L.pw?' 🔒':'')+(L.max_dl?' <span style="color:var(--tx3);font-size:10.5px">⬇'+esc(String(L.max_dl))+'</span>':'')
        +'</div>'
-       +(L.slug?'<div class="lnk-url" style="direction:ltr;text-align:left;color:var(--brand);font-size:11px;font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px">/f/'+esc(L.slug)+'</div>':'')
+       +(L.slug?'<div class="lnk-url" style="direction:ltr;text-align:left;color:var(--brand);font-size:11px;font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px">'+(L.album?'/f/a/':'/f/')+esc(L.slug)+'</div>':'')
        +'</div>'+badge
        +'<div class="lk-acts">'
        +(L.revoked||L.expired?''
@@ -2678,7 +2710,18 @@ async function openLinks(){
           +'<button class="btn btn-ghost lkcpy" title="'+esc(t("copy"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">⧉</button>'
           +'<button class="btn btn-warn lkrev" title="'+esc(t("revokeB"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">✕</button>')
        +'</div>';
-     if(!L.revoked&&!L.expired){
+       if(!L.revoked&&!L.expired){
+       /* BUG-v0.15.35: albums have no per-object manage/revoke — open + copy only */
+       if(L.album){
+         d.querySelector(".lkopn").onclick=()=>window.open(href,"_blank");
+         const rev=d.querySelector(".lkrev");
+         if(rev)rev.onclick=async()=>{
+           try{
+             await api("/api/v1/admin/album/"+encodeURIComponent(L.slug)+"/revoke",{method:"POST"});
+             toast(t("linkRevoked"));openLinks();
+           }catch(e){toast(e.message,"err");}
+         };
+       } else {
        d.querySelector(".lkopn").onclick=()=>openManage(L);
        d.querySelector(".lkcpy").onclick=async()=>{
          try{await navigator.clipboard.writeText(href);toast(t("copied"));}
@@ -2690,7 +2733,8 @@ async function openLinks(){
            toast(t("linkRevoked"));openLinks();
          }catch(e){toast(e.message,"err");}
        };
-     }
+       }
+       }
      box.appendChild(d);
    });
  }catch(e){box.innerHTML='<div class="empty" style="padding:24px"><p>'+esc(e.message)+'</p></div>';}
@@ -2815,7 +2859,13 @@ $("#trashBtn").onclick=openTrash;
 $("#trashClose").onclick=()=>$("#trashModal").classList.remove("on");
 $("#trashModal").onclick=e=>{if(e.target.id==="trashModal")$("#trashModal").classList.remove("on");};
 $("#trashEmptyBtn").onclick=guardBtn($("#trashEmptyBtn"),async()=>{
- if(!(await askConfirm(t("trashEmpty")+"؟")))return;
+ /* BUG-v0.15.35: empty trash with nothing inside → say so instead of a
+    pointless confirm; when there IS something, the confirm's OK renders red
+    (destructive action) via askConfirm's danger option. */
+ const r0=await api("/api/v1/admin/trash");
+ const n0=(r0.items||[]).length;
+ if(!n0){toast(t("trashAlreadyEmpty"),"warn");return;}
+ if(!(await askConfirm(t("trashEmpty")+"؟",{danger:true})))return;
  try{
    const r=await api("/api/v1/admin/trash");
    for(const o of (r.items||[])){
@@ -3078,6 +3128,9 @@ $("#fmShare").onclick=async()=>{
 /* share-options modal: prefill + show (single & bulk) */
 function openShareOpts(o){
   shareTarget=o;
+  /* BUG-v0.15.35: clear .menu-open (z-index:999) so the modal isn't covered */
+  document.querySelectorAll(".gcell.menu-open").forEach(c=>c.classList.remove("menu-open"));
+  document.querySelectorAll(".gmenu-pop.on").forEach(p=>p.classList.remove("on"));
   $("#sharePw").value="";
   $("#shareSlug").value="";
   const base=$("#slugBase");
@@ -3927,6 +3980,18 @@ function openDrawer(){
   drawer.classList.add("on");scrim.classList.add("on");
   loadSettings();renderKeys();
 }
+/* BUG-v0.15.35: the settings drawer now has a Restart button — .env-backed
+   keys (backend, bot tokens, channel, api id/hash, chunk size) need a
+   process restart; runtime-tunable keys (rates, cache_mb, view, ttl, …)
+   apply immediately and do NOT show the button. */
+const RESTART_KEYS=["backend","channel_id","channel_thread_id","api_id","api_hash","mtproto_peer","chunk_size_mb","bot_tokens","bot_add_token","bot_remove_index"];
+function markDirty(key){
+  const b=$("#restartBtn");
+  if(b&&key&&RESTART_KEYS.includes(key))b.style.display="";
+}
+function syncTgInputs(el){
+  if(el&&el.dataset&&el.dataset.dirtyKey)markDirty(el.dataset.dirtyKey);
+}
 function closeDrawer(){drawer.classList.remove("on");scrim.classList.remove("on");}
 let curSettings=null,authOn=null;
 async function loadSettings(){
@@ -4204,6 +4269,7 @@ function renderTgTokens(masked){
       try{
         await api("/api/v1/admin/telegram-config",{method:"POST",body:JSON.stringify({bot_remove_index:i})});
         toast(t("tgTokenRemoved"));
+        markDirty("bot_remove_index");   /* BUG-v0.15.35: needs restart */
         const rr=await api("/api/v1/admin/telegram-config");
         renderTgTokens(rr.bot_tokens_masked||[]);
         if($("#tgTokensCount"))$("#tgTokensCount").textContent=rr.bot_tokens_count?("(" + rr.bot_tokens_count + " active)"):"";
@@ -4221,9 +4287,10 @@ async function addTgToken(){
     await api("/api/v1/admin/telegram-config",{method:"POST",body:JSON.stringify({bot_add_token:val})});
     if(inp)inp.value="";
     toast(t("tgTokenAdded"));
+    markDirty("bot_add_token");   /* BUG-v0.15.35: needs restart to take effect */
     const rr=await api("/api/v1/admin/telegram-config");
     renderTgTokens(rr.bot_tokens_masked||[]);
-    if($("#tgTokensCount"))$("#tgTokensCount").textContent=rr.bot_tokens_count?("(" + rr.bot_tokens_count + " active)"):"";
+    if($("#tgTokensCount"))$("#tgTokensCount").textContent=rr.bot_tokens_count?(("(" + rr.bot_tokens_count + " active)")):"";
   }catch(e){toast(e.message,"err");}
 }
 if($("#btnTgTokenAdd"))$("#btnTgTokenAdd").onclick=addTgToken;
@@ -4425,9 +4492,36 @@ $("#saveBtn").onclick=guardBtn($("#saveBtn"),async()=>{
     } catch(err) {
       console.warn("telegram-config update notice:", err);
     }
+    /* BUG-v0.15.35: any touched .env-backed key → reveal the Restart button */
+    for(const k of Object.keys(tgBody)){
+      if(tgBody[k]!==""&&tgBody[k]!=null)markDirty(k);
+    }
     toast(t("saved"));
     refresh();
   }catch(e){toast(e.message,"err");}
+});
+/* BUG-v0.15.35: Restart button (drawer footer) — POST /admin/restart, then
+   poll /healthz until the process is back with the new .env values. */
+if($("#restartBtn"))$("#restartBtn").onclick=guardBtn($("#restartBtn"),async()=>{
+  if(!(await askConfirm(t("restartQ"),{danger:true})))return;
+  try{
+    await api("/api/v1/admin/restart",{method:"POST"});
+  }catch(e){/* the process may drop the connection mid-response — not fatal */}
+  toast(t("restarting"));
+  const b=$("#restartBtn");b.disabled=true;b.textContent="⟳ …";
+  const t0=Date.now();
+  const poll=setInterval(async()=>{
+    try{
+      const r=await fetch("/healthz",{cache:"no-store"});
+      if(r.ok){
+        clearInterval(poll);
+        b.disabled=false;b.style.display="none";b.textContent=t("restartNow");
+        toast(t("restarted"));
+        location.reload();
+      }
+    }catch(e){}
+    if(Date.now()-t0>60000){clearInterval(poll);b.disabled=false;b.textContent=t("restartNow");}
+  },1500);
 });
 $("#purgeBtn").onclick=async()=>{
   try{

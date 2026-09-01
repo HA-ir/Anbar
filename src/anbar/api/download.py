@@ -1042,10 +1042,10 @@ async def album_page(request: Request, token: str):
     raw = db.kv_get(f"{ALBUM_PREFIX}{token}")
     if not raw:
         return HTMLResponse(
-            '<!DOCTYPE html><html lang="fa" dir="rtl"><head>'
+            '<!DOCTYPE html><html lang="en"><head>'
             '<meta charset="utf-8"><title>anbar</title></head>'
             '<body style="font-family:sans-serif;text-align:center;'
-            'padding-top:20vh;color:#889">این آلبوم موجود نیست یا حذف شده.'
+            'padding-top:20vh;color:#889">This album does not exist or has been removed.'
             "</body></html>",
             status_code=404,
         )
@@ -1055,10 +1055,10 @@ async def album_page(request: Request, token: str):
     album_exp = int(data.get("exp") or 0)
     if album_exp and int(time.time()) >= album_exp:
         return HTMLResponse(
-            '<!DOCTYPE html><html lang="fa" dir="rtl"><head>'
+            '<!DOCTYPE html><html lang="en"><head>'
             '<meta charset="utf-8"><title>anbar</title></head>'
             '<body style="font-family:sans-serif;text-align:center;'
-            'padding-top:20vh;color:#889">این لینک منقضی شده است.'
+            'padding-top:20vh;color:#889">This link has expired.'
             "</body></html>",
             status_code=410,
         )
@@ -1107,7 +1107,7 @@ async def album_page(request: Request, token: str):
                 "exp": sig_exp,
             }
         )
-    title = data.get("title") or f"anbar · {len(items)} فایل"
+    title = data.get("title") or f"anbar · {len(items)} files"
     import html as _html
 
     # v0.15.14 audit fix: item names come from stored filenames (any uploader
@@ -1121,7 +1121,7 @@ async def album_page(request: Request, token: str):
     payload = json.dumps(items).replace("</", "<\\/")
     return HTMLResponse(
         f"""<!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1171,12 +1171,12 @@ text-decoration:none}}
 </head>
 <body>
 <h1>{_html.escape(title)}</h1>
-<div class="sub">{len(items)} فایل · anbar</div>
+<div class="sub">{len(items)} files · anbar</div>
 <div class="grid" id="grid"></div>
 <div class="lightbox" id="lb">
   <button class="lbclose" id="lbc">✕</button>
   <div id="lbcnt"></div>
-  <a class="lbdl" id="lbdl" download>دانلود</a>
+  <a class="lbdl" id="lbdl" download>Download</a>
 </div>
 <script>
 const ITEMS = __PAYLOAD__;
@@ -1206,8 +1206,8 @@ ITEMS.forEach((it,i)=>{{
   cell.innerHTML='<div class="thumb" data-i="'+i+'">'+th+'</div>'
     +'<div class="cname">'+(it.name||'file')+'</div>'
     +'<div class="csub"><span>'+fmt(it.size)+'</span>'
-    +(it.kind==='pdf'?'<a href="'+url+'" target="_blank">نمایش ↗</a>'
-      :'<a href="'+url+'" download>دانلود ⬇</a>')+'</div>';
+    +(it.kind==='pdf'?'<a href="'+url+'" target="_blank">View ↗</a>'
+      :'<a href="'+url+'" download>Download ⬇</a>')+'</div>';
   grid.appendChild(cell);
 }});
 const lb=document.getElementById('lb'),cnt=document.getElementById('lbcnt'),

@@ -187,6 +187,60 @@ def list_links(db, limit: int = 200, *, include_dead: bool = False) -> list[dict
     return rows[: max(1, limit)]
 
 
+# ── shared albums (v0.15.35): album links were invisible in the links manager ──
+# Albums live under their own kv prefix (album:<token>) and were never
+# registered in the per-object link registry, so the admin "active links"
+# panel showed only plain file links. They are now surfaced as rows with
+# `album: True` (obj_id = "<album-token>", no object row behind them).
+ALBUM_KV_PREFIX = "album:"
+
+
+def list_albums(db, limit: int = 200) -> list[dict]:
+    """Live album shares (newest first) for the admin links manager."""
+    import json as _json
+
+    now = int(time.time())
+    out = []
+    for k, v in db.kv_all():
+        if not k.startswith(ALBUM_KV_PREFIX):
+            continue
+        token = k[len(ALBUM_KV_PREFIX) :]
+        try:
+            meta = _json.loads(v)
+        except (ValueError, json.JSONDecodeError):
+            continue
+        exp = int(meta.get("exp") or 0)
+        if exp and exp <= now:
+            continue  # live view only
+        ids = meta.get("ids") or []
+        names = []
+        for oid in ids[:3]:
+            row = db.get_object(oid)
+            if row:
+                names.append(row["filename"])
+        label = " / ".join(n.split("/")[-1] for n in names)
+        if len(ids) > 3:
+            label += " …"
+        out.append(
+            {
+                "obj_id": f"album:{token}",
+                "filename": label or "album",
+                "exists": True,
+                "exp": exp,
+                "expired": False,
+                "revoked": False,
+                "slug": token,
+                "pw": False,
+                "max_dl": None,
+                "album": True,
+                "album_count": len(ids),
+                "created_at": int(meta.get("created_at") or 0),
+            }
+        )
+    out.sort(key=lambda r: r["created_at"], reverse=True)
+    return out[: max(1, limit)]
+
+
 def purge_expired(db, now: int | None = None) -> int:
     """Drop expired registrations + stale tombstones. Returns removed count."""
     now = now or int(time.time())

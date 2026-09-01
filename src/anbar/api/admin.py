@@ -804,9 +804,14 @@ async def api_keys_revoke(request: Request, key_id: str):
 async def links_list(request: Request, limit: int = 200):
     """All registered share links (newest first): expiry, slug, state."""
     require_admin(request)
-    from ..links import list_links
+    from ..links import list_albums, list_links
 
-    return {"links": list_links(request.app.state.db, limit=limit)}
+    rows = list_links(request.app.state.db, limit=limit)
+    # BUG-v0.15.35: shared-album links live in their own kv namespace and
+    # never showed up in the links manager — merge them in (newest first).
+    rows += list_albums(request.app.state.db, limit=limit)
+    rows.sort(key=lambda r: r.get("created_at") or r.get("exp") or 0, reverse=True)
+    return {"links": rows[: max(1, limit)]}
 
 
 # ── Telegram & MTProto Env Config (v0.14.1) ──────────────────────────────────
@@ -1126,6 +1131,45 @@ async def telegram_config_reveal_api_hash(request: Request):
         ip=request.client.host if request.client else None,
     )
     return {"api_hash": raw, "set": bool(raw)}
+
+
+@router.post("/admin/album/{token}/revoke")
+async def album_revoke(request: Request, token: str):
+    """Kill a shared album link immediately (its page starts returning 404)."""
+    require_admin(request)
+    from ..links import ALBUM_KV_PREFIX
+
+    db = request.app.state.db
+    key = f"{ALBUM_KV_PREFIX}{token}"
+    if db.kv_get(key) is None:
+        raise HTTPException(404, "unknown album")
+    db.kv_delete(key)
+    db.log_audit("album.revoke", actor="admin", target=token)
+    return {"revoked": True, "token": token}
+
+
+@router.post("/admin/restart")
+async def restart_service(request: Request):
+    """Graceful self-restart (v0.15.35). Admin key required.
+
+    .env-backed settings (backend, bot tokens, channel, api id/hash, chunk
+    size) only take effect on process start. This endpoint asks the running
+    process to exit cleanly; the container/supervisor restart policy brings
+    it back up with the new configuration. The response is sent first, so
+    the client sees ok before the connection drops.
+    """
+    require_admin(request)
+    request.app.state.db.log_audit("service.restart", actor="admin")
+
+    async def _bye():
+        import os
+        import signal
+
+        await asyncio.sleep(0.4)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    asyncio.create_task(_bye())
+    return {"status": "restarting"}
 
 
 @router.post("/admin/links/revoke-all")
