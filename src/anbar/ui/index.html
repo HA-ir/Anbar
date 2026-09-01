@@ -823,8 +823,8 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="lab"><span data-i18n="cacheLab">حداکثر حجم کش</span><small data-i18n="cacheSub">روی volume data · LRU · ۰ = خالی شود</small></div>
         <input type="number" min="0" id="s_cache_mb" style="direction:ltr"><span class="unit">MB</span>
       </div>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="cacheNow">حالا</span><small id="cacheNow" class="num">—</small></div>
+      <div class="set-row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <div class="lab"><span data-i18n="cacheFillLab">فضای پرشده از کش</span><small id="cacheNow" class="num">—</small></div>
         <button class="btn btn-warn" id="purgeBtn" data-i18n="purge">پاک‌کردن کش</button>
       </div>
       <div class="set-row" id="cacheOff" hidden>
@@ -1261,8 +1261,8 @@ const I18N={
   rLn:"ورود (UI)", rLnS:"به ازای هر IP — در برابر brute-force",
   maxUp:"حداکثر سایز فایل", maxUpS:"در حال حاضر backend بوت: حداکثر ۲۰MB واقعی",
   sessTtl:"عمر نشست UI", sessTtlS:"cookie ورود چند ساعت باقی می‌ماند",
-  cacheLab:"حداکثر حجم کش", cacheSub:"روی volume data · LRU · ۰ = خالی شود",
-  cacheNow:"حالا", purge:"پاک‌کردن کش", save:"ذخیره",
+  cacheLab:"حداکثر حجم کش", cacheSub:"حجمی از دیسک که برای کش دانلودها در نظر گرفته می‌شود (LRU؛ قدیمی‌ها خودکار حذف می‌شوند) · ۰ = غیرفعال",
+  cacheFillLab:"فضای پرشده از کش", purge:"پاک‌کردن کش", save:"ذخیره",
   cacheMasterOff:"غیرفعال — برای فعال‌سازی ANBAR_CACHE_ENABLED=true در .env و ری‌استارت لازم است",
   linkT:"لینک اشتراک‌گذاری", linkS:"این لینک بدون نیاز به ورود کار می‌کند و بعد از ۲۴ ساعت منقضی می‌شود.",
   copy:"کپی", copied:"کپی شد", close:"بستن",
@@ -1421,8 +1421,8 @@ const I18N={
   rLn:"Logins (UI)", rLnS:"per IP — brute-force protection",
   maxUp:"Max file size", maxUpS:"Bot backend currently: ~20 MB real cap",
   sessTtl:"UI session lifetime", sessTtlS:"how long the login cookie lasts",
-  cacheLab:"Cache size limit", cacheSub:"on data volume · LRU · 0 to flush",
-  cacheNow:"Now", purge:"Purge cache", save:"Save",
+  cacheLab:"Cache size limit", cacheSub:"Disk space reserved for the download cache on the data volume (LRU; oldest evicted first) · 0 = disabled",
+  cacheFillLab:"Cache used", purge:"Purge cache", save:"Save",
   cacheMasterOff:"Disabled — set ANBAR_CACHE_ENABLED=true in .env and restart to enable",
   linkT:"Share link", linkS:"Works without login; expires in 24 hours.",
   copy:"Copy", copied:"Copied", close:"Close",

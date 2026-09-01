@@ -94,9 +94,19 @@ def revoke(db, obj_id: str, exp: int) -> bool:
 
 
 def revoke_all(db) -> int:
-    """Revoke all registered active links immediately. Returns count of revoked links."""
+    """Revoke all registered active links immediately. Returns count of revoked links.
+
+    BUG-v0.15.36: shared albums (album:* namespace) were not touched here, so
+    "Revoke all" in the links manager reported success while every album
+    link kept working. Albums are now tombstoned too (the album page route
+    checks kv presence, so deleting the row kills it instantly).
+    """
     count = 0
     for k, _ in list(db.kv_all()):
+        if k.startswith(ALBUM_KV_PREFIX):
+            db.kv_delete(k)
+            count += 1
+            continue
         if not k.startswith(KV_PREFIX):
             continue
         try:
@@ -213,14 +223,26 @@ def list_albums(db, limit: int = 200) -> list[dict]:
         if exp and exp <= now:
             continue  # live view only
         ids = meta.get("ids") or []
+        # BUG-v0.15.36: folder albums show ONLY the folder name — listing the
+        # first files ("a.png / b.png …") is noise; the common prefix is the label.
+        folders = set()
         names = []
-        for oid in ids[:3]:
+        for oid in ids:
             row = db.get_object(oid)
-            if row:
-                names.append(row["filename"])
-        label = " / ".join(n.split("/")[-1] for n in names)
-        if len(ids) > 3:
-            label += " …"
+            if not row:
+                continue
+            fn = row["filename"] or ""
+            names.append(fn)
+            if "/" in fn:
+                folders.add(fn.rsplit("/", 1)[0])  # full parent dir path
+        label = ""
+        if folders:
+            # drop nested dirs that live INSIDE another dir in the set
+            # (myfolder + myfolder/deep → myfolder)
+            top = [d for d in folders if not any(d != o and d.startswith(o + "/") for o in folders)]
+            label = " / ".join(sorted(top))
+        if not label:
+            label = " / ".join(n.split("/")[-1] for n in names[:3]) + (" …" if len(names) > 3 else "")
         out.append(
             {
                 "obj_id": f"album:{token}",

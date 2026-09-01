@@ -22,7 +22,7 @@ class ChunkingMode(StrEnum):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="ANBAR_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="ANBAR_", env_file=".env", extra="ignore", env_ignore_empty=True)
 
     # server
     host: str = "0.0.0.0"
