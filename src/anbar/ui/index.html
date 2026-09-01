@@ -1048,11 +1048,11 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
   <div class="modal-card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px">
       <h3 data-i18n="linksT" style="margin:0">لینک‌های فعال</h3>
-      <button class="btn btn-warn" id="revokeAllLinksBtn" style="width:auto;padding:4px 10px;font-size:11.5px;height:26px" data-i18n="revokeAllLinks">ابطال همه</button>
     </div>
     <p id="linksSub" data-i18n="linksS">همه لینک‌های ساخته‌شده — امکان ابطال فوری</p>
     <div id="linksList" style="max-height:50vh;overflow-y:auto"></div>
-    <div style="margin-top:14px;text-align:end">
+    <div style="margin-top:14px;text-align:end;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-warn" id="revokeAllLinksBtn" style="width:auto" data-i18n="revokeAllLinks">ابطال همه</button>
       <button class="btn btn-ghost" id="linksClose" data-i18n="close">بستن</button>
     </div>
   </div>
@@ -2699,6 +2699,7 @@ async function openLinks(){
    const r=await api("/api/v1/admin/links?limit=200");
    const links=r.links||[];
    liveLinks=links.filter(L=>!L.revoked&&!L.expired).length;
+   linksLiveCount=liveLinks;   /* BUG-v0.15.38: sync to module scope for the revoke-all handler */
    if(!links.length){box.innerHTML='<div class="empty" style="padding:24px"><p>'+esc(t("noLinks"))+'</p></div>';return;}
    box.innerHTML="";
    links.forEach(L=>{
@@ -2757,19 +2758,20 @@ $("#linksBtn").onclick=openLinks;
 $("#linksClose").onclick=()=>$("#linksModal").classList.remove("on");
 $("#linksModal").onclick=e=>{if(e.target.id==="linksModal")$("#linksModal").classList.remove("on");};
 const revokeAllBtn=$("#revokeAllLinksBtn");
+let linksLiveCount=0;   /* BUG-v0.15.38: was scoped inside openLinks() → handler threw ReferenceError, button appeared dead */
 if(revokeAllBtn){
-  revokeAllBtn.onclick=async()=>{
-    /* v0.15.37: nothing live → explain instead of a no-op success toast;
+  revokeAllBtn.onclick=guardBtn(revokeAllBtn,async()=>{
+    /* nothing live → explain instead of a no-op success toast;
        something live → red (danger) confirm, matching other destructive
        actions (trash empty, restart). */
-    if(!liveLinks){toast(t("noLiveLinks"));return;}
+    if(!linksLiveCount){toast(t("noLiveLinks"));return;}
     if(!(await askConfirm(t("revokeAllConfirm"),{danger:true})))return;
     try{
       const r=await api("/api/v1/admin/links/revoke-all",{method:"POST"});
       toast(t("allLinksRevoked")+(r.count?" ("+r.count+")":""));
       openLinks();
     }catch(e){toast(e.message,"err");}
-  };
+  });
 }
 /* ── link manage modal (v0.10.4): edit one link in-place ── */
 let mgTarget=null;
