@@ -820,6 +820,10 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     <div class="sec">
       <h3 data-i18n="secCache">کش دانلود</h3>
       <div class="set-row">
+        <div class="lab"><span data-i18n="cacheSwitchLab">وضعیت کش دانلود</span><small data-i18n="cacheSwitchSub">خاموش = هیچ فایلی کش نمی‌شود · روشن = بودجه‌ی زیر اعمال می‌شود</small></div>
+        <div class="sw" id="swCache" role="switch"><i></i></div>
+      </div>
+      <div class="set-row">
         <div class="lab"><span data-i18n="cacheLab">حداکثر حجم کش</span><small data-i18n="cacheSub">روی volume data · LRU · ۰ = خالی شود</small></div>
         <input type="number" min="0" id="s_cache_mb" style="direction:ltr"><span class="unit">MB</span>
       </div>
@@ -828,7 +832,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <button class="btn btn-warn" id="purgeBtn" data-i18n="purge">پاک‌کردن کش</button>
       </div>
       <div class="set-row" id="cacheOff" hidden>
-        <div class="lab"><small data-i18n="cacheMasterOff" style="color:var(--warn)">غیرفعال — برای فعال‌سازی ANBAR_CACHE_ENABLED=true در .env و ری‌استارت لازم است</small></div>
+        <div class="lab"><small data-i18n="cacheMasterOff" style="color:var(--warn)"></small></div>
       </div>
     </div>
 
@@ -983,7 +987,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
   </div>
   <div class="drawer-foot">
     <button class="btn btn-primary" style="width:auto" id="saveBtn" data-i18n="save">ذخیره</button>
-    <button class="btn btn-warn" style="width:auto;display:none" id="restartBtn" data-i18n="restartNow">⟳ ری‌استارت</button>
+    <button class="btn btn-warn" style="width:auto" id="restartBtn" data-i18n="restartNow">⟳ ری‌استارت</button>
   </div>
 </aside>
 
@@ -1262,8 +1266,9 @@ const I18N={
   maxUp:"حداکثر سایز فایل", maxUpS:"در حال حاضر backend بوت: حداکثر ۲۰MB واقعی",
   sessTtl:"عمر نشست UI", sessTtlS:"cookie ورود چند ساعت باقی می‌ماند",
   cacheLab:"حداکثر حجم کش", cacheSub:"حجمی از دیسک که برای کش دانلودها در نظر گرفته می‌شود (LRU؛ قدیمی‌ها خودکار حذف می‌شوند) · ۰ = غیرفعال",
+  cacheSwitchLab:"وضعیت کش دانلود", cacheSwitchSub:"خاموش = هیچ فایلی کش نمی‌شود · روشن = بودجه‌ی زیر اعمال می‌شود",
   cacheFillLab:"فضای پرشده از کش", purge:"پاک‌کردن کش", save:"ذخیره",
-  cacheMasterOff:"غیرفعال — برای فعال‌سازی ANBAR_CACHE_ENABLED=true در .env و ری‌استارت لازم است",
+  cacheMasterOff:"غیرفعال — از کلید «وضعیت کش دانلود» استفاده کنید",
   linkT:"لینک اشتراک‌گذاری", linkS:"این لینک بدون نیاز به ورود کار می‌کند و بعد از ۲۴ ساعت منقضی می‌شود.",
   copy:"کپی", copied:"کپی شد", close:"بستن",
   tUp:"آپلود…", tDone:"آپلود شد", tFail:"خطا", tCancel:"لغو", tCanceled:"لغو شد",
@@ -1293,6 +1298,7 @@ const I18N={
   revokeAllLinks:"ابطال همه",
   revokeAllConfirm:"آیا از ابطال تمام لینک‌های فعال مطمئن هستید؟ پس از این کار، تمام لینک‌های اشتراک عمومی بلافاصله منقضی می‌شوند.",
   allLinksRevoked:"تمام لینک‌های فعال با موفقیت باطل شدند",
+  noLiveLinks:"هیچ لینک فعالی وجود ندارد — چیزی برای ابطال نیست",
   trashT:"سطل بازیافت", trashS:"موارد تا ۷ روز قابل بازیابی‌اند، بعد خودکار حذف می‌شوند.",
   trashEmpty:"خالی کردن سطل", restore:"بازیابی", purge:"حذف",
   restartNow:"⟳ ری‌استارت", restartQ:"سرویس ری‌استارت شود؟ چند ثانیه قطع می‌شود.", restarting:"در حال ری‌استارت…", restarted:"سرویس با تنظیمات جدید بالا آمد",
@@ -1422,8 +1428,9 @@ const I18N={
   maxUp:"Max file size", maxUpS:"Bot backend currently: ~20 MB real cap",
   sessTtl:"UI session lifetime", sessTtlS:"how long the login cookie lasts",
   cacheLab:"Cache size limit", cacheSub:"Disk space reserved for the download cache on the data volume (LRU; oldest evicted first) · 0 = disabled",
+  cacheSwitchLab:"Download cache", cacheSwitchSub:"Off = nothing is cached · On = the budget below applies",
   cacheFillLab:"Cache used", purge:"Purge cache", save:"Save",
-  cacheMasterOff:"Disabled — set ANBAR_CACHE_ENABLED=true in .env and restart to enable",
+  cacheMasterOff:"Disabled — use the «Download cache» switch above",
   linkT:"Share link", linkS:"Works without login; expires in 24 hours.",
   copy:"Copy", copied:"Copied", close:"Close",
   tUp:"Uploading…", tDone:"Uploaded", tFail:"Error", tCancel:"Cancel", tCanceled:"Canceled",
@@ -1453,6 +1460,7 @@ const I18N={
   revokeAllLinks:"Revoke All",
   revokeAllConfirm:"Are you sure you want to revoke all active share links? All existing public links will stop working immediately.",
   allLinksRevoked:"All active share links have been revoked",
+  noLiveLinks:"No active links — nothing to revoke",
   trashT:"Trash", trashS:"Items stay restorable for 7 days, then purge automatically.",
   trashEmpty:"Empty trash", restore:"Restore", purge:"Delete",
   restartNow:"⟳ Restart", restartQ:"Restart the service? It will be down for a few seconds.", restarting:"Restarting…", restarted:"Service is back up with the new settings",
@@ -2049,6 +2057,10 @@ function showNetBanner(show){
 function cacheInfo(st){
   const c=st.cache||{};
   const el=$("#cacheNow");
+  const sw=$("#swCache");
+  /* v0.15.37: the master switch is runtime-tunable — reflect it on the
+     switch and gate the budget/purge rows on it. */
+  if(sw)sw.classList.toggle("on",!!st.cache_master);
   if(!st.cache_master){
     el.textContent="";
     el.className="";
@@ -2682,9 +2694,11 @@ async function openLinks(){
  $("#linksModal").classList.add("on");
  const box=$("#linksList");
  box.innerHTML='<div class="empty" style="padding:24px">…</div>';
+ let liveLinks=0;   /* v0.15.37: live (not revoked/expired) count for revoke-all guard */
  try{
    const r=await api("/api/v1/admin/links?limit=200");
    const links=r.links||[];
+   liveLinks=links.filter(L=>!L.revoked&&!L.expired).length;
    if(!links.length){box.innerHTML='<div class="empty" style="padding:24px"><p>'+esc(t("noLinks"))+'</p></div>';return;}
    box.innerHTML="";
    links.forEach(L=>{
@@ -2745,10 +2759,14 @@ $("#linksModal").onclick=e=>{if(e.target.id==="linksModal")$("#linksModal").clas
 const revokeAllBtn=$("#revokeAllLinksBtn");
 if(revokeAllBtn){
   revokeAllBtn.onclick=async()=>{
-    if(!(await askConfirm(t("revokeAllConfirm"))))return;
+    /* v0.15.37: nothing live → explain instead of a no-op success toast;
+       something live → red (danger) confirm, matching other destructive
+       actions (trash empty, restart). */
+    if(!liveLinks){toast(t("noLiveLinks"));return;}
+    if(!(await askConfirm(t("revokeAllConfirm"),{danger:true})))return;
     try{
       const r=await api("/api/v1/admin/links/revoke-all",{method:"POST"});
-      toast(t("allLinksRevoked"));
+      toast(t("allLinksRevoked")+(r.count?" ("+r.count+")":""));
       openLinks();
     }catch(e){toast(e.message,"err");}
   };
@@ -3980,10 +3998,11 @@ function openDrawer(){
   drawer.classList.add("on");scrim.classList.add("on");
   loadSettings();renderKeys();
 }
-/* BUG-v0.15.35: the settings drawer now has a Restart button — .env-backed
+/* BUG-v0.15.35: the settings drawer has a Restart button — .env-backed
    keys (backend, bot tokens, channel, api id/hash, chunk size) need a
    process restart; runtime-tunable keys (rates, cache_mb, view, ttl, …)
-   apply immediately and do NOT show the button. */
+   apply immediately. v0.15.37: the button is now ALWAYS visible (user
+   request) — markDirty only keeps it visible, it never reveals it. */
 const RESTART_KEYS=["backend","channel_id","channel_thread_id","api_id","api_hash","mtproto_peer","chunk_size_mb","bot_tokens","bot_add_token","bot_remove_index"];
 function markDirty(key){
   const b=$("#restartBtn");
@@ -4383,6 +4402,19 @@ $("#swAutoBackup").onclick=async()=>{
   }catch(e){toast(e.message,"err");}
   finally{sw.style.opacity="";}
 };
+/* v0.15.37: runtime master switch for the download cache (was .env-only). */
+$("#swCache").onclick=async()=>{
+  const sw=$("#swCache");sw.style.opacity=".5";
+  try{
+    const nextOn=!sw.classList.contains("on");
+    const r=await api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify({cache_enabled:nextOn?1:0})});
+    curSettings=r.settings;
+    sw.classList.toggle("on",nextOn);
+    toast(t("saved"));
+    refresh();
+  }catch(e){toast(e.message,"err");}
+  finally{sw.style.opacity="";}
+};
 $("#btnToggleSecretVis").onclick=()=>{
   const inp=$("#s_enc_secret");
   if(inp)inp.type=inp.type==="password"?"text":"password";
@@ -4515,7 +4547,7 @@ if($("#restartBtn"))$("#restartBtn").onclick=guardBtn($("#restartBtn"),async()=>
       const r=await fetch("/healthz",{cache:"no-store"});
       if(r.ok){
         clearInterval(poll);
-        b.disabled=false;b.style.display="none";b.textContent=t("restartNow");
+        b.disabled=false;b.textContent=t("restartNow");
         toast(t("restarted"));
         location.reload();
       }

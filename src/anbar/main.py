@@ -274,10 +274,17 @@ def _build_cache(settings, db=None):
     """LRU object cache if enabled (F6); None otherwise (zero overhead).
 
     Honours the persisted ``cache_mb`` runtime override when ``db`` is
-    given, but never the master switch: with ``ANBAR_CACHE_ENABLED=false``
-    the cache stays off no matter what.
+    given. Since v0.15.37 the master switch is runtime-tunable too: the
+    persisted ``cache_enabled`` override wins over the env default
+    (``ANBAR_CACHE_ENABLED``) so the toggle in the settings UI survives
+    restarts without touching .env.
     """
-    if not settings.cache_enabled:
+    if db is not None:
+        from . import runtime
+
+        if not runtime.get_int(db, "cache_enabled", 1 if settings.cache_enabled else 0):
+            return None
+    elif not settings.cache_enabled:
         return None
     budget_mb = settings.cache_max_mb
     if db is not None:

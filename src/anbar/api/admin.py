@@ -40,6 +40,7 @@ def _env_defaults(s) -> dict[str, int]:
         "max_upload_mb": s.max_upload_mb,
         "web_session_ttl": s.web_session_ttl,
         "cache_mb": s.cache_max_mb,
+        "cache_enabled": 1 if s.cache_enabled else 0,
         "mtproto_export_conns": getattr(s, "mtproto_export_conns", 0),
         "hybrid_enabled": 1 if getattr(s, "hybrid_enabled", False) else 0,
         "hybrid_bot_timeout_ms": int(getattr(s, "hybrid_bot_timeout_s", 1.5) * 1000),
@@ -84,8 +85,9 @@ async def status(request: Request):
                 "misses": cc.misses,
             }
         ),
-        # master switch from .env — UI shows "disabled" when false
-        "cache_master": s.cache_enabled,
+        # master switch, effective (kv override → .env default). The UI shows
+        # "disabled" when false and offers the runtime toggle in the drawer.
+        "cache_master": bool(runtime.get_int(db, "cache_enabled", 1 if s.cache_enabled else 0)),
         "max_upload_bytes": runtime.get_int(db, "max_upload_mb", s.max_upload_mb) * 1024 * 1024,
         "settings": runtime.effective(db, _env_defaults(s)),
         "time": int(time.time()),
@@ -125,7 +127,7 @@ async def settings_update(request: Request):
             changed[name] = runtime.set_int(db, name, value)
         except ValueError as e:
             raise HTTPException(422, str(e)) from None
-    if "cache_mb" in changed:
+    if "cache_mb" in changed or "cache_enabled" in changed:
         _sync_cache(request.app, db)
     if "seek_cache_mb" in changed:
         _sync_chunk_cache(request.app, db)
@@ -140,17 +142,20 @@ async def settings_update(request: Request):
 def _sync_cache(app, db) -> None:
     """(Re)build or tear down the LRU cache instance.
 
-    ``ANBAR_CACHE_ENABLED`` is the master switch: when it is off, the disk
-    cache must stay off regardless of any ``cache_mb`` override, preserving
-    the zero-retention default.
+    The master switch is now runtime-tunable (v0.15.37): the effective
+    ``cache_enabled`` (kv override → env ``ANBAR_CACHE_ENABLED`` default)
+    governs whether the disk cache exists at all; when off, the cache must
+    stay off regardless of any ``cache_mb`` override, preserving the
+    zero-retention default.
     """
     s = app.state.settings
     cache_mb = runtime.get_int(db, "cache_mb", s.cache_max_mb)
+    enabled = bool(runtime.get_int(db, "cache_enabled", 1 if s.cache_enabled else 0))
     old = getattr(app.state, "cache", None)
     if old is not None:
         old.close()
     app.state.cache = (
-        DiskLRU(s.cache_dir, cache_mb * 1024 * 1024) if s.cache_enabled and cache_mb else None
+        DiskLRU(s.cache_dir, cache_mb * 1024 * 1024) if enabled and cache_mb else None
     )
 
 
@@ -185,7 +190,7 @@ async def settings_reset(request: Request):
     if unknown:
         raise HTTPException(422, f"unknown setting: {', '.join(unknown)}")
     reset = {k: runtime.reset(db, k) for k in names}
-    if "cache_mb" in names:
+    if "cache_mb" in names or "cache_enabled" in names:
         _sync_cache(request.app, db)
     return {"reset": reset, "settings": runtime.effective(db, _env_defaults(s))}
 

@@ -33,6 +33,10 @@ SPEC = {
     "hybrid_bot_timeout_ms": (200, 30_000),
     # zero-knowledge encryption: 0 = disabled (plain chunks), 1 = enabled (AES-256-GCM)
     "encryption_enabled": (0, 1),
+    # download cache master switch: 0 = cache off entirely, 1 = budget governs.
+    # Runtime-tunable (v0.15.37) — used to be .env-only (ANBAR_CACHE_ENABLED),
+    # which forced a manual .env edit + restart just to turn the cache on.
+    "cache_enabled": (0, 1),
     # auto daily database backup to telegram: 0 = disabled, 1 = enabled
     "auto_backup_enabled": (0, 1),
     # PERF-01: RAM budget (MB) for the per-chunk seek micro cache; 0 = off
