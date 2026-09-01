@@ -1659,7 +1659,14 @@ function humanDate(ts){
 let _apiKey=localStorage.getItem("anbar-key")||"";
 function mediaUrl(o){
   if(!o||!o.id)return"";
-  return"/f/"+encodeURIComponent(o.id)+(_apiKey?"?k="+encodeURIComponent(_apiKey):"");
+  /* v0.15.30: NO key in the URL. SEC-02: the admin key must never appear in
+     a URL (leaks via history/logs/referrers) and the server rejects it in
+     ?k=. The <img>/<video>/<audio>/<iframe> and the download anchor are
+     same-origin requests → the browser attaches the session cookie, which
+     authorizes them. If the cookie has expired, boot()/api() silent
+     re-login (BUG-v0.15.28) mints a fresh one — previews keep working
+     without ever exposing the key in a URL. */
+  return"/f/"+encodeURIComponent(o.id);
 }
 let _sessionReLoginDone=false;
 async function api(path,opt={}){
@@ -1709,11 +1716,12 @@ async function boot(){
   /* BUG-v0.15.28: session cookie expired but the key is still in
      localStorage → the app used to drop to showLogin() AND wipe the stored
      key. Worse, in the field a 401-only session state left the UI authed
-     (Bearer still valid for /api) while every <img>/<video>/download href
-     (?k= with the ADMIN key) got 401 — the reported "previews broken,
-     downloads fail" (SEC-02 removed admin-key ?k= in v0.15.20). Fix: with a
-     stored key, silently re-login once to mint a fresh cookie; only show the
-     login form when that fails or there is no stored key. */
+     (Bearer still valid for /api) while every media URL got 401 — the
+     reported "previews broken, downloads fail". v0.15.30: media URLs no
+     longer carry any key at all (SEC-02), so a live cookie is the ONLY
+     thing they need. Fix: with a stored key, silently re-login once to
+     mint a fresh cookie; only show the login form when that fails or there
+     is no stored key. */
   if(_apiKey){
     try{
       const r=await fetch("/ui/login",{method:"POST",credentials:"same-origin",
@@ -2332,7 +2340,7 @@ function renderGallery(list){
     cell.className="gcell"+(kind && previewsEnabled?" has":"");
     let inner;
     if(isDir)inner='<div class="gicon" style="font-size:26px">📁</div>';
-    else if(previewsEnabled && kind==="image")inner='<img loading="lazy" src="'+(o.hasThumb?"/f/"+encodeURIComponent(o.id)+"/thumb"+(_apiKey?"?k="+encodeURIComponent(_apiKey):""):url)+'" alt="" onerror="this.onerror=null;this.src=\''+url+'\'">';
+    else if(previewsEnabled && kind==="image")inner='<img loading="lazy" src="'+(o.hasThumb?"/f/"+encodeURIComponent(o.id)+"/thumb":url)+'" alt="" onerror="this.onerror=null;this.src=\''+url+'\'">';
     else if(previewsEnabled && kind==="video")inner='<video src="'+url+'" preload="metadata" muted playsinline></video><span class="gplay">▶</span>';
     else if(previewsEnabled && kind==="audio")inner='<div class="gaudio"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
       +'<audio src="'+url+'" controls preload="metadata"></audio></div>';

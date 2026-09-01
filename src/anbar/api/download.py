@@ -191,31 +191,22 @@ def _authenticate_download(request: Request, obj_id: str) -> None:
     if role in ("admin", "uploader"):
         return
     # Direct media / UI embed key fallback (?k=...)
-    # SEC-02 (v0.15.20) rejected the ADMIN key here; v0.15.28 reverts that
-    # per owner decision: the UI builds every preview/download URL as
-    # /f/<id>?k=<key>, and once the session cookie expires all of them 401'd
-    # ("no previews, downloads fail"). The admin key is the owner's own
-    # secret (it already authorizes everything server-side); only revocable
-    # dynamic keys and the uploader key are meant to travel in shared URLs.
+    # SEC-02 (v0.15.20, re-confirmed v0.15.30): the ADMIN key is NEVER
+    # accepted via query string — a URL carrying it leaks into logs, browser
+    # history and referrers. Only revocable dynamic keys (api_keys table) and
+    # the uploader key may appear in a URL; session-cookie auth is unaffected.
+    # (v0.15.29 briefly reverted this — WRONG fix. The real bug was the UI
+    # embedding the admin key in media URLs; fixed in the UI instead.)
     k = request.query_params.get("k")
     if k:
         from ..auth import _match_dynamic_key, constant_time_equal
 
-        admin_key = (
-            settings.admin_key.get_secret_value()
-            if hasattr(settings.admin_key, "get_secret_value")
-            else (str(settings.admin_key) if settings.admin_key else None)
-        )
         api_key = (
             settings.api_key.get_secret_value()
             if hasattr(settings.api_key, "get_secret_value")
             else (str(settings.api_key) if settings.api_key else None)
         )
-        if (
-            (admin_key and constant_time_equal(k, admin_key))
-            or (api_key and constant_time_equal(k, api_key))
-            or _match_dynamic_key(k, db)
-        ):
+        if (api_key and constant_time_equal(k, api_key)) or _match_dynamic_key(k, db):
             return
 
     sig = request.query_params.get("sig")
