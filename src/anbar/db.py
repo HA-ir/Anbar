@@ -172,7 +172,8 @@ class Database:
         where = "WHERE deleted_at IS NOT NULL" if trash else "WHERE deleted_at IS NULL"
         order = "deleted_at DESC" if trash else "created_at DESC"
         rows = self._conn.execute(
-            f"SELECT id, filename, size, backend, created_at, downloaded, deleted_at, manifest, content_type "
+            f"SELECT id, filename, size, backend, created_at, downloaded, deleted_at, "
+            f"manifest, content_type "
             f"FROM objects {where} ORDER BY {order} LIMIT ? OFFSET ?",
             (limit, offset),
         ).fetchall()

@@ -1567,9 +1567,12 @@ async def admin_subs_add(request: Request, obj_id: str, file: UploadFile):
     if row is None:
         raise HTTPException(404, "object not found")
     default = (request.query_params.get("default") or "").lower() in ("1", "true", "yes")
+    lang = (request.query_params.get("lang") or "").strip().lower()[:16] or None
     data = await file.read()
     try:
-        entry = subs.add(db, obj_id, file.filename or "subtitle.vtt", data, default=default)
+        entry = subs.add(
+            db, obj_id, file.filename or "subtitle.vtt", data, default=default, lang=lang
+        )
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
     db.log_audit(
@@ -1618,6 +1621,46 @@ async def admin_subs_delete(request: Request, obj_id: str, track_id: str):
         raise HTTPException(404, "track not found")
     db.log_audit("subtitle.delete", actor="admin", target=obj_id, details={"track": track_id})
     return {"deleted": track_id}
+
+
+@router.post("/admin/objects/{obj_id}/subs/import-embedded")
+async def admin_subs_import_embedded(request: Request, obj_id: str):
+    """FEAT-SUBS-2: extract subtitle tracks embedded in the video container.
+
+    Streams the object from storage, probes it with ffprobe and imports every
+    text subtitle stream (SRT/ASS/mov_text) as a regular track. Skips
+    languages that already exist as tracks. Returns the added tracks.
+    """
+    from .. import subs_extract
+    from ..api.upload import _chunk_fetcher
+    from ..objects import Manifest
+
+    require_admin(request)
+    db = request.app.state.db
+    settings = request.app.state.settings
+    row = db.get_object(obj_id)
+    if row is None:
+        raise HTTPException(404, "object not found")
+    if not subs_extract.AVAILABLE:
+        raise HTTPException(503, "ffmpeg/ffprobe not available on the server")
+    if not subs_extract.video_ext(str(row["filename"] or "")):
+        raise HTTPException(400, "not a video object")
+    manifest = Manifest.from_json(row["manifest"]) if row["manifest"] else Manifest()
+    added = await subs_extract.import_embedded(
+        db,
+        settings,
+        obj_id,
+        json.loads(manifest.to_json()),
+        _chunk_fetcher(request),
+        force=True,
+    )
+    db.log_audit(
+        "subtitle.import_embedded",
+        actor="admin",
+        target=obj_id,
+        details={"added": len(added)},
+    )
+    return {"added": added, "tracks": subs.public_view(subs.load(db, obj_id))}
 
 
 @router.post("/admin/objects/copy")

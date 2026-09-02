@@ -47,7 +47,6 @@ def test_cache_enabled_out_of_range_rejected(monkeypatch, tmp_path):
 
 def test_cache_enabled_survives_restart(monkeypatch, tmp_path):
     """The kv override (not the env) governs boot: toggle ON, reboot app → ON."""
-    from anbar.db import Database
 
     db_path = tmp_path / "anbar.db"
     monkeypatch.setenv("ANBAR_DB_PATH", str(db_path))

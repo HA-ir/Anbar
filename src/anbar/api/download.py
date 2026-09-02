@@ -884,6 +884,8 @@ async def _purge_object_blobs(backend, db, row: dict, secret: str | None = None,
     from ..subtitles import drop_for as _drop_subs
 
     _drop_subs(db, obj_id)
+    # FEAT-SUBS-2: one-shot embedded-import flag dies with the object too
+    db.kv_delete(f"subsimported:{obj_id}")
 
     # Only emit Tombstone event if remote blobs failed to be completely deleted from Telegram
     if deleted < total_chunks:

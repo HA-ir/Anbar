@@ -66,7 +66,7 @@ def test_album_missing_token_404(client):
     r = client.get("/f/a/nosuchtoken123", headers=BROWSER)
     assert r.status_code == 404
     # v0.15.35: the public album page is English-only (user request)
-    assert "does not exist".encode() in r.content
+    assert b"does not exist" in r.content
 
 
 def test_album_hides_deleted_files(client):

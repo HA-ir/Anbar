@@ -190,7 +190,6 @@ async def test_resume_out_of_range(app_like):
 @pytest.mark.asyncio
 async def test_ingest_run_job_commits_via_service(client, monkeypatch):
     """End-to-end ingest job: object committed through the shared service."""
-    import asyncio as aio
 
     from anbar.api import ingest as ing
 

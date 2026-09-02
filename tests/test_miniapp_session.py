@@ -30,7 +30,6 @@ def _signed_init_data(user_id: int = 12345678, auth_date: int | None = None) -> 
 
 def _boot_with_token(client: TestClient, monkeypatch) -> None:
     """Wire BOT_TOKEN into the app settings (tests run tokenless)."""
-    from types import SimpleNamespace
 
     monkeypatch.setattr(
         type(client.app.state.settings),

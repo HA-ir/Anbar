@@ -242,7 +242,8 @@ def list_albums(db, limit: int = 200) -> list[dict]:
             top = [d for d in folders if not any(d != o and d.startswith(o + "/") for o in folders)]
             label = " / ".join(sorted(top))
         if not label:
-            label = " / ".join(n.split("/")[-1] for n in names[:3]) + (" …" if len(names) > 3 else "")
+            n3 = [n.split("/")[-1] for n in names[:3]]
+            label = " / ".join(n3) + (" …" if len(names) > 3 else "")
         out.append(
             {
                 "obj_id": f"album:{token}",

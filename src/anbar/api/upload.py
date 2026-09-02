@@ -86,6 +86,26 @@ async def _commit(
                 pass
 
         asyncio.create_task(_make_thumb())
+
+    # FEAT-SUBS-2: best-effort import of subtitle tracks embedded in the
+    # video container (MKV soft subs). Runs in the background after commit;
+    # skipped silently when ffmpeg is unavailable.
+    from .. import subs_extract
+
+    if subs_extract.AVAILABLE and subs_extract.video_ext(filename):
+
+        async def _import_embedded() -> None:
+            try:
+                import json as _json
+
+                manifest_dict = _json.loads(manifest.to_json())
+                await subs_extract.import_embedded(
+                    db, settings, obj_id, manifest_dict, _chunk_fetcher(request)
+                )
+            except Exception:  # noqa: BLE001 — subs are best-effort
+                log.exception("embedded subs import failed for %s", obj_id)
+
+        asyncio.create_task(_import_embedded())
     base = settings.base_url.rstrip("/")
     return JSONResponse(
         {
@@ -127,6 +147,46 @@ async def _store_stream(
         raise HTTPException(status, detail) from e
     manifest._svc = svc  # noqa: SLF001 — commit drops the checkpoint via it
     return manifest, sha_hex
+
+
+def _chunk_fetcher(request: Request):
+    """Build a fetch_chunk(obj_id, chunk_index, offset, length) callable that
+    reads one segment of a committed object from the storage backend.
+
+    Used by the background embedded-subtitles importer — same access pattern
+    as the zipper archive worker.
+    """
+    from ..objects import Manifest
+    from ..storage import ObjectRef
+
+    db = request.app.state.db
+    backend = request.app.state.backend
+    pool = getattr(request.app.state, "bot_pool", None)
+
+    async def fetch_chunk(obj_id: str, chunk_index: int, chunk_offset: int, length: int) -> bytes:
+        row = db.get_object(obj_id)
+        if row is None:
+            return b"\0" * length
+        manifest = (
+            Manifest.from_json(row["manifest"]) if row["manifest"] else Manifest()
+        )
+        chunks = manifest.chunks
+        if chunk_index >= len(chunks):
+            return b"\0" * length
+        c = chunks[chunk_index]
+        chunk_backend = backend
+        if getattr(c, "backend", None) and pool is not None:
+            chunk_backend = pool.by_name(c.backend) or backend
+        ref = ObjectRef(
+            file_id=c.file_id,
+            message_id=c.message_id,
+            backend=chunk_backend.name,
+        )
+        blob = await chunk_backend.open(ref)
+        start = max(0, min(chunk_offset, len(blob)))
+        return blob[start : start + max(0, length)]
+
+    return fetch_chunk
 
 
 def _service_for(

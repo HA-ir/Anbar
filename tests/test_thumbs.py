@@ -52,19 +52,19 @@ def test_thumb_404_for_non_image_and_auth_matrix(client):
     assert r.status_code == 200
     obj_id = r.json()["id"]
     time.sleep(0.2)
-    assert (
-        client.get(f"/f/{obj_id}/thumb", headers={"Authorization": "Bearer test-admin-key"}).status_code
-        == 404
+    resp = client.get(
+        f"/f/{obj_id}/thumb", headers={"Authorization": "Bearer test-admin-key"}
     )
+    assert resp.status_code == 404
 
     # corrupt "image" upload must not break anything; no thumb either
     r2 = _upload_image(client, b"not-an-image", name="y.png", ct="image/png")
     assert r2.status_code == 200
     time.sleep(0.2)
-    assert (
-        client.get(f"/f/{r2.json()['id']}/thumb", headers={"Authorization": "Bearer test-admin-key"}).status_code
-        == 404
+    resp2 = client.get(
+        f"/f/{r2.json()['id']}/thumb", headers={"Authorization": "Bearer test-admin-key"}
     )
+    assert resp2.status_code == 404
 
     # auth: anon is rejected when auth is on
     assert client.get(f"/f/{obj_id}/thumb").status_code == 401

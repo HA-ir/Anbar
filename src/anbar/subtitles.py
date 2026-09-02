@@ -125,12 +125,20 @@ def public_view(tracks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def add(db, obj_id: str, filename: str, data: bytes, default: bool = False) -> dict[str, Any]:
+def add(
+    db,
+    obj_id: str,
+    filename: str,
+    data: bytes,
+    default: bool = False,
+    lang: str | None = None,
+) -> dict[str, Any]:
     tracks = load(db, obj_id)
     if len(tracks) >= MAX_TRACKS:
         raise ValueError(f"too many subtitle tracks (max {MAX_TRACKS})")
     vtt = parse_subtitle(filename, data)
-    lang, label = _meta_from_filename(filename)
+    file_lang, label = _meta_from_filename(filename)
+    lang = (lang or file_lang or "").strip().lower()[:16]
     entry = {
         "id": "s" + secrets.token_hex(4),
         "lang": lang,
