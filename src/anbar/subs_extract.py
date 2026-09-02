@@ -178,6 +178,13 @@ async def import_embedded(
         if not video.exists() or video.stat().st_size == 0:
             return []
 
+        # tiny "videos" (a few bytes) are placeholders/icons, not real media —
+        # probing them only burns a subprocess and (under test load) can race
+        # the shared sqlite connection. Skip early; the on-demand import
+        # endpoint remains available if an admin ever needs one.
+        if video.stat().st_size < 16 * 1024:
+            return []
+
         # probe on a background thread (blocking subprocess)
         probe_res = await asyncio.to_thread(_probe_file, video)
         if not probe_res:

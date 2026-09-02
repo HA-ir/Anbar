@@ -6,6 +6,7 @@ import json
 import os
 import sqlite3
 import tempfile
+import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
@@ -103,6 +104,14 @@ class Database:
         self._migrate()
         self._conn.commit()
         self._obj_cache = _ObjectLRU()
+        # BUG-v0.15.41: the same Database object is used from both the request
+        # loop thread and background asyncio tasks (embedded-subs import), and
+        # sqlite3's internal statement cache is not safe under that cross-thread
+        # interleave — it very rarely raised
+        # `sqlite3.InterfaceError: bad parameter or other API misuse` from
+        # kv_set(). A mutex around the shared connection serializes every
+        # statement; WAL keeps multi-reader throughput unaffected.
+        self._db_lock = threading.Lock()
 
     def _migrate(self) -> None:
         """Add columns introduced after v0.9 (idempotent, ALTER-only)."""
@@ -461,19 +470,22 @@ class Database:
 
     # -- kv (toggles, stats) ---------------------------------------------
     def kv_get(self, key: str, default: str | None = None) -> str | None:
-        row = self._conn.execute("SELECT v FROM kv WHERE k = ?", (key,)).fetchone()
+        with self._db_lock:
+            row = self._conn.execute("SELECT v FROM kv WHERE k = ?", (key,)).fetchone()
         return row["v"] if row else default
 
     def kv_set(self, key: str, value: str) -> None:
-        self._conn.execute(
-            "INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v",
-            (key, value),
-        )
-        self._conn.commit()
+        with self._db_lock:
+            self._conn.execute(
+                "INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v",
+                (key, value),
+            )
+            self._conn.commit()
 
     def kv_delete(self, key: str) -> None:
-        self._conn.execute("DELETE FROM kv WHERE k = ?", (key,))
-        self._conn.commit()
+        with self._db_lock:
+            self._conn.execute("DELETE FROM kv WHERE k = ?", (key,))
+            self._conn.commit()
 
     def kv_prune_prefix(self, prefix: str, max_age_s: int) -> int:
         """Delete kv rows whose key starts with `prefix` and whose stored
