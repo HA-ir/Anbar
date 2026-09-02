@@ -1103,6 +1103,23 @@ async def album_page(request: Request, token: str):
         )
     # per-file download signatures live as long as the album itself
     sig_exp = album_exp if album_exp else int(data["created_at"]) + 86400 * 30
+    # FEAT-SUBS: embed subtitle track metadata so the lightbox player can
+    # attach <track> elements (same signed URLs as the media itself).
+    subs_meta: dict[str, list] = {}
+    seen_ids: list[str] = []
+    for oid in data.get("ids", []):
+        if oid not in seen_ids:
+            seen_ids.append(oid)
+    for oid in seen_ids:
+        try:
+            tracks = subs.load(db, oid)
+        except Exception:
+            tracks = []
+        if tracks:
+            subs_meta[oid] = [
+                {"id": tr["id"], "label": tr["label"], "lang": tr["lang"], "default": tr["default"]}
+                for tr in tracks
+            ]
     items = []
     for oid in data.get("ids", []):
         row = db.get_object(oid)
@@ -1146,6 +1163,8 @@ async def album_page(request: Request, token: str):
                 "exp": sig_exp,
             }
         )
+        if oid in subs_meta:
+            items[-1]["subs"] = subs_meta[oid]
     title = data.get("title") or f"anbar · {len(items)} files"
     import html as _html
 
@@ -1254,8 +1273,22 @@ const lb=document.getElementById('lb'),cnt=document.getElementById('lbcnt'),
 function openLb(i){{
   const it=ITEMS[i],url='/f/'+it.id+'?sig='+it.sig+'&exp='+it.exp;
   if(it.kind==='image')cnt.innerHTML='<img src="'+url+'" alt="">';
-  else if(it.kind==='video')cnt.innerHTML='<video src="'+url
-    +'" controls autoplay></video>';
+  else if(it.kind==='video'){{
+    let vh='<video src="'+url+'" controls autoplay>';
+    (it.subs||[]).forEach(tr=>{{
+      vh+='<track kind="subtitles" label="'+(tr.label||tr.id)
+        +'" srclang="'+(tr.lang||'')+'" default="'+(tr.default?'true':'false')
+        +'" src="/f/'+it.id+'/subs/'+tr.id+'?sig='+it.sig+'&exp='+it.exp+'">';
+    }});
+    vh+='</video>';
+    cnt.innerHTML=vh;
+    const v=cnt.querySelector('video');
+    if(v&&v.textTracks){{
+      const want=it.subs||[];
+      for(let k=0;k<v.textTracks.length;k++)
+        v.textTracks[k].mode=(want[k]&&want[k].default)?'showing':'disabled';
+    }}
+  }}
   else if(it.kind==='audio')cnt.innerHTML='<audio src="'+url
     +'" controls autoplay style="width:min(500px,90vw)"></audio>';
   else if(it.kind==='pdf')cnt.innerHTML='<iframe src="'+url+'"></iframe>';

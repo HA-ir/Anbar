@@ -425,6 +425,7 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
 .fm-preview.has{padding:0}
 .fm-preview img,.fm-preview video{max-width:100%;max-height:400px;width:auto;display:block}
 /* FEAT-SUBS: subtitle manager strip under the video in the file modal */
+.fm-preview.video-col{flex-direction:column;align-items:stretch}
 .fm-subs{width:100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 10px;
   border-top:1px solid var(--line2);background:var(--bg2);direction:ltr}
 .fm-subs .subchip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
@@ -3065,7 +3066,7 @@ async function openFileModal(o){
        image is the actively-opened file — eager is correct here. */
     pv.innerHTML='<img src="'+url+'" alt="">';
   }else if(kind==="video"){
-    pv.classList.add("has");
+    pv.classList.add("has","video-col");
     pv.innerHTML='<video id="fmVid" src="'+url+'" controls preload="metadata" playsinline style="max-height:360px;width:100%;border-radius:10px"></video>';
     loadSubsStrip(o,pv);
   }else if(kind==="audio"){
@@ -3174,11 +3175,11 @@ function renderSubsStrip(o,pv){
     pv.appendChild(strip);   /* pv is flex — the strip flows under the video */
   }
   let html="";
-  for(const t of fmSubs){
-    html+='<span class="subchip'+(t.default?" on":"")+'" data-tid="'+esc(t.id)+'" title="'
-      +esc(t.label)+'">'
-      +(t.default?"★ ":"")+esc(t.label||t.id)
-      +'<span class="sx" data-x="'+esc(t.id)+'" title="'+esc(t("subDelete"))+'">✕</span></span>';
+  for(const trk of fmSubs){
+    html+='<span class="subchip'+(trk.default?" on":"")+'" data-tid="'+esc(trk.id)+'" title="'
+      +esc(trk.label)+'">'
+      +(trk.default?"★ ":"")+esc(trk.label||trk.id)
+      +'<span class="sx" data-x="'+esc(trk.id)+'" title="'+esc(t("subDelete"))+'">✕</span></span>';
   }
   html+='<span class="subadd" id="subAddBtn" role="button" tabindex="0">＋ '+esc(t("subAdd"))+'</span>';
   html+='<input type="file" id="subFileInput" accept=".srt,.vtt,text/vtt,application/x-subrip" style="display:none">';
@@ -3241,13 +3242,13 @@ function applyFmSubTracks(){
   if(!vid||!fmObj)return;
   vid.querySelectorAll("track").forEach(n=>n.remove());
   if(!fmSubs.length){vid.textTracks&&vid.textTracks.length&&(vid.textTracks[0].mode="disabled");return;}
-  for(const t of fmSubs){
+  for(const trk of fmSubs){
     const tr=document.createElement("track");
     tr.kind="subtitles";
-    tr.label=t.label||t.id;
-    tr.srclang=t.lang||"";
-    tr.src=fmSubUrl(fmObj,t.id);
-    if(t.default)tr.default=true;
+    tr.label=trk.label||trk.id;
+    tr.srclang=trk.lang||"";
+    tr.src=fmSubUrl(fmObj,trk.id);
+    if(trk.default)tr.default=true;
     vid.appendChild(tr);
   }
   // Chrome leaves all tracks "disabled" unless one is switched on
