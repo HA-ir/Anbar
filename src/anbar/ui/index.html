@@ -388,11 +388,12 @@ html[dir="rtl"] .sw.on i{transform:translateX(-18px)}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:start}
 /* toast */
 #toasts{position:fixed;bottom:22px;inset-inline-start:50%;transform:translateX(-50%);z-index:99999 !important;pointer-events:none;
-  display:flex;flex-direction:column;gap:9px;align-items:center}
+  display:flex;flex-direction:column;gap:9px;align-items:center;max-width:92vw}
 html[dir="rtl"] #toasts{transform:translateX(50%)}
 .toast{background:var(--bg2);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-lg);
   padding:11px 18px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:9px;pointer-events:auto;
-  animation:toastin .3s cubic-bezier(.2,.9,.3,1.2);max-width:90vw;white-space:nowrap}
+  animation:toastin .3s cubic-bezier(.2,.9,.3,1.2);max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[dir="rtl"] .toast{direction:rtl;text-align:right}
 .toast.ok{border-color:var(--ok)}
 .toast.err{border-color:var(--err)}
 .toast i{width:8px;height:8px;border-radius:50%;flex:none}
@@ -1203,7 +1204,7 @@ const I18N={
   statBots:"بات‌های فعال",
   statLastBk:"آخرین پشتیبان",
   duplicateOk:"نسخه کپی ایجاد شد",
-  subAdd:"زیرنویس", subImport:"از داخل ویدئو", subImported:"{n} زیرنویس از داخل ویدئو استخراج شد", subImportNone:"زیرنویس تعبیه‌شده‌ای پیدا نشد", subImportBusy:"در حال استخراج…", subDelete:"حذف زیرنویس", subDeleteConfirm:"این زیرنویس حذف شود؟",
+  subAdd:"زیرنویس", subImport:"از داخل ویدئو", subImported:"{n} زیرنویس از داخل ویدئو استخراج شد", subImportNone:"زیرنویس تعبیه‌شده‌ای پیدا نشد", subImportAlready:"زیرنویس این ویدئو قبلاً استخراج شده است", subImportBusy:"در حال استخراج…", subDelete:"حذف زیرنویس", subDeleteConfirm:"این زیرنویس حذف شود؟",
   subAdded:"زیرنویس اضافه شد", subDeleted:"زیرنویس حذف شد", subTooBig:"حجم فایل زیرنویس بیش از ۲ مگابایت است",
   subRenameT:"نام زیرنویس",
   codeTruncated:"نمایش ۱۰۰ خط اول — برای مشاهده کامل دانلود کنید",
@@ -1371,7 +1372,7 @@ const I18N={
   statBots:"Active Bots",
   statLastBk:"Last Backup",
   duplicateOk:"Copy created",
-  subAdd:"Subtitle", subImport:"From video", subImported:"{n} subtitle track(s) extracted from video", subImportNone:"No embedded subtitles found", subImportBusy:"Extracting…", subDelete:"Delete subtitle", subDeleteConfirm:"Delete this subtitle track?",
+  subAdd:"Subtitle", subImport:"From video", subImported:"{n} subtitle track(s) extracted from video", subImportNone:"No embedded subtitles found", subImportAlready:"This video's subtitles were already extracted", subImportBusy:"Extracting…", subDelete:"Delete subtitle", subDeleteConfirm:"Delete this subtitle track?",
   subAdded:"Subtitle added", subDeleted:"Subtitle deleted", subTooBig:"Subtitle file exceeds 2 MB",
   subRenameT:"Subtitle name",
   codeTruncated:"Showing first 100 lines — file exceeds preview limit",
@@ -3203,7 +3204,11 @@ function renderSubsStrip(o,pv){
       +'<span class="sx" data-x="'+esc(trk.id)+'" title="'+esc(t("subDelete"))+'">✕</span></span>';
   }
   html+='<span class="subadd" id="subAddBtn" role="button" tabindex="0">＋ '+esc(t("subAdd"))+'</span>';
-  html+='<span class="subadd" id="subImportBtn" role="button" tabindex="0">⤓ '+esc(t("subImport"))+'</span>';
+  /* the import button only makes sense while the extraction feature is ON
+     (BUG-v0.15.43: it stayed visible when the admin toggle was off and then
+     the click produced an English 409 error toast) */
+  if(curSettings&&curSettings.subs_extract_enabled&&curSettings.subs_extract_enabled.value===0)/*off: skip*/;
+  else html+='<span class="subadd" id="subImportBtn" role="button" tabindex="0">⤓ '+esc(t("subImport"))+'</span>';
   html+='<input type="file" id="subFileInput" accept=".srt,.vtt,text/vtt,application/x-subrip" style="display:none">';
   strip.innerHTML=html;
   const fileInput=strip.querySelector("#subFileInput");
@@ -3224,7 +3229,7 @@ function renderSubsStrip(o,pv){
     }catch(err){toast(err.message,"err");}
   };
   const importBtn=strip.querySelector("#subImportBtn");
-  importBtn.onclick=async(e)=>{
+  if(importBtn)importBtn.onclick=async(e)=>{
     e.stopPropagation();
     if(importBtn.dataset.busy)return; /* BUG-v0.15.42: ignore double-clicks while running */
     importBtn.dataset.busy="1";
@@ -3235,7 +3240,9 @@ function renderSubsStrip(o,pv){
     try{
       const r=await api("/api/v1/admin/objects/"+encodeURIComponent(o.id)+"/subs/import-embedded",{method:"POST"});
       const n=(r&&r.added&&r.added.length)||0;
-      toast(n?t("subImported").replace("{n}",n):t("subImportNone"));
+      if(n)toast(t("subImported").replace("{n}",n));
+      else if(r&&r.already_imported)toast(t("subImportAlready"));
+      else toast(t("subImportNone"));
       await loadSubsStrip(o,pv);
     }catch(err){toast(err.message,"err");}
     finally{

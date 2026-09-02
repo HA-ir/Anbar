@@ -158,6 +158,15 @@ def test_import_embedded_full_flow(client):
         f"/api/v1/admin/objects/{obj_id}/subs", headers={"Authorization": "Bearer test-admin-key"}
     )
     assert len(lst.json()["tracks"]) == 1
+    # BUG-v0.15.43: a forced re-import that dedupes everything must flag
+    # already_imported so the UI shows the right message
+    r2 = client.post(
+        f"/api/v1/admin/objects/{obj_id}/subs/import-embedded",
+        headers={"Authorization": "Bearer test-admin-key"},
+    )
+    assert r2.status_code == 200
+    assert r2.json()["added"] == []
+    assert r2.json()["already_imported"] is True
 
 
 @pytest.mark.skipif(not subs_extract.AVAILABLE, reason="ffmpeg not installed")

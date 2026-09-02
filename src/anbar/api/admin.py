@@ -1665,7 +1665,12 @@ async def admin_subs_import_embedded(request: Request, obj_id: str):
         target=obj_id,
         details={"added": len(added)},
     )
-    return {"added": added, "tracks": subs.public_view(subs.load(db, obj_id))}
+    tracks = subs.public_view(subs.load(db, obj_id))
+    # 0 added + existing tracks = every embedded track was already imported
+    # (dedupe) — tell the client so it can show a proper message instead of
+    # the misleading "no embedded subtitles found".
+    already = not added and bool(tracks)
+    return {"added": added, "tracks": tracks, "already_imported": already}
 
 
 @router.post("/admin/objects/copy")
