@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .. import runtime
+from .. import subtitles as subs
 from ..auth import (
     KV_AUTH,
     KV_HMAC_SECRET,
@@ -28,7 +29,6 @@ from ..auth import (
     revoke_api_key,
 )
 from ..cache import DiskLRU
-from .. import subtitles as subs
 
 router = APIRouter()
 

@@ -30,7 +30,9 @@ _STRAY_TAG = re.compile(r"<[^>\n]{0,200}>")
 # some rips also use a dot or a colon — normalize all to the VTT dot)
 _SRT_TS = re.compile(r"(\d{1,3}):(\d{2}):(\d{2})[,.:](\d{1,3})")
 _TIMING_LINE = re.compile(r"-->")
-_LANG_FROM_NAME = re.compile(r"[.\[ ]([a-zA-Z]{2,3}(?:-[a-zA-Z]{2,4})?)[.\]]?\.(srt|vtt)$", re.IGNORECASE)
+_LANG_FROM_NAME = re.compile(
+    r"[.\[ ]([a-zA-Z]{2,3}(?:-[a-zA-Z]{2,4})?)[.\]]?\.(srt|vtt)$", re.IGNORECASE
+)
 
 
 def _sanitize_vtt(text: str) -> str:
@@ -113,7 +115,12 @@ def _save(db, obj_id: str, tracks: list[dict[str, Any]]) -> None:
 
 def public_view(tracks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
-        {"id": t["id"], "lang": t.get("lang", ""), "label": t.get("label", ""), "default": bool(t.get("default"))}
+        {
+            "id": t["id"],
+            "lang": t.get("lang", ""),
+            "label": t.get("label", ""),
+            "default": bool(t.get("default")),
+        }
         for t in tracks
     ]
 

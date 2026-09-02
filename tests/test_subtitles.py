@@ -14,7 +14,6 @@ from anbar.subtitles import (
     load,
     parse_subtitle,
     public_view,
-    update,
 )
 
 SRT = (
@@ -50,7 +49,7 @@ def test_vtt_passthrough_and_rejects():
     with pytest.raises(ValueError):
         parse_subtitle("s.srt", b"\xff\xfe\x00garbage")
     with pytest.raises(ValueError):
-        parse_subtitle("s.srt", "just text no cues".encode())
+        parse_subtitle("s.srt", b"just text no cues")
     with pytest.raises(ValueError):
         parse_subtitle("s.srt", b"x" * (3 * 1024 * 1024))
 
@@ -122,7 +121,7 @@ def test_track_lifecycle(client):
 
 def test_default_flag_moves(client):
     obj_id = _video(client)
-    for i, fn in enumerate(("a.srt", "b.srt")):
+    for fn in ("a.srt", "b.srt"):
         client.post(
             f"/api/v1/admin/objects/{obj_id}/subs",
             files={"file": (fn, VTT.encode(), "text/vtt")},
@@ -164,10 +163,10 @@ def test_auth_enforced_on_subs(client):
     ok = client.get(f"/f/{obj_id}/subs", headers={"Authorization": "Bearer test-admin-key"})
     assert ok.status_code == 200
     # admin API requires admin
-    assert (
-        client.get(f"/api/v1/admin/objects/{obj_id}/subs", headers={"Authorization": "Bearer test-key"}).status_code
-        == 403
+    resp = client.get(
+        f"/api/v1/admin/objects/{obj_id}/subs", headers={"Authorization": "Bearer test-key"}
     )
+    assert resp.status_code == 403
     # unknown object → 404
     r = client.get("/f/missing/subs", headers={"Authorization": "Bearer test-admin-key"})
     assert r.status_code == 404

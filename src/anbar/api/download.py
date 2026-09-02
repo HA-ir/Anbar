@@ -26,6 +26,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from .. import runtime
+from .. import subtitles as subs
 from ..auth import (
     effective_auth_enabled,
     effective_hmac_secret,
@@ -35,7 +36,6 @@ from ..auth import (
 )
 from ..db import Database
 from ..objects import Manifest
-from .. import subtitles as subs
 from ..ratelimit import limit_download
 from ..storage import ObjectRef
 
@@ -568,7 +568,6 @@ async def subs_list(request: Request, obj_id: str):
     The video must be fetchable by this viewer; the subtitle listing is
     meaningless (and an oracle) otherwise.
     """
-    settings = request.app.state.settings
     db = request.app.state.db
     if db.get_object(obj_id) is None:
         raise HTTPException(404, "object not found")
@@ -580,7 +579,6 @@ async def subs_list(request: Request, obj_id: str):
 @router.get("/{obj_id}/subs/{track_id}")
 async def subs_get(request: Request, obj_id: str, track_id: str):
     """Serve one subtitle track as WebVTT (same auth matrix as the media)."""
-    settings = request.app.state.settings
     db = request.app.state.db
     if db.get_object(obj_id) is None:
         raise HTTPException(404, "object not found")
