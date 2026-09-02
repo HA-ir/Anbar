@@ -3208,7 +3208,7 @@ function renderSubsStrip(o,pv){
     e.stopPropagation();
     importBtn.classList.add("busy");
     try{
-      const r=await api("/api/v1/admin/objects/"+encodeURIComponent(o.id)+"/subs/import",{method:"POST"});
+      const r=await api("/api/v1/admin/objects/"+encodeURIComponent(o.id)+"/subs/import-embedded",{method:"POST"});
       const n=(r&&r.added&&r.added.length)||0;
       toast(n?t("subImported").replace("{n}",n):t("subImportNone"));
       await loadSubsStrip(o,pv);
