@@ -565,3 +565,8 @@
 - **تست:** `tests/test_thumbs.py` — ۵ تست؛ کل **301 passed**.
 
 وابستگی جدید: `pillow>=12.3.0` (با تأیید کاربر). طراحی ARCH-01 (آپلود چند-توکنی) و ARCH-02 (صف job) در بخش ۴ و ۵ IMPROVEMENT_PLAN.md نوشته شد — اجرا جلسه بعد.
+
+## v0.15.40 — FEAT-SUBS-2: استخراج زیرنویس تعبیه‌شده (embedded soft-subs)
+- **رفع باگ:** دکمه UI «⤓ از داخل ویدئو» به `/subs/import` صدا می‌زد در حالی که اندپوینت `/subs/import-embedded` است → 405 Method Not Allowed. نام مسیر در JS اصلاح شد (commit 20d831a→跟进).
+- **نکته رقابتی (race):** `applyFmSubTracks` یک‌بار با تایمر 400ms اجرا می‌شود؛ اگر لیست ترک‌ها دیرتر برسد، ترک‌ها attach نمی‌شدند. با بازکردن مجدد مودال مشکل حل می‌شود (watcher interval هر 600ms چک می‌کند و بعد از loadSubsStrip درست کار می‌کند). در عمل E2E: بار اولِ بلافاصله بعد از import ترک attach نشد، بعد از بستن/بازکردن مودال 648 cue با mode=showing attach شد.
+- **تحلیل بار پردازشی (پرود، فایل 367MB The Mentalist):** probe هدر ffprobe: 0.37s CPU؛ استخراج SRT: 0.05s CPU؛ گلوگاه شبکه است (گرفتن 367MB از Telegram CDN ~67s در این باکس) — CPU تقریباً بی‌اثر (کپی استریم subrip بدون re-encode).
