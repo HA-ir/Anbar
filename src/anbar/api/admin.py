@@ -28,6 +28,7 @@ from ..auth import (
     revoke_api_key,
 )
 from ..cache import DiskLRU
+from .. import subtitles as subs
 
 router = APIRouter()
 
@@ -1542,6 +1543,81 @@ async def objects_move(request: Request):
         "skipped": res["skipped"],
         "dest": dest + "/" if dest else "",
     }
+
+
+# ── subtitle tracks (FEAT-SUBS) ──────────────────────────────────────────────
+
+
+@router.get("/admin/objects/{obj_id}/subs")
+async def admin_subs_list(request: Request, obj_id: str):
+    """List subtitle tracks of one object (metadata + no VTT body)."""
+    require_admin(request)
+    db = request.app.state.db
+    if db.get_object(obj_id) is None:
+        raise HTTPException(404, "object not found")
+    return {"tracks": subs.public_view(subs.load(db, obj_id))}
+
+
+@router.post("/admin/objects/{obj_id}/subs")
+async def admin_subs_add(request: Request, obj_id: str, file: UploadFile):
+    """Add a subtitle track (SRT or VTT, ≤2 MB) to a video object."""
+    require_admin(request)
+    db = request.app.state.db
+    row = db.get_object(obj_id)
+    if row is None:
+        raise HTTPException(404, "object not found")
+    default = (request.query_params.get("default") or "").lower() in ("1", "true", "yes")
+    data = await file.read()
+    try:
+        entry = subs.add(db, obj_id, file.filename or "subtitle.vtt", data, default=default)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    db.log_audit(
+        "subtitle.add",
+        actor="admin",
+        target=obj_id,
+        details={"track": entry["id"], "label": entry["label"], "bytes": len(data)},
+    )
+    return {"track": entry}
+
+
+@router.patch("/admin/objects/{obj_id}/subs/{track_id}")
+async def admin_subs_update(request: Request, obj_id: str, track_id: str):
+    """Rename / re-language / set-default one subtitle track."""
+    require_admin(request)
+    db = request.app.state.db
+    if db.get_object(obj_id) is None:
+        raise HTTPException(404, "object not found")
+    try:
+        fields = await request.json()
+    except Exception:
+        raise HTTPException(400, "expected JSON {label?, lang?, default?}") from None
+    if not isinstance(fields, dict) or not fields:
+        raise HTTPException(400, "expected JSON {label?, lang?, default?}")
+    allowed = {"label", "lang", "default"}
+    if not (set(fields) & allowed) or not (set(fields) <= allowed):
+        raise HTTPException(400, "fields: label, lang, default")
+    try:
+        entry = subs.update(db, obj_id, track_id, fields)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    if entry is None:
+        raise HTTPException(404, "track not found")
+    db.log_audit("subtitle.update", actor="admin", target=obj_id, details={"track": track_id})
+    return {"track": entry}
+
+
+@router.delete("/admin/objects/{obj_id}/subs/{track_id}")
+async def admin_subs_delete(request: Request, obj_id: str, track_id: str):
+    """Remove one subtitle track from a video object."""
+    require_admin(request)
+    db = request.app.state.db
+    if db.get_object(obj_id) is None:
+        raise HTTPException(404, "object not found")
+    if not subs.delete(db, obj_id, track_id):
+        raise HTTPException(404, "track not found")
+    db.log_audit("subtitle.delete", actor="admin", target=obj_id, details={"track": track_id})
+    return {"deleted": track_id}
 
 
 @router.post("/admin/objects/copy")

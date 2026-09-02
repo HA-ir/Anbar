@@ -424,6 +424,18 @@ html[dir="rtl"] #toasts{transform:translateX(50%)}
   display:flex;align-items:center;justify-content:center;overflow:hidden;max-height:420px}
 .fm-preview.has{padding:0}
 .fm-preview img,.fm-preview video{max-width:100%;max-height:400px;width:auto;display:block}
+/* FEAT-SUBS: subtitle manager strip under the video in the file modal */
+.fm-subs{width:100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 10px;
+  border-top:1px solid var(--line2);background:var(--bg2);direction:ltr}
+.fm-subs .subchip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+  border:1px solid var(--line2);background:var(--bg3);color:var(--tx2);font-size:11.5px;cursor:pointer;max-width:180px}
+.fm-subs .subchip:hover{border-color:var(--brand);color:var(--brand)}
+.fm-subs .subchip.on{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+.fm-subs .subchip .sx{color:var(--tx3);font-size:13px;line-height:1}
+.fm-subs .subchip .sx:hover{color:#e5484d}
+.fm-subs .subadd{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;
+  border:1px dashed var(--line2);color:var(--tx3);font-size:11.5px;cursor:pointer}
+.fm-subs .subadd:hover{border-color:var(--brand);color:var(--brand)}
 .fm-preview iframe,.fm-preview object{width:100%;height:380px;border:none;border-radius:10px}
 .fm-preview pre{width:100%;max-height:360px;overflow:auto;padding:14px;margin:0;font-size:12px;
   font-family:ui-monospace,Menlo,Consolas,monospace;direction:ltr;text-align:left;white-space:pre-wrap;
@@ -1178,6 +1190,9 @@ const I18N={
   statBots:"بات‌های فعال",
   statLastBk:"آخرین پشتیبان",
   duplicateOk:"نسخه کپی ایجاد شد",
+  subAdd:"زیرنویس", subDelete:"حذف زیرنویس", subDeleteConfirm:"این زیرنویس حذف شود؟",
+  subAdded:"زیرنویس اضافه شد", subDeleted:"زیرنویس حذف شد", subTooBig:"حجم فایل زیرنویس بیش از ۲ مگابایت است",
+  subRenameT:"نام زیرنویس",
   codeTruncated:"نمایش ۱۰۰ خط اول — برای مشاهده کامل دانلود کنید",
   openFullPage:"مشاهده کامل در صفحه جدید",
   quickShareLink:"لینک ۲۴ ساعته",
@@ -1340,6 +1355,9 @@ const I18N={
   statBots:"Active Bots",
   statLastBk:"Last Backup",
   duplicateOk:"Copy created",
+  subAdd:"Subtitle", subDelete:"Delete subtitle", subDeleteConfirm:"Delete this subtitle track?",
+  subAdded:"Subtitle added", subDeleted:"Subtitle deleted", subTooBig:"Subtitle file exceeds 2 MB",
+  subRenameT:"Subtitle name",
   codeTruncated:"Showing first 100 lines — file exceeds preview limit",
   openFullPage:"Open full in new tab",
   quickShareLink:"24h Link",
@@ -3048,7 +3066,8 @@ async function openFileModal(o){
     pv.innerHTML='<img src="'+url+'" alt="">';
   }else if(kind==="video"){
     pv.classList.add("has");
-    pv.innerHTML='<video src="'+url+'" controls preload="metadata" playsinline style="max-height:360px;width:100%;border-radius:10px"></video>';
+    pv.innerHTML='<video id="fmVid" src="'+url+'" controls preload="metadata" playsinline style="max-height:360px;width:100%;border-radius:10px"></video>';
+    loadSubsStrip(o,pv);
   }else if(kind==="audio"){
     pv.classList.add("has","audio");
     pv.innerHTML='<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
@@ -3131,7 +3150,122 @@ async function openFileModal(o){
     +'<span class="fm-chip num">'+dlText+'</span>';
   $("#fileModal").classList.add("on");
 }
-$("#fmClose").onclick=()=>{$("#fileModal").classList.remove("on");$("#fmPreview").innerHTML="";};
+/* ================= FEAT-SUBS: subtitle tracks ================= */
+/* State consumed by the strip's click handlers lives at MODULE scope (the
+   B-041 lesson) and is synced by the loader function. */
+let fmSubs=[];            // [{id,lang,label,default}] for the modal's video
+let fmSubsObjId=null;     // which object the strip belongs to
+function fmSubUrl(o,tid){return "/f/"+encodeURIComponent(o.id)+"/subs/"+encodeURIComponent(tid);}
+async function loadSubsStrip(o,pv){
+  fmSubs=[];fmSubsObjId=null;
+  try{
+    const r=await api("/api/v1/admin/objects/"+encodeURIComponent(o.id)+"/subs");
+    fmSubs=r.tracks||[];
+    fmSubsObjId=o.id;
+  }catch(e){fmSubs=[];}
+  renderSubsStrip(o,pv);
+}
+function renderSubsStrip(o,pv){
+  let strip=pv.querySelector(".fm-subs");
+  if(!fmSubsObjId||fmSubsObjId!==o.id){if(strip)strip.remove();return;}
+  if(!strip){
+    strip=document.createElement("div");
+    strip.className="fm-subs";
+    pv.appendChild(strip);   /* pv is flex — the strip flows under the video */
+  }
+  let html="";
+  for(const t of fmSubs){
+    html+='<span class="subchip'+(t.default?" on":"")+'" data-tid="'+esc(t.id)+'" title="'
+      +esc(t.label)+'">'
+      +(t.default?"★ ":"")+esc(t.label||t.id)
+      +'<span class="sx" data-x="'+esc(t.id)+'" title="'+esc(t("subDelete"))+'">✕</span></span>';
+  }
+  html+='<span class="subadd" id="subAddBtn" role="button" tabindex="0">＋ '+esc(t("subAdd"))+'</span>';
+  html+='<input type="file" id="subFileInput" accept=".srt,.vtt,text/vtt,application/x-subrip" style="display:none">';
+  strip.innerHTML=html;
+  const fileInput=strip.querySelector("#subFileInput");
+  strip.querySelector("#subAddBtn").onclick=(e)=>{
+    e.stopPropagation();
+    fileInput.value="";
+    fileInput.click();
+  };
+  fileInput.onchange=async()=>{
+    const f=fileInput.files&&fileInput.files[0];
+    if(!f)return;
+    if(f.size>2*1024*1024){toast(t("subTooBig"),"err");return;}
+    const fd=new FormData();fd.append("file",f,f.name);
+    try{
+      await api("/api/v1/admin/objects/"+encodeURIComponent(o.id)+"/subs",{method:"POST",body:fd});
+      toast(t("subAdded"));
+      await loadSubsStrip(o,pv);
+    }catch(err){toast(err.message,"err");}
+  };
+  for(const chip of strip.querySelectorAll(".subchip")){
+    const tid=chip.dataset.tid;
+    chip.onclick=async(e)=>{
+      e.stopPropagation();
+      if(e.target.dataset.x){ // ✕ — delete track
+        if(!(await askConfirm(t("subDeleteConfirm"))))return;
+        try{
+          await api("/api/v1/admin/objects/"+encodeURIComponent(o.id)+"/subs/"+encodeURIComponent(tid),{method:"DELETE"});
+          toast(t("subDeleted"));
+          await loadSubsStrip(o,pv);
+        }catch(err){toast(err.message,"err");}
+        return;
+      }
+      // click = make default (server keeps single-default invariant)
+      try{
+        await api("/api/v1/admin/objects/"+encodeURIComponent(o.id)+"/subs/"+encodeURIComponent(tid),
+          {method:"PATCH",body:JSON.stringify({default:true})});
+        await loadSubsStrip(o,pv);
+      }catch(err){toast(err.message,"err");}
+    };
+    // double-click on a chip = rename label
+    chip.ondblclick=async(e)=>{
+      e.stopPropagation();
+      if(e.target.dataset.x)return;
+      const cur=fmSubs.find(x=>x.id===tid);
+      const name=await askText(t("subRenameT"),(cur&&cur.label)||"");
+      if(!name)return;
+      try{
+        await api("/api/v1/admin/objects/"+encodeURIComponent(o.id)+"/subs/"+encodeURIComponent(tid),
+          {method:"PATCH",body:JSON.stringify({label:name})});
+        await loadSubsStrip(o,pv);
+      }catch(err){toast(err.message,"err");}
+    };
+  }
+}
+/* attach <track> elements to the modal player — CC menu comes free */
+function applyFmSubTracks(){
+  const vid=document.getElementById("fmVid");
+  if(!vid||!fmObj)return;
+  vid.querySelectorAll("track").forEach(n=>n.remove());
+  if(!fmSubs.length){vid.textTracks&&vid.textTracks.length&&(vid.textTracks[0].mode="disabled");return;}
+  for(const t of fmSubs){
+    const tr=document.createElement("track");
+    tr.kind="subtitles";
+    tr.label=t.label||t.id;
+    tr.srclang=t.lang||"";
+    tr.src=fmSubUrl(fmObj,t.id);
+    if(t.default)tr.default=true;
+    vid.appendChild(tr);
+  }
+  // Chrome leaves all tracks "disabled" unless one is switched on
+  const tt=vid.textTracks;
+  if(tt)for(let i=0;i<tt.length;i++)tt[i].mode=fmSubs[i]&&fmSubs[i].default?"showing":"disabled";
+}
+/* watch the modal player appear, then hook its tracks */
+setInterval(()=>{
+  const vid=document.getElementById("fmVid");
+  if(vid&&!vid._subsHooked){
+    vid._subsHooked=true;
+    vid.addEventListener("loadedmetadata",applyFmSubTracks);
+    setTimeout(applyFmSubTracks,400); /* cached videos may skip loadedmetadata */
+  }
+  if(!vid&&fmSubs.length){fmSubs=[];fmSubsObjId=null;} /* modal closed */
+},600);
+
+$("#fmClose").onclick=()=>{$("#fileModal").classList.remove("on");$("#fmPreview").innerHTML="";fmSubs=[];fmSubsObjId=null;};
 $("#fmCloseTop").onclick=()=>$("#fmClose").onclick();
 $("#fmPrev").onclick=(e)=>{e.stopPropagation();navModalFile(-1);};
 $("#fmNext").onclick=(e)=>{e.stopPropagation();navModalFile(1);};

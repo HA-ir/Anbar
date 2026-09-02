@@ -35,6 +35,7 @@ from ..auth import (
 )
 from ..db import Database
 from ..objects import Manifest
+from .. import subtitles as subs
 from ..ratelimit import limit_download
 from ..storage import ObjectRef
 
@@ -560,6 +561,40 @@ async def download(request: Request, obj_id: str):
     return StreamingResponse(stream(), status_code=status, headers=headers)
 
 
+@router.get("/{obj_id}/subs")
+async def subs_list(request: Request, obj_id: str):
+    """Subtitle track metadata for a video (same auth matrix as the media).
+
+    The video must be fetchable by this viewer; the subtitle listing is
+    meaningless (and an oracle) otherwise.
+    """
+    settings = request.app.state.settings
+    db = request.app.state.db
+    if db.get_object(obj_id) is None:
+        raise HTTPException(404, "object not found")
+    _authenticate_download(request, obj_id)
+    tracks = subs.load(db, obj_id)
+    return {"tracks": subs.public_view(tracks)}
+
+
+@router.get("/{obj_id}/subs/{track_id}")
+async def subs_get(request: Request, obj_id: str, track_id: str):
+    """Serve one subtitle track as WebVTT (same auth matrix as the media)."""
+    settings = request.app.state.settings
+    db = request.app.state.db
+    if db.get_object(obj_id) is None:
+        raise HTTPException(404, "object not found")
+    _authenticate_download(request, obj_id)
+    vtt = subs.get_vtt(db, obj_id, track_id)
+    if vtt is None:
+        raise HTTPException(404, "track not found")
+    return Response(
+        content=vtt,
+        media_type="text/vtt; charset=utf-8",
+        headers={"Cache-Control": "private, max-age=300", "Access-Control-Allow-Origin": "*"},
+    )
+
+
 @router.get("/{obj_id}/thumb")
 async def thumb(request: Request, obj_id: str):
     """PERF-03: serve the pre-generated thumbnail (≤256px WebP/JPEG).
@@ -847,6 +882,10 @@ async def _purge_object_blobs(backend, db, row: dict, secret: str | None = None,
             db.kv_delete(k)
     for tag in ("pw:", "maxdl:", "dlc:"):
         db.kv_delete(f"{tag}{obj_id}")
+    # subtitle tracks (FEAT-SUBS) die with the object
+    from ..subtitles import drop_for as _drop_subs
+
+    _drop_subs(db, obj_id)
 
     # Only emit Tombstone event if remote blobs failed to be completely deleted from Telegram
     if deleted < total_chunks:
