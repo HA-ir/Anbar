@@ -976,7 +976,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="sw on" id="swSubsExtract" role="switch"><i></i></div>
       </div>
       <div class="set-row" style="flex-direction:column;align-items:stretch;gap:4px">
-        <div class="lab"><small data-i18n="subsEdgeNote" style="color:var(--tx3);line-height:1.7">⚠️ این قابلیت فقط روی سرور خودمیزی (Docker + ffmpeg) کار می‌کند. در نسخه‌ی Cloudflare Workers قابل اجرا نیست: ffmpeg در Workers وجود ندارد، سقف CPU پلن پولی ۳۰ ثانیه است، حافظه ۱۲۸MB برای فایل‌های ویدئوی حجیم کافی نیست و دیسک موقت هم وجود ندارد. استخراج زیرنویس MKV بدون decode نیاز به پارسر سبک EBML دارد که امکان‌پذیر ولی پروژه‌ای جداگانه است.</small></div>
+        <div class="lab"><small data-i18n="subsEdgeNote" style="color:var(--tx3);line-height:1.7">⚠️ این قابلیت فقط روی سرور خودمیزی (Docker + ffmpeg) کار می‌کند. در نسخه‌ی Cloudflare Workers قابل اجرا نیست: ffmpeg در Workers وجود ندارد، سقف CPU پلن پولی ۳۰ ثانیه است و حافظه ۱۲۸MB برای فایل‌های ویدئوی حجیم کافی نیست.</small></div>
       </div>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1197,13 +1197,13 @@ const I18N={
   autoBackupSub:"ارسال روزانه یک نسخه پشتیبان از دیتابیس به کانال ذخیره‌سازی",
   subsExtractLab:"استخراج زیرنویس تعبیه‌شده (ffmpeg)",
   subsExtractSub:"استخراج خودکار زیرنویس‌های داخل MKV/MP4 بعد از آپلود + دکمه «⤓ از داخل ویدئو»",
-  subsEdgeNote:"⚠️ این قابلیت فقط روی سرور خودمیزی (Docker + ffmpeg) کار می‌کند. در نسخه‌ی Cloudflare Workers قابل اجرا نیست: ffmpeg در Workers وجود ندارد، سقف CPU پلن پولی ۳۰ ثانیه است، حافظه ۱۲۸MB برای فایل‌های ویدئوی حجیم کافی نیست و دیسک موقت هم وجود ندارد. استخراج زیرنویس MKV بدون decode نیاز به پارسر سبک EBML دارد که امکان‌پذیر ولی پروژه‌ای جداگانه است.",
+  subsEdgeNote:"⚠️ این قابلیت فقط روی سرور خودمیزی (Docker + ffmpeg) کار می‌کند. در نسخه‌ی Cloudflare Workers قابل اجرا نیست: ffmpeg در Workers وجود ندارد، سقف CPU پلن پولی ۳۰ ثانیه است و حافظه ۱۲۸MB برای فایل‌های ویدئوی حجیم کافی نیست.",
   statStorage:"حجم کل ذخیره",
   statFiles:"تعداد فایل‌ها",
   statBots:"بات‌های فعال",
   statLastBk:"آخرین پشتیبان",
   duplicateOk:"نسخه کپی ایجاد شد",
-  subAdd:"زیرنویس", subImport:"از داخل ویدئو", subImported:"{n} زیرنویس از داخل ویدئو استخراج شد", subImportNone:"زیرنویس تعبیه‌شده‌ای پیدا نشد", subDelete:"حذف زیرنویس", subDeleteConfirm:"این زیرنویس حذف شود؟",
+  subAdd:"زیرنویس", subImport:"از داخل ویدئو", subImported:"{n} زیرنویس از داخل ویدئو استخراج شد", subImportNone:"زیرنویس تعبیه‌شده‌ای پیدا نشد", subImportBusy:"در حال استخراج…", subDelete:"حذف زیرنویس", subDeleteConfirm:"این زیرنویس حذف شود؟",
   subAdded:"زیرنویس اضافه شد", subDeleted:"زیرنویس حذف شد", subTooBig:"حجم فایل زیرنویس بیش از ۲ مگابایت است",
   subRenameT:"نام زیرنویس",
   codeTruncated:"نمایش ۱۰۰ خط اول — برای مشاهده کامل دانلود کنید",
@@ -1365,13 +1365,13 @@ const I18N={
   autoBackupSub:"Automatically send daily SQLite backup to storage channel",
   subsExtractLab:"Embedded subtitle extraction (ffmpeg)",
   subsExtractSub:"Auto-extract subtitles inside MKV/MP4 after upload + the “⤓ From video” button",
-  subsEdgeNote:"⚠️ Works only on the self-hosted server (Docker + ffmpeg). Not possible on Cloudflare Workers: ffmpeg does not exist there, the paid CPU cap is 30s, 128MB memory cannot hold large videos, and there is no temp disk. Extracting MKV subs without decode needs a lightweight EBML parser — feasible but a separate project.",
+  subsEdgeNote:"⚠️ Works only on the self-hosted server (Docker + ffmpeg). Not possible on Cloudflare Workers: ffmpeg does not exist there, the paid CPU cap is 30s, and 128MB memory cannot hold large videos.",
   statStorage:"Total Stored",
   statFiles:"Total Files",
   statBots:"Active Bots",
   statLastBk:"Last Backup",
   duplicateOk:"Copy created",
-  subAdd:"Subtitle", subImport:"From video", subImported:"{n} subtitle track(s) extracted from video", subImportNone:"No embedded subtitles found", subDelete:"Delete subtitle", subDeleteConfirm:"Delete this subtitle track?",
+  subAdd:"Subtitle", subImport:"From video", subImported:"{n} subtitle track(s) extracted from video", subImportNone:"No embedded subtitles found", subImportBusy:"Extracting…", subDelete:"Delete subtitle", subDeleteConfirm:"Delete this subtitle track?",
   subAdded:"Subtitle added", subDeleted:"Subtitle deleted", subTooBig:"Subtitle file exceeds 2 MB",
   subRenameT:"Subtitle name",
   codeTruncated:"Showing first 100 lines — file exceeds preview limit",
@@ -3171,15 +3171,21 @@ async function openFileModal(o){
    B-041 lesson) and is synced by the loader function. */
 let fmSubs=[];            // [{id,lang,label,default}] for the modal's video
 let fmSubsObjId=null;     // which object the strip belongs to
+let fmSubsSeq=0;          /* BUG-v0.15.42: token to discard stale loads — without it,
+                             a slow response for video A could arrive after the user
+                             navigated to video B and re-attach A's tracks to B */
 function fmSubUrl(o,tid){return "/f/"+encodeURIComponent(o.id)+"/subs/"+encodeURIComponent(tid);}
 async function loadSubsStrip(o,pv){
+  const seq=++fmSubsSeq;
   fmSubs=[];fmSubsObjId=null;
   try{
     const r=await api("/api/v1/admin/objects/"+encodeURIComponent(o.id)+"/subs");
+    if(seq!==fmSubsSeq)return; /* superseded by a newer open/navigation */
     fmSubs=r.tracks||[];
     fmSubsObjId=o.id;
   }catch(e){fmSubs=[];}
   renderSubsStrip(o,pv);
+  applyFmSubTracks(); /* re-attach <track>s now — loadedmetadata may have fired with stale data */
 }
 function renderSubsStrip(o,pv){
   let strip=pv.querySelector(".fm-subs");
@@ -3220,14 +3226,25 @@ function renderSubsStrip(o,pv){
   const importBtn=strip.querySelector("#subImportBtn");
   importBtn.onclick=async(e)=>{
     e.stopPropagation();
+    if(importBtn.dataset.busy)return; /* BUG-v0.15.42: ignore double-clicks while running */
+    importBtn.dataset.busy="1";
+    /* visible in-progress state: spinner + label, so the user knows the
+       extraction is running (large videos take ~1min from Telegram) */
     importBtn.classList.add("busy");
+    importBtn.innerHTML='<span class="spin"></span> '+esc(t("subImportBusy"));
     try{
       const r=await api("/api/v1/admin/objects/"+encodeURIComponent(o.id)+"/subs/import-embedded",{method:"POST"});
       const n=(r&&r.added&&r.added.length)||0;
       toast(n?t("subImported").replace("{n}",n):t("subImportNone"));
       await loadSubsStrip(o,pv);
     }catch(err){toast(err.message,"err");}
-    finally{importBtn.classList.remove("busy");}
+    finally{
+      delete importBtn.dataset.busy;
+      importBtn.classList.remove("busy");
+      importBtn.innerHTML='⤓ '+esc(t("subImport"));
+      /* restore handlers — innerHTML replaced the button content but the
+         strip may have been re-rendered by loadSubsStrip() meanwhile */
+    }
   };
   for(const chip of strip.querySelectorAll(".subchip")){
     const tid=chip.dataset.tid;
@@ -3269,7 +3286,9 @@ function applyFmSubTracks(){
   const vid=document.getElementById("fmVid");
   if(!vid||!fmObj)return;
   vid.querySelectorAll("track").forEach(n=>n.remove());
-  if(!fmSubs.length){vid.textTracks&&vid.textTracks.length&&(vid.textTracks[0].mode="disabled");return;}
+  /* BUG-v0.15.42: never attach tracks belonging to a different video — the
+     interval hook can fire between openFileModal() and loadSubsStrip() */
+  if(!fmSubs.length||fmSubsObjId!==fmObj.id){vid.textTracks&&vid.textTracks.length&&(vid.textTracks[0].mode="disabled");return;}
   for(const trk of fmSubs){
     const tr=document.createElement("track");
     tr.kind="subtitles";
