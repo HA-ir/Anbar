@@ -570,3 +570,7 @@
 - **رفع باگ:** دکمه UI «⤓ از داخل ویدئو» به `/subs/import` صدا می‌زد در حالی که اندپوینت `/subs/import-embedded` است → 405 Method Not Allowed. نام مسیر در JS اصلاح شد (commit 20d831a→跟进).
 - **نکته رقابتی (race):** `applyFmSubTracks` یک‌بار با تایمر 400ms اجرا می‌شود؛ اگر لیست ترک‌ها دیرتر برسد، ترک‌ها attach نمی‌شدند. با بازکردن مجدد مودال مشکل حل می‌شود (watcher interval هر 600ms چک می‌کند و بعد از loadSubsStrip درست کار می‌کند). در عمل E2E: بار اولِ بلافاصله بعد از import ترک attach نشد، بعد از بستن/بازکردن مودال 648 cue با mode=showing attach شد.
 - **تحلیل بار پردازشی (پرود، فایل 367MB The Mentalist):** probe هدر ffprobe: 0.37s CPU؛ استخراج SRT: 0.05s CPU؛ گلوگاه شبکه است (گرفتن 367MB از Telegram CDN ~67s در این باکس) — CPU تقریباً بی‌اثر (کپی استریم subrip بدون re-encode).
+
+## v0.15.41 — سوییچ استخراج زیرنویس + فیکس فلاکی sqlite
+- **قابلیت:** تنظیم runtime `subs_extract_enabled` (پیش‌فرض روشن، بدون restart) — آپلود خودکار را skip و اندپوینت import را 409 می‌کند. سوییچ UI در تنظیمات + توضیح محدودیت اجرا روی Cloudflare Workers (بدون ffmpeg، سقف CPU 30s، رم 128MB، بدون دیسک tmp؛ پارسر EBML = پروژه جدا).
+- **باگ فلاکی (BUG-v0.15.41):** `sqlite3.InterfaceError: bad parameter or other API misuse` در `kv_set` — تسک پس‌زمینه import زیرنویس از ترد دیگر همان connection استفاده می‌کرد و statement cache ار sqlite3 تحت interleaving خراب می‌شد (~1 از 9 ران تست). فیکس: `Database._db_lock` دور kv_get/kv_set/kv_delete + skip پروب ویدئوهای زیر 16KB. ۱۵ ران متوالی full-suite سبز.
