@@ -2,7 +2,7 @@
 .env
 *.session
 secrets/
-data/
+/data/
 
 # python
 __pycache__/
