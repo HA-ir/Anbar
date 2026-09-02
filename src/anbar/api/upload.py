@@ -89,10 +89,15 @@ async def _commit(
 
     # FEAT-SUBS-2: best-effort import of subtitle tracks embedded in the
     # video container (MKV soft subs). Runs in the background after commit;
-    # skipped silently when ffmpeg is unavailable.
-    from .. import subs_extract
+    # skipped silently when ffmpeg is unavailable or the admin has turned
+    # the feature off (runtime setting subs_extract_enabled).
+    from .. import runtime, subs_extract
 
-    if subs_extract.AVAILABLE and subs_extract.video_ext(filename):
+    if (
+        subs_extract.AVAILABLE
+        and subs_extract.video_ext(filename)
+        and runtime.get_int(db, "subs_extract_enabled", 1)
+    ):
 
         async def _import_embedded() -> None:
             try:

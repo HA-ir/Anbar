@@ -971,6 +971,14 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="sw on" id="swAutoBackup" role="switch"><i></i></div>
       </div>
 
+      <div class="set-row">
+        <div class="lab"><span data-i18n="subsExtractLab">استخراج زیرنویس تعبیه‌شده (ffmpeg)</span><small data-i18n="subsExtractSub">استخراج خودکار زیرنویس‌های داخل MKV/MP4 بعد از آپلود + دکمه «⤓ از داخل ویدئو»</small></div>
+        <div class="sw on" id="swSubsExtract" role="switch"><i></i></div>
+      </div>
+      <div class="set-row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <div class="lab"><small data-i18n="subsEdgeNote" style="color:var(--tx3);line-height:1.7">⚠️ این قابلیت فقط روی سرور خودمیزی (Docker + ffmpeg) کار می‌کند. در نسخه‌ی Cloudflare Workers قابل اجرا نیست: ffmpeg در Workers وجود ندارد، سقف CPU پلن پولی ۳۰ ثانیه است، حافظه ۱۲۸MB برای فایل‌های ویدئوی حجیم کافی نیست و دیسک موقت هم وجود ندارد. استخراج زیرنویس MKV بدون decode نیاز به پارسر سبک EBML دارد که امکان‌پذیر ولی پروژه‌ای جداگانه است.</small></div>
+      </div>
+
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost" id="btnDownloadBackup" type="button" style="flex:1;min-width:130px;font-size:12px">
           💾 <span data-i18n="btnDlBackup">دانلود بکاپ</span>
@@ -1187,6 +1195,9 @@ const I18N={
   secBackup:"پشتیبان‌گیری و سلامت سیستم",
   autoBackupLab:"بکاپ روزانه خودکار به تلگرام",
   autoBackupSub:"ارسال روزانه یک نسخه پشتیبان از دیتابیس به کانال ذخیره‌سازی",
+  subsExtractLab:"استخراج زیرنویس تعبیه‌شده (ffmpeg)",
+  subsExtractSub:"استخراج خودکار زیرنویس‌های داخل MKV/MP4 بعد از آپلود + دکمه «⤓ از داخل ویدئو»",
+  subsEdgeNote:"⚠️ این قابلیت فقط روی سرور خودمیزی (Docker + ffmpeg) کار می‌کند. در نسخه‌ی Cloudflare Workers قابل اجرا نیست: ffmpeg در Workers وجود ندارد، سقف CPU پلن پولی ۳۰ ثانیه است، حافظه ۱۲۸MB برای فایل‌های ویدئوی حجیم کافی نیست و دیسک موقت هم وجود ندارد. استخراج زیرنویس MKV بدون decode نیاز به پارسر سبک EBML دارد که امکان‌پذیر ولی پروژه‌ای جداگانه است.",
   statStorage:"حجم کل ذخیره",
   statFiles:"تعداد فایل‌ها",
   statBots:"بات‌های فعال",
@@ -1352,6 +1363,9 @@ const I18N={
   secBackup:"System Backup & Health",
   autoBackupLab:"Daily Auto-Backup to Telegram",
   autoBackupSub:"Automatically send daily SQLite backup to storage channel",
+  subsExtractLab:"Embedded subtitle extraction (ffmpeg)",
+  subsExtractSub:"Auto-extract subtitles inside MKV/MP4 after upload + the “⤓ From video” button",
+  subsEdgeNote:"⚠️ Works only on the self-hosted server (Docker + ffmpeg). Not possible on Cloudflare Workers: ffmpeg does not exist there, the paid CPU cap is 30s, 128MB memory cannot hold large videos, and there is no temp disk. Extracting MKV subs without decode needs a lightweight EBML parser — feasible but a separate project.",
   statStorage:"Total Stored",
   statFiles:"Total Files",
   statBots:"Active Bots",
@@ -4183,6 +4197,8 @@ async function loadSettings(){
     if(swE)swE.classList.toggle("on",!!v("encryption_enabled"));
     const swAB=$("#swAutoBackup");
     if(swAB)swAB.classList.toggle("on",v("auto_backup_enabled")!==0);
+    const swSE=$("#swSubsExtract");
+    if(swSE)swSE.classList.toggle("on",v("subs_extract_enabled")!==0);
     $("#s_rate_download").value=v("rate_download")??"";
     $("#s_rate_upload").value=v("rate_upload");
     $("#s_rate_login").value=v("rate_login");
@@ -4553,6 +4569,18 @@ $("#swAutoBackup").onclick=async()=>{
   }catch(e){toast(e.message,"err");}
   finally{sw.style.opacity="";}
 };
+/* v0.15.41: master switch for embedded subtitle extraction (ffmpeg). */
+$("#swSubsExtract").onclick=async()=>{
+  const sw=$("#swSubsExtract");sw.style.opacity=".5";
+  try{
+    const nextOn=!sw.classList.contains("on");
+    const r=await api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify({subs_extract_enabled:nextOn?1:0})});
+    curSettings=r.settings;
+    sw.classList.toggle("on",nextOn);
+    toast(t("saved"));
+  }catch(e){toast(e.message,"err");}
+  finally{sw.style.opacity="";}
+};
 /* v0.15.37: runtime master switch for the download cache (was .env-only). */
 $("#swCache").onclick=async()=>{
   const sw=$("#swCache");sw.style.opacity=".5";
@@ -4647,7 +4675,8 @@ $("#saveBtn").onclick=guardBtn($("#saveBtn"),async()=>{
     max_upload_mb:+$("#s_max_upload_mb").value,
     web_session_ttl:Math.round(+$("#s_session_ttl_h").value*3600),
     cache_mb:+$("#s_cache_mb").value,
-    auto_backup_enabled:$("#swAutoBackup")?.classList.contains("on")?1:0
+    auto_backup_enabled:$("#swAutoBackup")?.classList.contains("on")?1:0,
+    subs_extract_enabled:$("#swSubsExtract")?.classList.contains("on")?1:0
   };
   const tgBody={
     backend:$("#s_tg_backend")?.value,

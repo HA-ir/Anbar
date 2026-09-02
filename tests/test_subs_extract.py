@@ -186,3 +186,69 @@ def test_import_endpoint_requires_video(client):
         headers={"Authorization": "Bearer test-admin-key"},
     )
     assert r.status_code == 400
+
+
+def test_subs_extract_enabled_runtime_switch(client):
+    """v0.15.41: subs_extract_enabled runtime setting gates auto-import + import endpoint."""
+    import time
+
+    from anbar import runtime
+
+    db = client.app.state.db
+    assert runtime.get_int(db, "subs_extract_enabled", 1) == 1  # default ON
+
+    # upload a real MKV → bg auto-import fires (flag on) → 1 track
+    r = client.post(
+        "/api/v1/upload",
+        files={"file": ("real.mkv", FFMPEG_MKVIDEO.read_bytes(), "application/octet-stream")},
+        headers={"Authorization": "Bearer test-admin-key"},
+    )
+    assert r.status_code == 200
+    obj_id = r.json()["id"]
+    from anbar import subtitles as _subs
+
+    for _ in range(40):
+        if _subs.load(client.app.state.db, obj_id):
+            break
+        time.sleep(0.1)
+    assert len(_subs.load(client.app.state.db, obj_id)) == 1
+
+    # turn the feature OFF
+    r = client.post(
+        "/api/v1/admin/settings",
+        json={"subs_extract_enabled": 0},
+        headers={"Authorization": "Bearer test-admin-key"},
+    )
+    assert r.status_code == 200
+    assert runtime.get_int(db, "subs_extract_enabled", 1) == 0
+
+    # manual import endpoint now refuses with 409
+    r2 = client.post(
+        f"/api/v1/admin/objects/{obj_id}/subs/import-embedded",
+        headers={"Authorization": "Bearer test-admin-key"},
+    )
+    assert r2.status_code == 409
+
+    # a NEW upload with flag off → no auto-import (one-shot flag still unset)
+    r3 = client.post(
+        "/api/v1/upload",
+        files={"file": ("real2.mkv", FFMPEG_MKVIDEO.read_bytes(), "application/octet-stream")},
+        headers={"Authorization": "Bearer test-admin-key"},
+    )
+    assert r3.status_code == 200
+    obj2 = r3.json()["id"]
+    time.sleep(1.5)
+    assert _subs.load(client.app.state.db, obj2) == []
+
+    # back ON → endpoint works again
+    client.post(
+        "/api/v1/admin/settings",
+        json={"subs_extract_enabled": 1},
+        headers={"Authorization": "Bearer test-admin-key"},
+    )
+    r4 = client.post(
+        f"/api/v1/admin/objects/{obj2}/subs/import-embedded",
+        headers={"Authorization": "Bearer test-admin-key"},
+    )
+    assert r4.status_code == 200
+    assert len(r4.json()["added"]) == 1

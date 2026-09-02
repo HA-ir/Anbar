@@ -48,6 +48,7 @@ def _env_defaults(s) -> dict[str, int]:
         "encryption_enabled": 0,
         "auto_backup_enabled": 1 if getattr(s, "auto_backup_enabled", True) else 0,
         "seek_cache_mb": getattr(s, "seek_cache_mb", 32),
+        "subs_extract_enabled": 1,
     }
 
 
@@ -1643,6 +1644,10 @@ async def admin_subs_import_embedded(request: Request, obj_id: str):
         raise HTTPException(404, "object not found")
     if not subs_extract.AVAILABLE:
         raise HTTPException(503, "ffmpeg/ffprobe not available on the server")
+    from .. import runtime
+
+    if not runtime.get_int(db, "subs_extract_enabled", 1):
+        raise HTTPException(409, "embedded subtitle extraction is disabled in settings")
     if not subs_extract.video_ext(str(row["filename"] or "")):
         raise HTTPException(400, "not a video object")
     manifest = Manifest.from_json(row["manifest"]) if row["manifest"] else Manifest()

@@ -1,6 +1,6 @@
 [project]
 name = "anbar"
-version = "0.15.40"
+version = "0.15.41"
 description = "Telegram-backed object storage: upload/download proxy with zero local file retention"
 requires-python = ">=3.11"
 dependencies = [

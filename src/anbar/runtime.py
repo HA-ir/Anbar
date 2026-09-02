@@ -41,6 +41,10 @@ SPEC = {
     "auto_backup_enabled": (0, 1),
     # PERF-01: RAM budget (MB) for the per-chunk seek micro cache; 0 = off
     "seek_cache_mb": (0, 512),
+    # FEAT-SUBS-2: embedded subtitle extraction with ffmpeg (auto-import after
+    # upload + the admin import-embedded endpoint). 0 = off (no probing, no
+    # tmp-file chunk gathering), 1 = on when ffmpeg is installed.
+    "subs_extract_enabled": (0, 1),
 }
 
 
