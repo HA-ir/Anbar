@@ -15,9 +15,19 @@ from email.utils import formatdate
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 
+from .. import runtime
 from ..auth import effective_auth_enabled, whoami
 from ..db import Database
-from ..objects import Chunk, Manifest, chunk_stream, new_object_id, opaque_chunk_name
+from ..object_service import purge_object_blobs as _purge_object_blobs
+from ..objects import (
+    Chunk,
+    Manifest,
+    UploadCeilingExceeded,
+    chunk_stream,
+    new_object_id,
+    opaque_chunk_name,
+)
+from ..ratelimit import limit_download, limit_upload
 from ..storage import ObjectRef
 
 router = APIRouter(prefix="/s3")
@@ -32,38 +42,68 @@ def _xml_error(code: str, message: str, resource: str, status_code: int = 400) -
     return Response(content=xml_bytes, status_code=status_code, media_type="application/xml")
 
 
-def _check_s3_auth(request: Request):
+def _check_s3_auth(request: Request, write: bool = False):
     settings = request.app.state.settings
     db = request.app.state.db
-    if effective_auth_enabled(db, settings.auth_enabled):
-        role = whoami(request)
+    auth_enabled = effective_auth_enabled(db, settings.auth_enabled)
+    role = whoami(request)
+    if auth_enabled:
         if role == "anon":
             raise HTTPException(401, "S3 Access Denied")
+    elif write and role == "anon":
+        # SEC-B3: Even when general auth is OFF, anonymous S3 writes are rejected
+        raise HTTPException(401, "S3 writes require authentication")
 
 
 @router.get("/{bucket}")
-async def list_objects_v2(bucket: str, request: Request):
+async def list_objects_v2(
+    bucket: str,
+    request: Request,
+    max_keys: int = 1000,
+    continuation_token: str | None = None,
+):
     """List objects in a bucket (stored as prefix 'bucket/')."""
     _check_s3_auth(request)
     db: Database = request.app.state.db
+    settings = request.app.state.settings
+    rate = runtime.get_int(db, "rate_download", settings.rate_download_per_min)
+    limit_download(db, request, f"s3:{bucket}", rate)
     prefix = f"{bucket}/"
-    rows = db.list_objects(limit=1000)
-    matching = [r for r in rows if r["filename"].startswith(prefix) or bucket == "default"]
+    # SEC-B3: never fall back to global default-bucket enumeration. S3 lists
+    rows = db.list_objects_by_prefix(prefix)
+    matching = [r for r in rows if r["filename"].startswith(prefix) and not r.get("deleted_at")]
 
-    root = ET.Element("ListBucketResult", attrib={"xmlns": "http://s3.amazonaws.com/doc/2006-03-01/"})
+    max_keys_int = max(1, min(int(request.query_params.get("max-keys", max_keys)), 1000))
+    offset = 0
+    token = request.query_params.get("continuation-token") or continuation_token
+    if token:
+        try:
+            offset = max(0, int(token))
+        except ValueError:
+            offset = 0
+
+    paged = matching[offset : offset + max_keys_int]
+    is_truncated = (offset + max_keys_int) < len(matching)
+    next_token = str(offset + max_keys_int) if is_truncated else None
+
+    root = ET.Element(
+        "ListBucketResult", attrib={"xmlns": "http://s3.amazonaws.com/doc/2006-03-01/"}
+    )
     ET.SubElement(root, "Name").text = bucket
-    ET.SubElement(root, "KeyCount").text = str(len(matching))
-    ET.SubElement(root, "MaxKeys").text = "1000"
-    ET.SubElement(root, "IsTruncated").text = "false"
+    ET.SubElement(root, "KeyCount").text = str(len(paged))
+    ET.SubElement(root, "MaxKeys").text = str(max_keys_int)
+    ET.SubElement(root, "IsTruncated").text = "true" if is_truncated else "false"
+    if next_token:
+        ET.SubElement(root, "NextContinuationToken").text = next_token
 
-    for r in matching:
-        full_row = db.get_object(r["id"]) or r
+    for r in paged:
+        # REL-C4: sha256 is already selected in db.list_objects() — zero N+1 queries
         contents = ET.SubElement(root, "Contents")
         is_pfx = r["filename"].startswith(prefix)
         key_name = r["filename"][len(prefix) :] if is_pfx else r["filename"]
         ET.SubElement(contents, "Key").text = key_name
         ET.SubElement(contents, "Size").text = str(r["size"])
-        ET.SubElement(contents, "ETag").text = f'"{full_row.get("sha256") or ""}"'
+        ET.SubElement(contents, "ETag").text = f'"{r.get("sha256") or ""}"'
         ET.SubElement(contents, "LastModified").text = formatdate(r["created_at"], usegmt=True)
 
     xml_bytes = ET.tostring(root, encoding="utf-8", xml_declaration=True)
@@ -73,12 +113,21 @@ async def list_objects_v2(bucket: str, request: Request):
 @router.put("/{bucket}/{key:path}")
 async def put_object(bucket: str, key: str, request: Request):
     """PutObject into Telegram backend via standard chunking."""
-    _check_s3_auth(request)
+    _check_s3_auth(request, write=True)
     backend = request.app.state.backend
     settings = request.app.state.settings
     db: Database = request.app.state.db
 
-    full_filename = f"{bucket}/{key}" if bucket != "default" else key
+    # SEC-B3: rate limit S3 uploads
+    limit_upload(db, request, runtime.get_int(db, "rate_upload", settings.rate_upload_per_min))
+
+    # SEC-B3 & SEC-B4: running upload size ceiling
+    max_bytes = runtime.get_int(db, "max_upload_mb", settings.max_upload_mb) * 1024 * 1024
+    declared = int(request.headers.get("content-length", "0") or 0)
+    if declared and declared > max_bytes:
+        raise HTTPException(413, "object exceeds configured ceiling")
+
+    full_filename = f"{bucket}/{key}"
     content_type = request.headers.get("content-type") or "application/octet-stream"
 
     # Stream chunks
@@ -94,19 +143,49 @@ async def put_object(bucket: str, key: str, request: Request):
                 message_id=ref.message_id,
             )
         )
-        return ref.file_id
+        return str(ref.file_id)
 
     from .upload import _RequestBodyReader
 
-    # Read body stream
+    # Read body stream with running byte counter
     body_reader = _RequestBodyReader(request, request.app.state.settings.body_idle_timeout_s)
-    total_size, sha256_hex = await chunk_stream(
-        body_reader,
-        settings.chunk_size,
-        on_chunk,
-    )
+    try:
+        total_size, sha256_hex = await chunk_stream(
+            body_reader,
+            settings.chunk_size,
+            on_chunk,
+            max_bytes=max_bytes,
+        )
+    except UploadCeilingExceeded as e:
+        for c in manifest.chunks:
+            try:
+                await backend.delete(
+                    ObjectRef(
+                        file_id=c.file_id,
+                        message_id=c.message_id,
+                        backend=backend.name,
+                    )
+                )
+            except Exception:
+                pass
+        raise HTTPException(413, str(e)) from e
+
     manifest.total_size = total_size
     obj_id = new_object_id()
+
+    # SEC-B7: Reuse the canonical purge path so old blobs, metadata, tags and
+    # subtitles cannot leak behind the replaced S3 key.
+    old_obj_id = db.kv_get(f"s3:{bucket}:{key}")
+    if old_obj_id:
+        old_row = db.get_object(old_obj_id)
+        if old_row:
+            await _purge_object_blobs(
+                backend,
+                db,
+                old_row,
+                pool=getattr(request.app.state, "bot_pool", None),
+            )
+        db.kv_delete(f"s3:{bucket}:{key}")
 
     # Save to SQLite
     db.insert_object(
@@ -137,6 +216,9 @@ async def head_object(bucket: str, key: str, request: Request):
     """HeadObject metadata."""
     _check_s3_auth(request)
     db: Database = request.app.state.db
+    settings = request.app.state.settings
+    rate = runtime.get_int(db, "rate_download", settings.rate_download_per_min)
+    limit_download(db, request, f"s3:{bucket}:{key}", rate)
     obj_id = db.kv_get(f"s3:{bucket}:{key}")
     if not obj_id:
         return Response(status_code=404)
@@ -159,6 +241,9 @@ async def get_object(bucket: str, key: str, request: Request):
     """GetObject with Range and ETag support."""
     _check_s3_auth(request)
     db: Database = request.app.state.db
+    settings = request.app.state.settings
+    rate = runtime.get_int(db, "rate_download", settings.rate_download_per_min)
+    limit_download(db, request, f"s3:{bucket}:{key}", rate)
     obj_id = db.kv_get(f"s3:{bucket}:{key}")
     if not obj_id:
         return _xml_error("NoSuchKey", "The specified key does not exist.", f"/{bucket}/{key}", 404)
@@ -224,9 +309,7 @@ async def get_object(bucket: str, key: str, request: Request):
             chunk_backend = backend
             if c.backend and pool is not None:
                 chunk_backend = pool.by_name(c.backend) or backend
-            ref = ObjectRef(
-                file_id=c.file_id, message_id=c.message_id, backend=chunk_backend.name
-            )
+            ref = ObjectRef(file_id=c.file_id, message_id=c.message_id, backend=chunk_backend.name)
             chunk_data = await chunk_backend.open(ref)
             yield chunk_data[off : off + n]
 
@@ -246,7 +329,7 @@ async def get_object(bucket: str, key: str, request: Request):
 @router.delete("/{bucket}/{key:path}")
 async def delete_object(bucket: str, key: str, request: Request):
     """DeleteObject from storage."""
-    _check_s3_auth(request)
+    _check_s3_auth(request, write=True)
     db: Database = request.app.state.db
     backend = request.app.state.backend
     obj_id = db.kv_get(f"s3:{bucket}:{key}")

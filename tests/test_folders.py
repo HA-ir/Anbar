@@ -189,17 +189,13 @@ def test_move_objects_validation(client):
     assert r.json()["moved"] == 0
 
     # non-admin cannot move
-    r = client.post(
-        "/api/v1/admin/objects/move", json={"ids": [a["id"]], "dest": "x"}
-    )
+    r = client.post("/api/v1/admin/objects/move", json={"ids": [a["id"]], "dest": "x"})
     assert r.status_code == 401
 
 
 def test_folder_rename_into_itself_rejected(client):
     ADMIN = {"Authorization": "Bearer test-admin-key"}
-    r = client.post(
-        "/api/v1/admin/folders/create", json={"path": "docs/reports"}, headers=ADMIN
-    )
+    r = client.post("/api/v1/admin/folders/create", json={"path": "docs/reports"}, headers=ADMIN)
     assert r.status_code == 200
 
     # moving into itself

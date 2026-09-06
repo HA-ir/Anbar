@@ -6,13 +6,16 @@ import asyncio
 import sys
 import time
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse, Response
 
 from . import __version__
 from .config import get_settings
 from .db import Database
 from .storage import StorageBackend
+from .tasks import _BACKGROUND_TASKS, spawn_background_task
 
 
 def _configure_logging(level_name: str) -> None:
@@ -53,9 +56,7 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         from .cache import ChunkMicroCache
 
         seek_mb = runtime.get_int(db, "seek_cache_mb", settings.seek_cache_mb)
-        app.state.chunk_cache = (
-            ChunkMicroCache(seek_mb * 1024 * 1024) if seek_mb > 0 else None
-        )
+        app.state.chunk_cache = ChunkMicroCache(seek_mb * 1024 * 1024) if seek_mb > 0 else None
 
         # ARCH-02: durable job queue (jobs table in the same SQLite DB)
         from .jobqueue import JobQueue
@@ -125,6 +126,20 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
                     raise
                 except Exception:
                     continue
+                try:
+                    from . import links as links_registry
+
+                    links_registry.purge_expired(db)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    continue
+                try:
+                    jq = getattr(app.state, "job_queue", None)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    continue
                 # ARCH-02: prune finished job rows after 1h (same TTL rule as
                 # the old in-memory JOBS dict)
                 try:
@@ -139,6 +154,7 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         async def _auto_backup_loop() -> None:
             """Periodic database snapshot push to Telegram (every 24 hours)."""
             from . import runtime
+
             while True:
                 await asyncio.sleep(86400)
                 try:
@@ -172,14 +188,19 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
                 except Exception:  # pragma: no cover
                     pass
 
-        prune_task = asyncio.create_task(_prune_rate_loop())
-        backup_task = asyncio.create_task(_auto_backup_loop())
+        spawn_background_task(_prune_rate_loop(), name="main:prune-rate-loop")
+        spawn_background_task(_auto_backup_loop(), name="main:auto-backup-loop")
         yield
-        jq = getattr(app.state, "job_queue", None)
-        if jq is not None:
-            await jq.stop()
-        prune_task.cancel()
-        backup_task.cancel()
+        active_jq = getattr(app.state, "job_queue", None)
+        if active_jq is not None:
+            await active_jq.stop()
+        for task in tuple(_BACKGROUND_TASKS):
+            if task.get_loop() is asyncio.get_running_loop() and not task.done():
+                task.cancel()
+        current_loop = asyncio.get_running_loop()
+        current_tasks = [task for task in _BACKGROUND_TASKS if task.get_loop() is current_loop]
+        if current_tasks:
+            await asyncio.gather(*current_tasks, return_exceptions=True)
         if app.state.harvester is not None:
             await app.state.harvester.stop()
         if app.state.bot_pool is not None:
@@ -213,9 +234,110 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
 
     app.add_middleware(_SelectiveGZip, minimum_size=1000)
 
+    from starlette.middleware.base import BaseHTTPMiddleware
+
+    class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
+        """SEC-B8: Attach standard security headers to HTTP responses."""
+
+        async def dispatch(self, request, call_next):
+            response = await call_next(request)
+            response.headers.setdefault("X-Content-Type-Options", "nosniff")
+            response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+            path = request.url.path
+            if not path.startswith("/ui/miniapp"):
+                response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+            ctype = response.headers.get("content-type", "")
+            if "text/html" in ctype:
+                csp = (
+                    "default-src 'self'; "
+                    "script-src 'self' 'unsafe-inline' https://telegram.org; "
+                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                    "font-src 'self' https://fonts.gstatic.com data:; "
+                    "img-src 'self' data: blob:; "
+                    "media-src 'self' blob:; "
+                    "connect-src 'self'; "
+                    "frame-ancestors 'self' https://web.telegram.org;"
+                )
+                response.headers.setdefault("Content-Security-Policy", csp)
+            return response
+
+    app.add_middleware(_SecurityHeadersMiddleware)
+
     @app.get("/healthz", include_in_schema=False)
-    async def healthz():
-        return {"status": "ok", "service": "anbar", "version": __version__}
+    async def healthz(full: bool = False):
+        db_ok = True
+        try:
+            with app.state.db.lock:
+                app.state.db._conn.execute("SELECT 1").fetchone()
+        except Exception:
+            db_ok = False
+
+        status = "ok" if db_ok else "unhealthy"
+        code = 200 if db_ok else 503
+        data: dict[str, Any] = {"status": status, "service": "anbar", "version": __version__}
+        if full:
+            data["checks"] = {"db": "ok" if db_ok else "error"}
+        return JSONResponse(data, status_code=code)
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics():
+        db = app.state.db
+        lines: list[str] = []
+
+        try:
+            with db.lock:
+                row = db._conn.execute(
+                    "SELECT COUNT(*) AS cnt, COALESCE(SUM(size), 0) AS total_bytes "
+                    "FROM objects WHERE deleted_at IS NULL"
+                ).fetchone()
+                obj_count = row["cnt"] if row else 0
+                obj_bytes = row["total_bytes"] if row else 0
+        except Exception:
+            obj_count = 0
+            obj_bytes = 0
+
+        lines.append("# HELP anbar_objects_total Total active stored objects")
+        lines.append("# TYPE anbar_objects_total gauge")
+        lines.append(f"anbar_objects_total {obj_count}")
+
+        lines.append(
+            "# HELP anbar_objects_bytes_total Total size in bytes of active stored objects"
+        )
+        lines.append("# TYPE anbar_objects_bytes_total gauge")
+        lines.append(f"anbar_objects_bytes_total {obj_bytes}")
+
+        chunk_cache = getattr(app.state, "chunk_cache", None)
+        hits = getattr(chunk_cache, "hits", 0) if chunk_cache else 0
+        misses = getattr(chunk_cache, "misses", 0) if chunk_cache else 0
+        entries = getattr(chunk_cache, "entries", 0) if chunk_cache else 0
+        used_bytes = getattr(chunk_cache, "used_bytes", 0) if chunk_cache else 0
+
+        lines.append("# HELP anbar_chunk_cache_hits_total Number of chunk cache hits")
+        lines.append("# TYPE anbar_chunk_cache_hits_total counter")
+        lines.append(f"anbar_chunk_cache_hits_total {hits}")
+
+        lines.append("# HELP anbar_chunk_cache_misses_total Number of chunk cache misses")
+        lines.append("# TYPE anbar_chunk_cache_misses_total counter")
+        lines.append(f"anbar_chunk_cache_misses_total {misses}")
+
+        lines.append("# HELP anbar_chunk_cache_entries Current entries in chunk cache")
+        lines.append("# TYPE anbar_chunk_cache_entries gauge")
+        lines.append(f"anbar_chunk_cache_entries {entries}")
+
+        lines.append("# HELP anbar_chunk_cache_bytes Current memory used by chunk cache")
+        lines.append("# TYPE anbar_chunk_cache_bytes gauge")
+        lines.append(f"anbar_chunk_cache_bytes {used_bytes}")
+
+        jq = getattr(app.state, "job_queue", None)
+        if jq is not None:
+            stats = jq.stats() if hasattr(jq, "stats") else {}
+            lines.append("# HELP anbar_jobs_total Number of background jobs by state")
+            lines.append("# TYPE anbar_jobs_total gauge")
+            for state, count in stats.items():
+                lines.append(f'anbar_jobs_total{{state="{state}"}} {count}')
+
+        body = "\n".join(lines) + "\n"
+        return Response(content=body, media_type="text/plain; version=0.0.4; charset=utf-8")
 
     from .api import admin, download, s3, upload, web  # noqa: PLC0415
 

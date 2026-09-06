@@ -232,7 +232,9 @@ class MTProtoBackend(StorageBackend):
                     await self._reconnect()
                     continue
                 raise
-        raise last  # pragma: no cover - loop always returns or raises
+        if last is not None:
+            raise last
+        raise RuntimeError("operation failed after retries")
 
     async def health(self) -> bool:
         try:

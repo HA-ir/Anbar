@@ -26,10 +26,10 @@ def _http(
         req.add_header("Authorization", f"Bearer {admin_key}")
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
-            return resp.status, json.loads(resp.read().decode() or "{}")  # type: ignore[no-any-return]
+            return resp.status, json.loads(resp.read().decode() or "{}")
     except urllib.error.HTTPError as e:
         try:
-            return e.code, json.loads(e.read().decode() or "{}")  # type: ignore[no-any-return]
+            return e.code, json.loads(e.read().decode() or "{}")
         except (ValueError, UnicodeDecodeError):
             return e.code, {"detail": str(e)}
     except urllib.error.URLError as e:
@@ -341,7 +341,7 @@ def _cmd_s3(args: argparse.Namespace) -> int:
             return 1
 
     elif action == "get":
-        out_path = args.out or os.path.basename(key)
+        out_path = args.out or os.path.basename(key or "download")
         url = f"{base}/s3/{bucket}/{key}"
         req = urllib.request.Request(url, headers=headers)
         try:

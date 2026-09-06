@@ -181,8 +181,6 @@ def test_purge_drops_subs(client):
     )
     assert load(client.app.state.db, obj_id)
     # hard-delete the object (trash purge)
-    r = client.delete(
-        f"/f/{obj_id}?purge=true", headers={"Authorization": "Bearer test-admin-key"}
-    )
+    r = client.delete(f"/f/{obj_id}?purge=true", headers={"Authorization": "Bearer test-admin-key"})
     assert r.status_code in (200, 410), r.text
     assert load(client.app.state.db, obj_id) == []

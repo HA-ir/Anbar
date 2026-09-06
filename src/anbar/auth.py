@@ -113,14 +113,23 @@ def list_api_keys(db) -> list[dict]:
 
 
 def add_api_key(db, name: str) -> dict:
+    raw_key = new_secret(24)
     entry = {
         "id": secrets.token_hex(4),
-        "key": new_secret(24),
+        "key": raw_key,
         "name": (name or "key").strip()[:60],
         "created_at": int(time.time()),
     }
     keys = list_api_keys(db)
-    keys.append({k: v for k, v in entry.items() if k != "key"} | {"key": entry["key"]})
+    # SEC-B5: Store hash instead of plaintext in kv
+    stored_entry = {
+        "id": entry["id"],
+        "name": entry["name"],
+        "created_at": entry["created_at"],
+        "key_hash": hash_key(raw_key),
+        "prefix": raw_key[:6] + "...",
+    }
+    keys.append(stored_entry)
     db.kv_set("api_keys", __import__("json").dumps(keys))
     return entry
 
@@ -136,9 +145,13 @@ def revoke_api_key(db, key_id: str) -> bool:
 
 def _match_dynamic_key(key: str, db) -> bool:
     """Constant-time match against every stored uploader key."""
+    kh = hash_key(key)
     for k in list_api_keys(db):
-        stored = k.get("key", "")
-        if stored and constant_time_equal(key, stored):
+        stored_hash = k.get("key_hash")
+        if stored_hash and constant_time_equal(kh, stored_hash):
+            return True
+        stored_raw = k.get("key")
+        if stored_raw and constant_time_equal(key, stored_raw):
             return True
     return False
 
@@ -152,22 +165,21 @@ def whoami(request) -> str:
     settings = getattr(request.app.state, "settings", None)
     if not settings:
         from anbar.config import get_settings
+
         settings = get_settings()
     auth = request.headers.get("authorization", "")
     key = auth[7:] if auth.lower().startswith("bearer ") else None
     admin_key = (
         settings.admin_key.get_secret_value()
-        if hasattr(settings.admin_key, "get_secret_value")
+        if settings.admin_key is not None and hasattr(settings.admin_key, "get_secret_value")
         else (str(settings.admin_key) if settings.admin_key else None)
     )
     api_key = (
         settings.api_key.get_secret_value()
-        if hasattr(settings.api_key, "get_secret_value")
+        if settings.api_key is not None and hasattr(settings.api_key, "get_secret_value")
         else (str(settings.api_key) if settings.api_key else None)
     )
-    if key and (
-        admin_key and constant_time_equal(key, admin_key)
-    ):
+    if key and (admin_key and constant_time_equal(key, admin_key)):
         return "admin"
     if key and (
         (api_key and constant_time_equal(key, api_key))

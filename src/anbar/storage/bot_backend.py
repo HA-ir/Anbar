@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import ClassVar
 
 import httpx
 
@@ -61,6 +62,7 @@ class FloodBudgetExceeded(TelegramError):
 
 class BotBackend(StorageBackend):
     name = "bot"
+    _instance_named: ClassVar[bool] = False
     # Telegram hard limit is 20 MB via the Bot API; stay under it.
     max_upload_bytes = 19 * 1024 * 1024
 

@@ -13,15 +13,14 @@ REPO = Path(__file__).resolve().parents[1]
 
 def _load_recover():
     """Import scripts/recover.py as a module (zero-dep script, stdlib only)."""
-    spec = importlib.util.spec_from_file_location(
-        "anbar_recover", REPO / "scripts" / "recover.py"
-    )
+    spec = importlib.util.spec_from_file_location("anbar_recover", REPO / "scripts" / "recover.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
 # ── B-057: caption filenames must never escape out_path ────────────────────
+
 
 @pytest.mark.parametrize(
     "raw",
@@ -53,8 +52,7 @@ def test_recover_writes_inside_output_dir(tmp_path, monkeypatch):
     # Build a fake single-chunk object whose caption filename is absolute.
     payload = b"POISON-CONTENTS"
     chunks = [
-        {"meta": {"id": "victim", "fn": "/etc/evil.txt", "n": 1, "i": 0},
-         "data": payload},
+        {"meta": {"id": "victim", "fn": "/etc/evil.txt", "n": 1, "i": 0}, "data": payload},
     ]
     out_dir = tmp_path / "out"
     result = rec.recover_files(chunks, [], out_dir, server_secret=None)
@@ -70,10 +68,7 @@ def test_recover_writes_inside_output_dir(tmp_path, monkeypatch):
     assert files[0].name == "evil.txt"
     assert files[0].read_bytes() == payload
     # and nothing was written anywhere else under tmp_path
-    others = [
-        p for p in tmp_path.rglob("*")
-        if p.is_file() and not p.is_relative_to(resolved_out)
-    ]
+    others = [p for p in tmp_path.rglob("*") if p.is_file() and not p.is_relative_to(resolved_out)]
     assert others == []
 
 
@@ -89,6 +84,7 @@ def test_recover_dotdot_caption_refused(tmp_path):
 
 
 # ── ratelimit.py: direct coverage (no dedicated test existed) ──────────────
+
 
 def test_rate_limit_window_and_retry_after(tmp_path):
     from anbar.db import Database
@@ -131,13 +127,15 @@ def test_rate_limit_window_and_retry_after(tmp_path):
 
 # ── qrcode.py: direct coverage (no dedicated test existed) ─────────────────
 
+
 def test_qr_svg_realistic_signed_link():
     from anbar.qrcode import qr_svg
 
     url = (
         "https://storage.example-subdomain-long-name.com/f/"
         + "a" * 40
-        + "?sig=" + "b" * 64
+        + "?sig="
+        + "b" * 64
         + "&exp=9999999999"
     )
     svg = qr_svg(url)

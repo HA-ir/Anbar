@@ -21,6 +21,7 @@ import json
 import os
 import re
 import time
+from typing import cast
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
@@ -35,9 +36,11 @@ from ..auth import (
     whoami,
 )
 from ..db import Database
+from ..object_service import purge_object_blobs as _purge_object_blobs
 from ..objects import Manifest
 from ..ratelimit import limit_download
 from ..storage import ObjectRef
+from ..templates import render_album_page, render_password_page
 
 router = APIRouter()
 
@@ -73,123 +76,33 @@ def _range_416(total: int) -> HTTPException:
     return HTTPException(416, "unsatisfiable range", headers={"Content-Range": f"bytes */{total}"})
 
 
-def _password_page(obj_id: str, sig: str, exp: int, failed: bool = False) -> str:
-    """Standalone RTL unlock page for a pw-protected link.
-
-    The GET form keeps the link's `sig`/`exp` in hidden fields (a bare
-    `?pw=` would drop them and fail auth), shows a server-driven error
-    line when the previous try was wrong, and includes a show-password
-    eye toggle.
-    """
-    html = """<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>anbar · قفل</title>
-<style>
-:root{--bg:#0b0f17;--bg2:#121826;--bg3:#1a2234;--line:#232c40;--line2:#2d3852;
---tx:#e7ecf5;--tx2:#aab3c5;--tx3:#6b7690;--brand:#2f6bff;--err:#ff5d6c}
-@media(prefers-color-scheme:light){:root{--bg:#f3f6fb;--bg2:#ffffff;--bg3:#eaeff7;
---line:#dde3ee;--line2:#cbd3e4;--tx:#17202f;--tx2:#48536a;--tx3:#8590a8}}
-*{box-sizing:border-box;margin:0}
-body{font-family:'Vazirmatn',system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;
-min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
-background:radial-gradient(1200px 600px at 70% -10%,
-rgba(47,107,255,.12),transparent 60%),var(--bg);color:var(--tx)}
-.card{width:100%;max-width:380px;background:var(--bg2);border:1px solid var(--line);
-border-radius:20px;padding:38px 30px;text-align:center;
-box-shadow:0 18px 50px rgba(0,0,0,.25);animation:rise .35s cubic-bezier(.2,.9,.3,1.15)}
-@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
-.lock{width:58px;height:58px;margin:0 auto 16px;border-radius:16px;display:flex;
-align-items:center;justify-content:center;background:var(--bg3);color:var(--brand)}
-h1{font-size:16.5px;font-weight:700;margin-bottom:6px}
-p{font-size:12.5px;color:var(--tx2);margin-bottom:20px;line-height:1.9}
-form{display:flex;gap:8px}
-input{flex:1;min-width:0;padding:12px 14px;border:1.5px solid var(--line2);border-radius:12px;
-background:var(--bg3);color:var(--tx);font-size:14px;font-family:inherit;outline:none;
-transition:border .15s}
-input:focus{border-color:var(--brand)}
-button{padding:12px 18px;border:none;border-radius:12px;background:var(--brand);color:#fff;
-font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
-button:hover{filter:brightness(1.08)}
-.err{display:none;color:var(--err);font-size:12px;margin-top:12px}
-.foot{margin-top:22px;font-size:10.5px;color:var(--tx3);direction:ltr}
-.pwrow{display:flex;gap:8px;align-items:stretch}
-.pwwrap{position:relative;flex:1;min-width:0}
-.pwwrap input{width:100%;padding-inline-end:44px}
-.eye{position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);
-background:none;border:none;padding:8px;color:var(--tx3);cursor:pointer;line-height:0}
-.eye:hover{color:var(--tx)}
-</style>
-</head>
-<body>
-<div class="card">
-  <div class="lock">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18"
-      height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-  </div>
-  <h1>این فایل رمزدار است</h1>
-  <p>برای دسترسی به فایل، رمز عبور لینک را وارد کنید.</p>
-  <form method="get" action="" id="pf">
-    <input type="hidden" name="sig" value="__SIG__">
-    <input type="hidden" name="exp" value="__EXP__">
-    <div class="pwrow">
-      <div class="pwwrap">
-        <input type="password" name="pw" id="pwin" autocomplete="off"
-          autofocus placeholder="رمز عبور">
-        <button type="button" class="eye" id="eyebtn" aria-label="نمایش رمز"
-          title="نمایش رمز">
-          <svg id="eye-open" width="18" height="18" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="2"><path
-            d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle
-            cx="12" cy="12" r="3"/></svg>
-          <svg id="eye-shut" width="18" height="18" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path
-            d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45
-            18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11
-            8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line
-            x1="1" y1="1" x2="23" y2="23"/></svg>
-        </button>
-      </div>
-      <button type="submit">باز کردن</button>
-    </div>
-  </form>
-  <div class="err" id="perr">رمز عبور اشتباه است — دوباره تلاش کنید.</div>
-  <div class="foot">powered by anbar</div>
-</div>
-<script>
-var err=document.getElementById('perr');
-__FAILED__
-document.getElementById('pwin').focus();
-document.getElementById('eyebtn').onclick=function(){
-  var inp=document.getElementById('pwin'),o=document.getElementById('eye-open'),
-      s=document.getElementById('eye-shut'),show=inp.type==='password';
-  inp.type=show?'text':'password';
-  o.style.display=show?'none':'';
-  s.style.display=show?'':'none';
-};
-</script>
-</body>
-</html>"""
-    html = (
-        html.replace("__SIG__", sig)
-        .replace("__EXP__", str(int(exp)))
-        .replace("__FAILED__", "err.style.display='block';" if failed else "")
-    )
-    return html
+def _password_page(obj_id: str, sig: str, exp: int | None = 0, failed: bool = False) -> str:
+    return render_password_page(obj_id, sig, exp, failed)
 
 
 def _authenticate_download(request: Request, obj_id: str) -> None:
     """Enforce the download auth matrix for this object (no-op when auth OFF)."""
     settings = request.app.state.settings
     db = request.app.state.db
-    if not effective_auth_enabled(db, settings.auth_enabled):
-        return
     role = whoami(request)
     if role in ("admin", "uploader"):
+        return
+
+    # SEC-B2: Password protection must be enforced even if global auth is disabled
+    pw_tag = db.kv_get(f"pw:{obj_id}")
+    if pw_tag:
+        given = request.query_params.get("pw", "")
+        configured2 = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
+        secret2 = effective_hmac_secret(db, configured2) or ""
+        want = hmac.new(
+            secret2.encode(), f"pw:{obj_id}:{given}".encode(), hashlib.sha256
+        ).hexdigest()[:32]
+        if not hmac.compare_digest(want, pw_tag):
+            raise HTTPException(
+                403, "password required", headers={"WWW-Authenticate": 'xBasic realm="anbar-pw"'}
+            )
+
+    if not effective_auth_enabled(db, settings.auth_enabled):
         return
     # Direct media / UI embed key fallback (?k=...)
     # SEC-02 (v0.15.20, re-confirmed v0.15.30): the ADMIN key is NEVER
@@ -266,10 +179,9 @@ async def download(request: Request, obj_id: str):
     # gets the unlock page. A carried valid sig/exp is reused in the form;
     # pretty-slug opens get a fresh 1h window (the pw tag only exists while
     # a live link does, so revoking the last link kills the page too).
-    if (
-        "text/html" in request.headers.get("accept", "")
-        and effective_auth_enabled(db, settings.auth_enabled)
-        and whoami(request) not in ("admin", "uploader")
+    if "text/html" in request.headers.get("accept", "") and whoami(request) not in (
+        "admin",
+        "uploader",
     ):
         pw_tag = db.kv_get(f"pw:{obj_id}")
         if pw_tag:
@@ -342,10 +254,7 @@ async def download(request: Request, obj_id: str):
             resolved_ct = guessed
 
     ct = (resolved_ct or "").lower()
-    is_media = (
-        ct.startswith(("image/", "video/", "audio/", "text/"))
-        or ct == "application/pdf"
-    )
+    is_media = ct.startswith(("image/", "video/", "audio/", "text/")) or ct == "application/pdf"
     req_view = request.query_params.get("view") in ("1", "true")
     req_dl = request.query_params.get("dl") in ("1", "true") or request.query_params.get(
         "download"
@@ -371,9 +280,7 @@ async def download(request: Request, obj_id: str):
     if utf8_fn == ascii_fn and '"' not in ascii_fn:
         disposition_value = f'{disposition}; filename="{ascii_fn}"'
     else:
-        disposition_value = (
-            f'{disposition}; filename="{ascii_fn}"; filename*=UTF-8\'\'{utf8_fn}'
-        )
+        disposition_value = f"{disposition}; filename=\"{ascii_fn}\"; filename*=UTF-8''{utf8_fn}"
     headers = {
         "Content-Length": str(length),
         "Content-Type": resolved_ct or "application/octet-stream",
@@ -421,7 +328,7 @@ async def download(request: Request, obj_id: str):
         and total <= runtime.get_int(db, "cache_mb", settings.cache_max_mb) * 1024 * 1024
     )
 
-    if use_cache and (path := cache.get(obj_id)) is not None:
+    if cache is not None and use_cache and (path := cache.get(obj_id)) is not None:
         # cache hit: stream the temp file, zero backend calls
         async def cached_stream():
             with open(path, "rb") as f:
@@ -448,7 +355,7 @@ async def download(request: Request, obj_id: str):
         if chunk_cache is not None and cache_key is not None:
             hit = chunk_cache.get(cache_key[0], cache_key[1])
             if hit is not None:
-                return hit
+                return cast(bytes, hit)
         data = await _fetch_chunk_bytes_uncached(chunk_obj)
         if chunk_cache is not None and cache_key is not None:
             chunk_cache.put(cache_key[0], cache_key[1], data)
@@ -478,7 +385,7 @@ async def download(request: Request, obj_id: str):
         last_err = None
         for attempt in range(3):
             try:
-                return await chunk_backend.open(ref)
+                return cast(bytes, await chunk_backend.open(ref))
             except Exception as e:
                 last_err = e
                 await asyncio.sleep(0.5 * (attempt + 1))
@@ -490,14 +397,13 @@ async def download(request: Request, obj_id: str):
         # Each chunk index appears in at most one segment (map_range walks
         # contiguously), so per-request memory is one chunk, never the object.
         async def filling_stream():
+            assert cache is not None
             tmp = cache.new_entry_path()
             size = 0
             try:
                 with open(tmp, "wb") as out:
                     for idx, off, n in segments:
-                        chunk = await _fetch_chunk_bytes(
-                            manifest.chunks[idx], (obj_id, idx)
-                        )
+                        chunk = await _fetch_chunk_bytes(manifest.chunks[idx], (obj_id, idx))
                         part = chunk[off : off + n]
                         out.write(part)
                         size += len(part)
@@ -533,9 +439,7 @@ async def download(request: Request, obj_id: str):
                     if target_i < len(segments) and target_i not in tasks:
                         t_idx = segments[target_i][0]
                         tasks[target_i] = asyncio.create_task(
-                            _fetch_chunk_bytes(
-                                manifest.chunks[t_idx], (obj_id, t_idx)
-                            )
+                            _fetch_chunk_bytes(manifest.chunks[t_idx], (obj_id, t_idx))
                         )
 
             try:
@@ -544,9 +448,7 @@ async def download(request: Request, obj_id: str):
                     if seg_i in tasks:
                         chunk = await tasks.pop(seg_i)
                     else:
-                        chunk = await _fetch_chunk_bytes(
-                            manifest.chunks[idx], (obj_id, idx)
-                        )
+                        chunk = await _fetch_chunk_bytes(manifest.chunks[idx], (obj_id, idx))
 
                     _ensure_prefetch(seg_i)
 
@@ -820,6 +722,7 @@ async def rename(request: Request, obj_id: str):
         raise HTTPException(404, "object not found")
 
     from ..self_healing import emit_meta_event
+
     configured_sec = settings.hmac_secret.get_secret_value() if settings.hmac_secret else None
     sec = effective_hmac_secret(db, configured_sec)
     asyncio.create_task(
@@ -844,62 +747,9 @@ def _key_matches(request: Request, uploader_key: str) -> bool:
     return constant_time_equal(key, uploader_key)
 
 
-async def _purge_object_blobs(backend, db, row: dict, secret: str | None = None, pool=None) -> int:
-    """Hard-destroy one object row + its Telegram blobs. Returns blob count."""
-    obj_id = row["id"]
-    manifest = json.loads(row["manifest"]) if row["manifest"] else {"chunks": []}
-    chunks = manifest.get("chunks", [])
-    total_chunks = len(chunks)
-    deleted = 0
-    for c in chunks:
-        # ARCH-01: multi-token chunks record their holding member — delete
-        # from the right bot, not always the primary backend.
-        chunk_backend = backend
-        chunk_name = c.get("k")
-        if chunk_name and pool is not None:
-            chunk_backend = pool.by_name(chunk_name) or backend
-        try:
-            ref = ObjectRef(
-                file_id=c["f"],
-                message_id=c.get("m"),
-                backend=chunk_backend.name,
-            )
-            if await chunk_backend.delete(ref):
-                deleted += 1
-        except Exception:  # noqa: BLE001 - best-effort remote cleanup
-            pass
-    db.delete_object(obj_id)
-    # drop per-object kv tags (pw, cap, slugs, link registrations/tombstones)
-    from ..links import KV_PREFIX as _LK
-    from ..links import REV_PREFIX as _RV
-
-    for k, v in list(db.kv_all()):
-        if (v == obj_id and k.startswith("slug:")) or (
-            k.startswith((_LK, _RV)) and len(k.split(":", 2)) == 3 and k.split(":", 2)[1] == obj_id
-        ):
-            db.kv_delete(k)
-    for tag in ("pw:", "maxdl:", "dlc:"):
-        db.kv_delete(f"{tag}{obj_id}")
-    # subtitle tracks (FEAT-SUBS) die with the object
-    from ..subtitles import drop_for as _drop_subs
-
-    _drop_subs(db, obj_id)
-    # FEAT-SUBS-2: one-shot embedded-import flag dies with the object too
-    db.kv_delete(f"subsimported:{obj_id}")
-
-    # Only emit Tombstone event if remote blobs failed to be completely deleted from Telegram
-    if deleted < total_chunks:
-        from ..self_healing import emit_meta_event
-
-        asyncio.create_task(
-            emit_meta_event(backend, {"op": "del_obj", "id": obj_id}, secret=secret)
-        )
-
-    return deleted
-
-
 @router.get("/{obj_id}/info")
 async def info(request: Request, obj_id: str):
+    _authenticate_download(request, obj_id)
     db = request.app.state.db
     row = db.get_object(obj_id)
     if row is None:
@@ -989,7 +839,7 @@ async def zip_download(request: Request):
                 chunk_backend = pool.by_name(c["k"]) or backend
         ref = ObjectRef(file_id=c["f"], message_id=c.get("m"), backend=chunk_backend.name)
         blob = await chunk_backend.open(ref)
-        return blob[chunk_offset : chunk_offset + length]
+        return cast(bytes, blob[chunk_offset : chunk_offset + length])
 
     from ..zipper import stream_zip
 
@@ -1158,7 +1008,8 @@ async def album_page(request: Request, token: str):
                     effective_hmac_secret(
                         db,
                         settings.hmac_secret.get_secret_value() if settings.hmac_secret else None,
-                    ),
+                    )
+                    or "",
                 ),
                 "exp": sig_exp,
             }
@@ -1174,139 +1025,9 @@ async def album_page(request: Request, token: str):
     # Escape server-side, before the JSON payload is embedded.
     for it in items:
         it["name"] = _html.escape(str(it.get("name") or ""), quote=False)
+        for s in it.get("subs", []):
+            if isinstance(s, dict) and "label" in s and s["label"]:
+                s["label"] = _html.escape(str(s["label"]), quote=False)
     title = _html.escape(title, quote=True)
 
-    payload = json.dumps(items).replace("</", "<\\/")
-    return HTMLResponse(
-        f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>{_html.escape(title)}</title>
-<style>
-:root{{--bg:#0b0f17;--bg2:#121826;--bg3:#1a2234;--line:#232c40;--line2:#2d3852;
---tx:#e7ecf5;--tx2:#aab3c5;--tx3:#6b7690;--brand:#2f6bff}}
-@media(prefers-color-scheme:light){{:root{{--bg:#f3f6fb;--bg2:#fff;--bg3:#eaeff7;
---line:#dde3ee;--line2:#cbd3e4;--tx:#17202f;--tx2:#48536a;--tx3:#8590a8}}}}
-*{{box-sizing:border-box;margin:0}}
-body{{background:var(--bg);color:var(--tx);
-font-family:'Vazirmatn',system-ui,'Segoe UI',Tahoma,sans-serif;padding:24px 16px}}
-h1{{font-size:17px;font-weight:700;text-align:center;margin-bottom:4px}}
-.sub{{text-align:center;color:var(--tx3);font-size:12px;margin-bottom:22px}}
-.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;
-max-width:1100px;margin:0 auto}}
-.cell{{background:var(--bg2);border:1px solid var(--line);border-radius:14px;overflow:hidden}}
-.thumb{{height:130px;background:var(--bg3);display:flex;align-items:center;
-justify-content:center;overflow:hidden;cursor:pointer;position:relative}}
-.thumb img,.thumb video{{width:100%;height:100%;object-fit:cover}}
-.thumb .ico{{color:var(--tx3);font-weight:800;font-size:13px;letter-spacing:.1em;
-display:flex;flex-direction:column;align-items:center;gap:6px}}
-.thumb .ico svg{{width:32px;height:32px;fill:none;stroke:currentColor;
-stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}}
-.gplay{{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.55);color:#fff;
-font-size:11px;padding:2px 7px;border-radius:8px}}
-.cname{{font-size:12px;padding:9px 10px 2px;white-space:nowrap;overflow:hidden;
-text-overflow:ellipsis;direction:ltr;text-align:left}}
-.csub{{font-size:11px;color:var(--tx3);padding:0 10px 10px;display:flex;
-justify-content:space-between;align-items:center}}
-.csub a{{color:var(--brand);text-decoration:none;font-weight:700}}
-.csub a:hover{{text-decoration:underline}}
-.lightbox{{display:none;position:fixed;inset:0;background:rgba(5,8,14,.92);
-z-index:50;align-items:center;justify-content:center;padding:20px;flex-direction:column;gap:14px}}
-.lightbox.on{{display:flex}}
-.lightbox img,.lightbox video{{max-width:94vw;max-height:80vh;border-radius:12px}}
-.lightbox iframe{{width:min(900px,94vw);height:min(720px,84vh);
-border:none;border-radius:12px;background:#fff}}
-.lbclose{{position:absolute;top:14px;left:16px;background:none;border:none;
-color:#fff;font-size:26px;cursor:pointer;padding:8px}}
-.lbdl{{padding:10px 22px;border-radius:11px;background:var(--brand);color:#fff;
-border:none;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
-text-decoration:none}}
-@media(max-width:480px){{.grid{{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}}.thumb{{height:104px}}}}
-</style>
-</head>
-<body>
-<h1>{_html.escape(title)}</h1>
-<div class="sub">{len(items)} files · anbar</div>
-<div class="grid" id="grid"></div>
-<div class="lightbox" id="lb">
-  <button class="lbclose" id="lbc">✕</button>
-  <div id="lbcnt"></div>
-  <a class="lbdl" id="lbdl" download>Download</a>
-</div>
-<script>
-const ITEMS = __PAYLOAD__;
-const grid = document.getElementById('grid');
-function fmt(n){{
-  if(n>=1073741824)return (n/1073741824).toFixed(1)+' GB';
-  if(n>=1048576)return (n/1048576).toFixed(1)+' MB';
-  if(n>=1024)return (n/1024).toFixed(0)+' KB';
-  return n+' B';
-}}
-const ICO={{
-pdf:'<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12'
-   +'a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span>PDF</span>',
-audio:'<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/>'
-     +'<circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
-other:'<svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2'
-     +'h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg>'}};
-ITEMS.forEach((it,i)=>{{
-  const url='/f/'+it.id+'?sig='+it.sig+'&exp='+it.exp;
-  let th;
-  if(it.kind==='image')th='<img loading="lazy" src="'+url+'" alt="">';
-  else if(it.kind==='video')th='<video src="'+url+'#t=1.5" preload="metadata" muted>'
-    +'</video><span class="gplay">▶</span>';
-  else th='<div class="ico">'+(ICO[it.kind]||ICO.other)+'</div>';
-  const cell=document.createElement('div');
-  cell.className='cell';
-  cell.innerHTML='<div class="thumb" data-i="'+i+'">'+th+'</div>'
-    +'<div class="cname">'+(it.name||'file')+'</div>'
-    +'<div class="csub"><span>'+fmt(it.size)+'</span>'
-    +(it.kind==='pdf'?'<a href="'+url+'" target="_blank">View ↗</a>'
-      :'<a href="'+url+'" download>Download ⬇</a>')+'</div>';
-  grid.appendChild(cell);
-}});
-const lb=document.getElementById('lb'),cnt=document.getElementById('lbcnt'),
-      bdl=document.getElementById('lbdl');
-function openLb(i){{
-  const it=ITEMS[i],url='/f/'+it.id+'?sig='+it.sig+'&exp='+it.exp;
-  if(it.kind==='image')cnt.innerHTML='<img src="'+url+'" alt="">';
-  else if(it.kind==='video'){{
-    let vh='<video src="'+url+'" controls autoplay>';
-    (it.subs||[]).forEach(tr=>{{
-      vh+='<track kind="subtitles" label="'+(tr.label||tr.id)
-        +'" srclang="'+(tr.lang||'')+'" default="'+(tr.default?'true':'false')
-        +'" src="/f/'+it.id+'/subs/'+tr.id+'?sig='+it.sig+'&exp='+it.exp+'">';
-    }});
-    vh+='</video>';
-    cnt.innerHTML=vh;
-    const v=cnt.querySelector('video');
-    if(v&&v.textTracks){{
-      const want=it.subs||[];
-      for(let k=0;k<v.textTracks.length;k++)
-        v.textTracks[k].mode=(want[k]&&want[k].default)?'showing':'disabled';
-    }}
-  }}
-  else if(it.kind==='audio')cnt.innerHTML='<audio src="'+url
-    +'" controls autoplay style="width:min(500px,90vw)"></audio>';
-  else if(it.kind==='pdf')cnt.innerHTML='<iframe src="'+url+'"></iframe>';
-  else cnt.innerHTML='';
-  bdl.href=url;bdl.download=it.name||'file';
-  lb.classList.add('on');
-}}
-grid.addEventListener('click',e=>{{
-  const t=e.target.closest('.thumb');if(!t)return;
-  openLb(+t.dataset.i);
-}});
-document.getElementById('lbc').onclick=()=>{{
-  lb.classList.remove('on');cnt.innerHTML='';}};
-lb.addEventListener('click',e=>{{
-  if(e.target===lb){{lb.classList.remove('on');cnt.innerHTML='';}}}});
-document.addEventListener('keydown',e=>{{
-  if(e.key==='Escape'){{lb.classList.remove('on');cnt.innerHTML='';}}}});
-</script>
-</body>
-</html>""".replace("__PAYLOAD__", payload)
-    )
+    return HTMLResponse(render_album_page(title, items))

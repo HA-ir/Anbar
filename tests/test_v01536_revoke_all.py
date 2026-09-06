@@ -1,4 +1,5 @@
 """v0.15.36 — Revoke-all covers albums; album rows show folder name only."""
+
 from __future__ import annotations
 
 from starlette.testclient import TestClient

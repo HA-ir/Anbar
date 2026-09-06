@@ -6,6 +6,7 @@ as a bare JSON array literal (json.dumps output, not a quoted string), so
 -> #grid stayed empty ("files in the shared folder do not show").
 Fix: embed the payload directly as `const ITEMS = __PAYLOAD__;`.
 """
+
 from __future__ import annotations
 
 from starlette.testclient import TestClient
@@ -53,6 +54,7 @@ def test_album_page_items_structure_valid(client: TestClient):
     start = body.index("const ITEMS = [") + len("const ITEMS = ")
     end = body.index("];", start) + 1
     import json
+
     items = json.loads(body[start:end])
     assert len(items) == 1
     it = items[0]

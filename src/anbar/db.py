@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import sqlite3
@@ -58,6 +59,21 @@ CREATE TABLE IF NOT EXISTS objects (
 CREATE INDEX IF NOT EXISTS idx_objects_created ON objects(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_objects_deleted ON objects(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_objects_filename ON objects(filename);
+CREATE TABLE IF NOT EXISTS links (
+  obj_id      TEXT NOT NULL,
+  exp         INTEGER NOT NULL,
+  sig         TEXT,
+  slug        TEXT,
+  pw          INTEGER NOT NULL DEFAULT 0,
+  max_dl      INTEGER,
+  downloads   INTEGER NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL,
+  revoked     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (obj_id, exp)
+);
+CREATE INDEX IF NOT EXISTS idx_links_exp ON links(exp);
+CREATE INDEX IF NOT EXISTS idx_links_created ON links(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_links_obj_id ON links(obj_id);
 CREATE TABLE IF NOT EXISTS kv (
   k TEXT PRIMARY KEY,
   v TEXT NOT NULL
@@ -93,34 +109,110 @@ def _connect(path: Path) -> sqlite3.Connection:
     return conn
 
 
+class _LockWrapper:
+    def __init__(self, lock: threading.RLock) -> None:
+        self._lock = lock
+
+    def __enter__(self):
+        return self._lock.__enter__()
+
+    def __exit__(self, *args):
+        return self._lock.__exit__(*args)
+
+    def __call__(self):
+        return self
+
+
+def _locked(fn):
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        with self._db_lock:
+            return fn(self, *args, **kwargs)
+
+    return wrapper
+
+
 class Database:
     # trash retention: soft-deleted rows purge themselves after 7 days
     TRASH_TTL_S = 7 * 86400
 
     def __init__(self, path: Path):
         self.path = path
+        self._db_lock = threading.RLock()
         self._conn = _connect(path)
         self._conn.executescript(SCHEMA)
         self._migrate()
         self._conn.commit()
         self._obj_cache = _ObjectLRU()
-        # BUG-v0.15.41: the same Database object is used from both the request
-        # loop thread and background asyncio tasks (embedded-subs import), and
-        # sqlite3's internal statement cache is not safe under that cross-thread
-        # interleave — it very rarely raised
-        # `sqlite3.InterfaceError: bad parameter or other API misuse` from
-        # kv_set(). A mutex around the shared connection serializes every
-        # statement; WAL keeps multi-reader throughput unaffected.
-        self._db_lock = threading.Lock()
 
+    @property
+    def lock(self) -> _LockWrapper:
+        return _LockWrapper(self._db_lock)
+
+    @_locked
     def _migrate(self) -> None:
         """Add columns introduced after v0.9 (idempotent, ALTER-only)."""
         cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(objects)")}
         if "deleted_at" not in cols:
             self._conn.execute("ALTER TABLE objects ADD COLUMN deleted_at INTEGER")
             self._conn.commit()
+        # Ensure links table exists for pre-existing databases
+        self._conn.executescript("""
+        CREATE TABLE IF NOT EXISTS links (
+          obj_id      TEXT NOT NULL,
+          exp         INTEGER NOT NULL,
+          sig         TEXT,
+          slug        TEXT,
+          pw          INTEGER NOT NULL DEFAULT 0,
+          max_dl      INTEGER,
+          downloads   INTEGER NOT NULL DEFAULT 0,
+          created_at  INTEGER NOT NULL,
+          revoked     INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (obj_id, exp)
+        );
+        CREATE INDEX IF NOT EXISTS idx_links_exp ON links(exp);
+        CREATE INDEX IF NOT EXISTS idx_links_created ON links(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_links_obj_id ON links(obj_id);
+        """)
+        link_cnt = self._conn.execute("SELECT COUNT(*) FROM links").fetchone()[0]
+        if link_cnt == 0:
+            kv_rows = self._conn.execute(
+                "SELECT k, v FROM kv WHERE k LIKE \x27link:%\x27"
+            ).fetchall()
+            for row in kv_rows:
+                k, v = row["k"], row["v"]
+                try:
+                    rest = k[5:]
+                    oid, exp_s = rest.rsplit(":", 1)
+                    exp_val = int(exp_s)
+                    meta = json.loads(v)
+                    is_rev = bool(
+                        self._conn.execute(
+                            "SELECT 1 FROM kv WHERE k = ?", (f"rev:{oid}:{exp_val}",)
+                        ).fetchone()
+                    )
+                    self._conn.execute(
+                        """INSERT OR IGNORE INTO links
+                           (obj_id, exp, sig, slug, pw, max_dl, downloads, created_at, revoked)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            oid,
+                            exp_val,
+                            meta.get("sig"),
+                            meta.get("slug"),
+                            1 if meta.get("pw") else 0,
+                            meta.get("max_dl"),
+                            meta.get("downloads", 0),
+                            meta.get("created_at", int(time.time())),
+                            1 if is_rev else 0,
+                        ),
+                    )
+                except Exception:
+                    continue
+            self._conn.commit()
 
     # -- objects ---------------------------------------------------------
+    @_locked
     def insert_object(self, obj: dict[str, Any]) -> None:
         created_at = obj.get("created_at", int(time.time()))
         downloaded = obj.get("downloaded", 0)
@@ -160,6 +252,7 @@ class Database:
         }
         self._obj_cache.put(obj["id"], full_obj)
 
+    @_locked
     def get_object(self, obj_id: str, *, include_trashed: bool = False) -> dict[str, Any] | None:
         if not include_trashed:
             cached = self._obj_cache.get(obj_id)
@@ -175,6 +268,7 @@ class Database:
             self._obj_cache.put(obj_id, d)
         return d
 
+    @_locked
     def list_objects(
         self, limit: int = 50, offset: int = 0, trash: bool = False
     ) -> list[dict[str, Any]]:
@@ -182,7 +276,7 @@ class Database:
         order = "deleted_at DESC" if trash else "created_at DESC"
         rows = self._conn.execute(
             f"SELECT id, filename, size, backend, created_at, downloaded, deleted_at, "
-            f"manifest, content_type "
+            f"manifest, content_type, sha256, uploader_key "
             f"FROM objects {where} ORDER BY {order} LIMIT ? OFFSET ?",
             (limit, offset),
         ).fetchall()
@@ -201,6 +295,21 @@ class Database:
             out.append(d)
         return out
 
+    @_locked
+    def count_objects_by_prefix(self, prefixes: list[str], trash: bool = False) -> int:
+        """Count untrashed objects whose filename begins with any prefix."""
+        if not prefixes:
+            return 0
+        where = "WHERE deleted_at IS NOT NULL" if trash else "WHERE deleted_at IS NULL"
+        clauses = ["filename LIKE ?"] * len(prefixes)
+        params = [f"{prefix}%" for prefix in prefixes]
+        row = self._conn.execute(
+            f"SELECT COUNT(*) AS n FROM objects {where} AND ({' OR '.join(clauses)})",
+            params,
+        ).fetchone()
+        return row["n"] if row else 0
+
+    @_locked
     def list_objects_full(self, limit: int = 500, trash: bool = False) -> list[dict[str, Any]]:
         """Listing that includes manifests (needed for ZIP/purge work)."""
         where = "WHERE deleted_at IS NOT NULL" if trash else "WHERE deleted_at IS NULL"
@@ -232,20 +341,23 @@ class Database:
             out.append({k: d[k] for k in return_list if k in d})
         return out
 
+    @_locked
     def delete_object(self, obj_id: str) -> bool:
         self._obj_cache.invalidate(obj_id)
         cur = self._conn.execute("DELETE FROM objects WHERE id = ?", (obj_id,))
         self._conn.commit()
         return cur.rowcount > 0
 
+    @_locked
     def list_objects_by_prefix(
         self, prefix: str, *, include_trashed: bool = False
     ) -> list[dict[str, Any]]:
         """List all objects starting with a prefix (for folder operations)."""
+        prefix = prefix.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
         where = (
-            "WHERE filename LIKE ? AND deleted_at IS NULL"
+            "WHERE filename LIKE ? ESCAPE '\\' AND deleted_at IS NULL"
             if not include_trashed
-            else "WHERE filename LIKE ?"
+            else "WHERE filename LIKE ? ESCAPE '\\'"
         )
         rows = self._conn.execute(
             f"SELECT * FROM objects {where} ORDER BY created_at DESC",
@@ -253,6 +365,7 @@ class Database:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    @_locked
     def rename_folder(self, old_prefix: str, new_prefix: str) -> int:
         """Rename/move all files under old_prefix to new_prefix."""
         self._obj_cache.clear()
@@ -265,16 +378,18 @@ class Database:
         count = 0
         for r in rows:
             old_name = r["filename"]
-            suffix = old_name[len(old_prefix):]
+            suffix = old_name[len(old_prefix) :]
             new_name = new_prefix + suffix
             self._conn.execute("UPDATE objects SET filename = ? WHERE id = ?", (new_name, r["id"]))
             count += 1
         self._conn.commit()
         return count
 
+    @_locked
     def copy_folder(self, src_prefix: str, dst_prefix: str) -> int:
         """Duplicate metadata of all files under src_prefix to dst_prefix."""
         import uuid
+
         src_prefix = src_prefix.rstrip("/") + "/"
         dst_prefix = dst_prefix.rstrip("/") + "/"
         rows = self._conn.execute(
@@ -285,7 +400,7 @@ class Database:
         now = int(time.time())
         for r in rows:
             d = dict(r)
-            suffix = d["filename"][len(src_prefix):]
+            suffix = d["filename"][len(src_prefix) :]
             new_name = dst_prefix + suffix
             new_id = uuid.uuid4().hex[:12]
             self._conn.execute(
@@ -310,6 +425,7 @@ class Database:
         self._conn.commit()
         return count
 
+    @_locked
     def copy_object(self, obj_id: str, new_filename: str | None = None) -> dict[str, Any] | None:
         """Duplicate an object's metadata pointing to the same storage chunks with a new ID."""
         row = self._conn.execute(
@@ -357,6 +473,7 @@ class Database:
             "created_at": now,
         }
 
+    @_locked
     def soft_delete_folder(self, prefix: str) -> int:
         """Soft-delete all files under a prefix."""
         self._obj_cache.clear()
@@ -371,6 +488,7 @@ class Database:
         return cur.rowcount
 
     # -- trash (v0.10): soft delete → restore / hard purge -----------------
+    @_locked
     def soft_delete(self, obj_id: str) -> bool:
         self._obj_cache.invalidate(obj_id)
         cur = self._conn.execute(
@@ -380,6 +498,7 @@ class Database:
         self._conn.commit()
         return cur.rowcount > 0
 
+    @_locked
     def restore_object(self, obj_id: str) -> bool:
         self._obj_cache.invalidate(obj_id)
         cur = self._conn.execute(
@@ -389,12 +508,14 @@ class Database:
         self._conn.commit()
         return cur.rowcount > 0
 
+    @_locked
     def trash_count(self) -> int:
         row = self._conn.execute(
             "SELECT COUNT(*) AS n FROM objects WHERE deleted_at IS NOT NULL"
         ).fetchone()
         return row["n"]
 
+    @_locked
     def purge_expired_trash(self) -> list[str]:
         """Hard-delete rows whose soft-delete is older than TRASH_TTL_S.
 
@@ -414,12 +535,14 @@ class Database:
             self._conn.commit()
         return ids
 
+    @_locked
     def rename_object(self, obj_id: str, filename: str) -> bool:
         self._obj_cache.invalidate(obj_id)
         cur = self._conn.execute("UPDATE objects SET filename = ? WHERE id = ?", (filename, obj_id))
         self._conn.commit()
         return cur.rowcount > 0
 
+    @_locked
     def move_objects_to_prefix(self, ids: list[str], new_prefix: str) -> dict[str, Any]:
         """Move objects into a folder (prefix). Only the path portion of the
         filename changes; the basename is preserved. Collisions are skipped,
@@ -460,6 +583,7 @@ class Database:
         self._conn.commit()
         return {"moved": moved, "skipped": skipped}
 
+    @_locked
     def bump_downloads(self, obj_id: str) -> None:
         self._conn.execute("UPDATE objects SET downloaded = downloaded + 1 WHERE id = ?", (obj_id,))
         self._conn.commit()
@@ -469,24 +593,97 @@ class Database:
             self._obj_cache.put(obj_id, cached)
 
     # -- kv (toggles, stats) ---------------------------------------------
+
+    @_locked
+    def count_objects(self, trash: bool = False) -> int:
+        where = "WHERE deleted_at IS NOT NULL" if trash else "WHERE deleted_at IS NULL"
+        row = self._conn.execute(f"SELECT COUNT(*) as n FROM objects {where}").fetchone()
+        return row["n"] if row else 0
+
+    @_locked
+    def get_system_stats(self) -> dict[str, Any]:
+        row = self._conn.execute(
+            """SELECT COUNT(*) AS total_objects,
+                      COALESCE(SUM(size), 0) AS total_bytes,
+                      COALESCE(SUM(downloaded), 0) AS total_downloads
+               FROM objects WHERE deleted_at IS NULL"""
+        ).fetchone()
+        cat_rows = self._conn.execute(
+            "SELECT size, filename, content_type FROM objects WHERE deleted_at IS NULL"
+        ).fetchall()
+        breakdown = {
+            "image": 0,
+            "video": 0,
+            "audio": 0,
+            "pdf": 0,
+            "text": 0,
+            "archive": 0,
+            "other": 0,
+        }
+        img_exts = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif")
+        vid_exts = (".mp4", ".webm", ".mkv", ".mov", ".avi")
+        aud_exts = (".mp3", ".ogg", ".wav", ".flac", ".m4a", ".opus", ".aac")
+        txt_exts = (
+            ".txt",
+            ".json",
+            ".js",
+            ".ts",
+            ".py",
+            ".md",
+            ".sh",
+            ".yaml",
+            ".yml",
+            ".html",
+            ".css",
+            ".sql",
+        )
+        arc_exts = (".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz")
+
+        for r in cat_rows:
+            sz = int(r["size"] or 0)
+            fn = (r["filename"] or "").lower()
+            ct = (r["content_type"] or "").lower()
+            if ct.startswith("image/") or fn.endswith(img_exts):
+                breakdown["image"] += sz
+            elif ct.startswith("video/") or fn.endswith(vid_exts):
+                breakdown["video"] += sz
+            elif ct.startswith("audio/") or fn.endswith(aud_exts):
+                breakdown["audio"] += sz
+            elif ct == "application/pdf" or fn.endswith(".pdf"):
+                breakdown["pdf"] += sz
+            elif ct.startswith("text/") or fn.endswith(txt_exts):
+                breakdown["text"] += sz
+            elif fn.endswith(arc_exts):
+                breakdown["archive"] += sz
+            else:
+                breakdown["other"] += sz
+
+        return {
+            "total_objects": row["total_objects"] if row else 0,
+            "total_bytes": row["total_bytes"] if row else 0,
+            "total_downloads": row["total_downloads"] if row else 0,
+            "breakdown": breakdown,
+        }
+
+    @_locked
     def kv_get(self, key: str, default: str | None = None) -> str | None:
-        with self._db_lock:
-            row = self._conn.execute("SELECT v FROM kv WHERE k = ?", (key,)).fetchone()
+        row = self._conn.execute("SELECT v FROM kv WHERE k = ?", (key,)).fetchone()
         return row["v"] if row else default
 
+    @_locked
     def kv_set(self, key: str, value: str) -> None:
-        with self._db_lock:
-            self._conn.execute(
-                "INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v",
-                (key, value),
-            )
-            self._conn.commit()
+        self._conn.execute(
+            "INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v",
+            (key, value),
+        )
+        self._conn.commit()
 
+    @_locked
     def kv_delete(self, key: str) -> None:
-        with self._db_lock:
-            self._conn.execute("DELETE FROM kv WHERE k = ?", (key,))
-            self._conn.commit()
+        self._conn.execute("DELETE FROM kv WHERE k = ?", (key,))
+        self._conn.commit()
 
+    @_locked
     def kv_prune_prefix(self, prefix: str, max_age_s: int) -> int:
         """Delete kv rows whose key starts with `prefix` and whose stored
         JSON payload is older than `max_age_s` (epoch seconds embedded at
@@ -500,9 +697,7 @@ class Database:
         effort). Returns rows removed.
         """
         cutoff = int(time.time()) - max_age_s
-        rows = self._conn.execute(
-            "SELECT k, v FROM kv WHERE k LIKE ?", (prefix + "%",)
-        ).fetchall()
+        rows = self._conn.execute("SELECT k, v FROM kv WHERE k LIKE ?", (prefix + "%",)).fetchall()
         removed = 0
         for r in rows:
             try:
@@ -518,12 +713,129 @@ class Database:
         self._conn.commit()
         return removed
 
+    @_locked
+    @_locked
+    def kv_prefix(self, prefix: str) -> list[tuple[str, str]]:
+        """Return all (k, v) pairs where key starts with prefix."""
+        rows = self._conn.execute(
+            "SELECT k, v FROM kv WHERE k LIKE ? ORDER BY k",
+            (f"{prefix}%",),
+        ).fetchall()
+        return [(r["k"], r["v"]) for r in rows]
+
+    # -- links table operations (Wave 3) --------------------------------------
+    @_locked
+    def link_insert(
+        self,
+        obj_id: str,
+        exp: int,
+        sig: str | None = None,
+        slug: str | None = None,
+        pw: bool = False,
+        max_dl: int | None = None,
+        created_at: int | None = None,
+        downloads: int = 0,
+    ) -> None:
+        c_at = created_at or int(time.time())
+        self._conn.execute(
+            """INSERT OR REPLACE INTO links
+               (obj_id, exp, sig, slug, pw, max_dl, downloads, created_at, revoked)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+            (obj_id, exp, sig, slug, 1 if pw else 0, max_dl, downloads, c_at),
+        )
+        self._conn.commit()
+
+    @_locked
+    def link_get(self, obj_id: str, exp: int) -> dict[str, Any] | None:
+        row = self._conn.execute(
+            "SELECT * FROM links WHERE obj_id = ? AND exp = ?",
+            (obj_id, exp),
+        ).fetchone()
+        return dict(row) if row else None
+
+    @_locked
+    def link_is_revoked(self, obj_id: str, exp: int) -> bool:
+        row = self._conn.execute(
+            "SELECT revoked FROM links WHERE obj_id = ? AND exp = ?",
+            (obj_id, exp),
+        ).fetchone()
+        if row is not None:
+            return bool(row["revoked"])
+        return (
+            self._conn.execute(
+                "SELECT 1 FROM kv WHERE k = ?",
+                (f"rev:{obj_id}:{exp}",),
+            ).fetchone()
+            is not None
+        )
+
+    @_locked
+    def link_revoke(self, obj_id: str, exp: int) -> bool:
+        res = self._conn.execute(
+            "UPDATE links SET revoked = 1 WHERE obj_id = ? AND exp = ? AND revoked = 0",
+            (obj_id, exp),
+        )
+        self._conn.commit()
+        return res.rowcount > 0
+
+    @_locked
+    def link_revoke_all(self) -> int:
+        res = self._conn.execute("UPDATE links SET revoked = 1 WHERE revoked = 0")
+        self._conn.commit()
+        return res.rowcount
+
+    @_locked
+    def link_list(self, limit: int = 200, include_dead: bool = False) -> list[dict[str, Any]]:
+        now = int(time.time())
+        if include_dead:
+            rows = self._conn.execute(
+                "SELECT * FROM links ORDER BY exp DESC LIMIT ?",
+                (max(1, limit),),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM links WHERE revoked = 0 AND exp > ? ORDER BY exp DESC LIMIT ?",
+                (now, max(1, limit)),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    @_locked
+    def link_bump_downloads(self, obj_id: str) -> None:
+        now = int(time.time())
+        self._conn.execute(
+            "UPDATE links SET downloads = downloads + 1 "
+            "WHERE obj_id = ? AND revoked = 0 AND exp > ?",
+            (obj_id, now),
+        )
+        self._conn.commit()
+
+    @_locked
+    def link_purge_expired(self, now: int | None = None) -> int:
+        now_ts = now or int(time.time())
+        res = self._conn.execute(
+            "DELETE FROM links WHERE (revoked = 0 AND exp <= ?) "
+            "OR (revoked = 1 AND exp + 7 * 86400 < ?)",
+            (now_ts, now_ts),
+        )
+        self._conn.commit()
+        return res.rowcount
+
+    @_locked
+    def link_has_live(self, obj_id: str) -> bool:
+        now = int(time.time())
+        row = self._conn.execute(
+            "SELECT 1 FROM links WHERE obj_id = ? AND revoked = 0 AND exp > ? LIMIT 1",
+            (obj_id, now),
+        ).fetchone()
+        return row is not None
+
     def kv_all(self) -> list[tuple[str, str]]:
         """All kv pairs (small table; used for slug cleanup on delete)."""
         rows = self._conn.execute("SELECT k, v FROM kv").fetchall()
         return [(r["k"], r["v"]) for r in rows]
 
     # -- rate limiting (fixed windows in SQLite) ------------------------------
+    @_locked
     def rate_check(self, key: str, window_s: int, limit: int) -> tuple[bool, int, int]:
         """Atomically check+count one request in a fixed window.
 
@@ -552,6 +864,7 @@ class Database:
             return False, max(1, retry_after), n
         return True, 0, n
 
+    @_locked
     def rate_prune(self, max_age_s: int = 3600) -> int:
         """Drop finished windows; returns rows removed."""
         cur = self._conn.execute(
@@ -562,9 +875,11 @@ class Database:
         return cur.rowcount
 
     # -- maintenance ------------------------------------------------------
+    @_locked
     def vacuum(self) -> None:
         self._conn.execute("VACUUM")
 
+    @_locked
     def backup_bytes(self) -> bytes:
         """Create a consistent, point-in-time binary snapshot of the SQLite WAL database."""
         mem_conn = sqlite3.connect(":memory:")
@@ -573,6 +888,7 @@ class Database:
         mem_conn.close()
         return data
 
+    @_locked
     def restore_bytes(self, data: bytes) -> dict:
         """Restore database from a binary SQLite backup snapshot atomically."""
         if not data.startswith(b"SQLite format 3\x00"):
@@ -620,6 +936,7 @@ class Database:
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
+    @_locked
     def restore_from_file(self, path: str) -> dict:
         """Restore database from a SQLite backup file on disk (no RAM copy).
 
@@ -668,6 +985,7 @@ class Database:
         finally:
             src_conn.close()
 
+    @_locked
     def log_audit(
         self,
         event: str,
@@ -690,8 +1008,9 @@ class Database:
             (int(time.time()), event, actor, target, ip, det_str),
         )
         self._conn.commit()
-        return cur.lastrowid
+        return cur.lastrowid or 0
 
+    @_locked
     def audit_prune(self, max_age_s: int = 90 * 86400) -> int:
         """Delete audit records older than `max_age_s` (default 90 days).
 
@@ -705,6 +1024,7 @@ class Database:
         self._conn.commit()
         return cur.rowcount
 
+    @_locked
     def list_audit_logs(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         """List audit logs ordered by newest first."""
         cur = self._conn.execute(
@@ -727,5 +1047,10 @@ class Database:
             out.append(d)
         return out
 
+    @_locked
     def close(self) -> None:
         self._conn.close()
+
+    def connection(self) -> sqlite3.Connection:
+        """Trusted internal access for wrapped, lock-synchronized stores."""
+        return self._conn

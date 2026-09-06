@@ -71,9 +71,7 @@ def test_write_env_dict_inplace_fallback_on_bindmount(tmp_path, monkeypatch):
     env, fake_replace = _make_bindmount_like_env(tmp_path)
     monkeypatch.setattr(os, "replace", fake_replace)
     try:
-        ok = admin_mod._write_env_dict(
-            env, {"ANBAR_BOT_TOKENS": "111:AAA, 222:BBB"}
-        )
+        ok = admin_mod._write_env_dict(env, {"ANBAR_BOT_TOKENS": "111:AAA, 222:BBB"})
         assert ok, "in-place fallback must succeed when atomic path is blocked"
         d = admin_mod._read_env_dict(env)
         assert d["ANBAR_BOT_TOKENS"] == "111:AAA, 222:BBB"
@@ -143,9 +141,7 @@ def test_telegram_config_endpoint_ok_when_fallback_writes(
         tmp_path.chmod(0o755)
 
 
-def test_bot_add_token_via_endpoint_and_fallback(
-    client: TestClient, tmp_path, monkeypatch
-):
+def test_bot_add_token_via_endpoint_and_fallback(client: TestClient, tmp_path, monkeypatch):
     """The v0.15.26b add-one-token flow must persist even on a bind mount."""
     _authed(client)
     env, fake_replace = _make_bindmount_like_env(tmp_path)
@@ -219,9 +215,7 @@ def test_album_expired_returns_410(client: TestClient, monkeypatch):
     token = r.json()["token"]
 
     real_time = time.time
-    monkeypatch.setattr(
-        time, "time", lambda: real_time() + 700
-    )
+    monkeypatch.setattr(time, "time", lambda: real_time() + 700)
     page = client.get(f"/f/a/{token}")
     assert page.status_code == 410
 

@@ -19,7 +19,7 @@ def _upload(client: TestClient, name: str, body: bytes = b"x") -> dict:
 
 
 def test_album_escapes_malicious_filename(client: TestClient):
-    evil = '<img src=x onerror=alert(1)>.png'
+    evil = "<img src=x onerror=alert(1)>.png"
     obj = _upload(client, evil)
     r = client.post(
         "/f/album",

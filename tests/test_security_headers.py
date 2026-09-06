@@ -51,7 +51,7 @@ def test_info_endpoint_metadata_only(client: TestClient):
         headers={**UP, "X-File-Name": "meta.bin"},
     )
     obj_id = r.json()["id"]
-    info = client.get(f"/f/{obj_id}/info")
+    info = client.get(f"/f/{obj_id}/info", headers=UP)
     assert info.status_code == 200
     body = info.json()
     assert "manifest" not in body

@@ -29,6 +29,7 @@ from ..auth import (
     revoke_api_key,
 )
 from ..cache import DiskLRU
+from ..tasks import spawn_background_task
 
 router = APIRouter()
 
@@ -64,7 +65,9 @@ async def status(request: Request):
         "status": "ok",
         "backend": getattr(backend, "name", s.backend.value),
         "auth_enabled": effective_auth_enabled(db, s.auth_enabled),
-        "objects": len(db.list_objects(limit=1000)),
+        "objects": (
+            db.count_objects() if hasattr(db, "count_objects") else len(db.list_objects(limit=1000))
+        ),
         "cache": (
             {"enabled": False}
             if cache is None
@@ -156,9 +159,7 @@ def _sync_cache(app, db) -> None:
     old = getattr(app.state, "cache", None)
     if old is not None:
         old.close()
-    app.state.cache = (
-        DiskLRU(s.cache_dir, cache_mb * 1024 * 1024) if enabled and cache_mb else None
-    )
+    app.state.cache = DiskLRU(s.cache_dir, cache_mb * 1024 * 1024) if enabled and cache_mb else None
 
 
 def _sync_chunk_cache(app, db) -> None:
@@ -227,13 +228,18 @@ async def auth_toggle(request: Request):
 
 @router.get("/admin/auth/secret")
 async def secret_get(request: Request):
-    """Retrieve current HMAC / encryption secret (admin only)."""
+    """Retrieve current HMAC / encryption secret status (admin only, masked)."""
     require_admin(request)
     db = request.app.state.db
     s = request.app.state.settings
     env_secret = s.hmac_secret.get_secret_value() if s.hmac_secret else None
     secret = effective_hmac_secret(db, env_secret)
-    return {"secret": secret}
+    masked = (
+        (secret[:4] + "..." + secret[-4:])
+        if secret and len(secret) >= 8
+        else ("*" * len(secret) if secret else "")
+    )
+    return {"configured": bool(secret), "masked": masked}
 
 
 @router.post("/admin/auth/rotate-secret")
@@ -253,13 +259,16 @@ async def rotate_secret(request: Request):
     secret = custom or new_secret()
     db.kv_set(KV_HMAC_SECRET, secret)
     db.log_audit("secret.rotate", actor="admin", details={"custom": bool(custom)})
-    return {"hmac_secret": secret, "note": "previously minted links are now invalid"}
+    masked = (secret[:4] + "..." + secret[-4:]) if len(secret) >= 8 else ("*" * len(secret))
+    return {
+        "status": "rotated",
+        "masked": masked,
+        "note": "previously minted links are now invalid",
+    }
 
 
 @router.get("/admin/objects")
-async def objects(
-    request: Request, limit: int = 50, offset: int = 0, prefix: str = ""
-):
+async def objects(request: Request, limit: int = 50, offset: int = 0, prefix: str = ""):
     """List stored objects (newest first). Admin key required.
 
     BUG-v0.15.33: optional `prefix` filter — folder ZIP/share used to build
@@ -276,6 +285,9 @@ async def objects(
         return {"objects": rows, "count": len(rows)}
     limit = max(1, min(limit, 500))
     rows = db.list_objects(limit=limit, offset=max(0, offset))
+    for r in rows:
+        r.pop("manifest", None)
+        r.pop("uploader_key", None)
     # PERF-03: one cheap stat() per image row — lets the gallery use the
     # pre-generated thumbnail instead of pulling the full object
     from .. import thumbs
@@ -398,12 +410,15 @@ async def backup_push_telegram(request: Request):
         db.kv_set("last_backup_time", str(int(time.time())))
         db.kv_set("last_backup_ref", ref.file_id)
         db.log_audit("backup.telegram", actor="admin", target=name, details={"size": len(data)})
-        jq.finish(jid, result={
-            "size": len(data),
-            "file_id": ref.file_id,
-            "message_id": ref.message_id,
-            "backup_time": int(time.time()),
-        })
+        jq.finish(
+            jid,
+            result={
+                "size": len(data),
+                "file_id": ref.file_id,
+                "message_id": ref.message_id,
+                "backup_time": int(time.time()),
+            },
+        )
 
     jq.submit("backup_now", job_id=job_id, handler=_backup_job)
     return {"status": "queued", "job_id": job_id}
@@ -463,8 +478,6 @@ async def backup_import(request: Request, file: UploadFile):
             os.unlink(tmp.name)
         except OSError:
             pass
-
-
 
 
 # ── Telegram MTProto Interactive Auth (v0.15.8) ──────────────────────────────
@@ -531,9 +544,7 @@ async def telegram_verify_code(request: Request):
     password = (body or {}).get("password", "").strip()
     phone = (body or {}).get("phone", "").strip() or db.kv_get("tg_temp_phone") or ""
     phone_code_hash = (
-        (body or {}).get("phone_code_hash", "").strip()
-        or db.kv_get("tg_temp_phone_hash")
-        or ""
+        (body or {}).get("phone_code_hash", "").strip() or db.kv_get("tg_temp_phone_hash") or ""
     )
     temp_session_str = db.kv_get("tg_temp_session") or ""
 
@@ -555,8 +566,7 @@ async def telegram_verify_code(request: Request):
                     "ok": False,
                     "need_password": True,
                     "message": (
-                        "اکانت شما دارای رمز دومرحله‌ای (2FA) است."
-                        " لطفاً رمز عبور را وارد کنید."
+                        "اکانت شما دارای رمز دومرحله‌ای (2FA) است. لطفاً رمز عبور را وارد کنید."
                     ),
                 }
             await client.sign_in(password=password)
@@ -698,9 +708,63 @@ async def system_stats_get(request: Request):
     require_admin(request)
     db = request.app.state.db
     s = request.app.state.settings
-    rows = db.list_objects(limit=1000)
-    total_bytes = sum(r.get("size", 0) for r in rows)
-    total_dl = sum(r.get("downloaded", 0) for r in rows)
+    if hasattr(db, "get_system_stats"):
+        agg = db.get_system_stats()
+        total_objects = agg["total_objects"]
+        total_bytes = agg["total_bytes"]
+        total_dl = agg["total_downloads"]
+        breakdown = agg["breakdown"]
+    else:
+        rows = db.list_objects(limit=1000)
+        total_objects = len(rows)
+        total_bytes = sum(r.get("size", 0) for r in rows)
+        total_dl = sum(r.get("downloaded", 0) for r in rows)
+        breakdown = {
+            "image": 0,
+            "video": 0,
+            "audio": 0,
+            "pdf": 0,
+            "text": 0,
+            "archive": 0,
+            "other": 0,
+        }
+        img_exts = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif")
+        vid_exts = (".mp4", ".webm", ".mkv", ".mov", ".avi")
+        aud_exts = (".mp3", ".ogg", ".wav", ".flac", ".m4a", ".opus", ".aac")
+        txt_exts = (
+            ".txt",
+            ".json",
+            ".js",
+            ".ts",
+            ".py",
+            ".md",
+            ".sh",
+            ".yaml",
+            ".yml",
+            ".html",
+            ".css",
+            ".sql",
+        )
+        arc_exts = (".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz")
+        for r in rows:
+            sz = int(r.get("size") or 0)
+            fn = (r.get("filename") or "").lower()
+            ct = (r.get("content_type") or "").lower()
+            if ct.startswith("image/") or fn.endswith(img_exts):
+                breakdown["image"] += sz
+            elif ct.startswith("video/") or fn.endswith(vid_exts):
+                breakdown["video"] += sz
+            elif ct.startswith("audio/") or fn.endswith(aud_exts):
+                breakdown["audio"] += sz
+            elif ct == "application/pdf" or fn.endswith(".pdf"):
+                breakdown["pdf"] += sz
+            elif ct.startswith("text/") or fn.endswith(txt_exts):
+                breakdown["text"] += sz
+            elif fn.endswith(arc_exts):
+                breakdown["archive"] += sz
+            else:
+                breakdown["other"] += sz
+
     backend_str = s.backend.value if hasattr(s.backend, "value") else str(s.backend)
     tokens_count = len(getattr(s, "bot_tokens", []))
     last_backup_ts = db.kv_get("last_backup_time")
@@ -709,49 +773,11 @@ async def system_stats_get(request: Request):
     encryption_on = bool(runtime.get_int(db, "encryption_enabled", enc_default))
     hybrid_on = bool(runtime.get_int(db, "hybrid_enabled", hyb_default))
 
-    # File size category breakdown
-    breakdown = {
-        "image": 0,
-        "video": 0,
-        "audio": 0,
-        "pdf": 0,
-        "text": 0,
-        "archive": 0,
-        "other": 0,
-    }
-    img_exts = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif")
-    vid_exts = (".mp4", ".webm", ".mkv", ".mov", ".avi")
-    aud_exts = (".mp3", ".ogg", ".wav", ".flac", ".m4a", ".opus", ".aac")
-    txt_exts = (
-        ".txt", ".json", ".js", ".ts", ".py", ".md", ".sh",
-        ".yaml", ".yml", ".html", ".css", ".sql",
-    )
-    arc_exts = (".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz")
-
-    for r in rows:
-        sz = int(r.get("size") or 0)
-        fn = (r.get("filename") or "").lower()
-        ct = (r.get("content_type") or "").lower()
-        if ct.startswith("image/") or fn.endswith(img_exts):
-            breakdown["image"] += sz
-        elif ct.startswith("video/") or fn.endswith(vid_exts):
-            breakdown["video"] += sz
-        elif ct.startswith("audio/") or fn.endswith(aud_exts):
-            breakdown["audio"] += sz
-        elif ct == "application/pdf" or fn.endswith(".pdf"):
-            breakdown["pdf"] += sz
-        elif ct.startswith("text/") or fn.endswith(txt_exts):
-            breakdown["text"] += sz
-        elif fn.endswith(arc_exts):
-            breakdown["archive"] += sz
-        else:
-            breakdown["other"] += sz
-
     return {
         "status": "healthy",
         "version": getattr(request.app, "version", "0.14.3"),
         "backend": "hybrid" if (backend_str == "mtproto" and hybrid_on) else backend_str,
-        "total_objects": len(rows),
+        "total_objects": total_objects,
         "total_bytes": total_bytes,
         "total_downloads": total_dl,
         "bot_tokens_count": tokens_count,
@@ -777,7 +803,7 @@ async def api_keys_list(request: Request):
     require_admin(request)
     keys = list_api_keys(request.app.state.db)
     # never echo full keys after creation — only id/name/created_at
-    return {"keys": [{k: v for k, v in k_.items() if k != "key"} for k_ in keys]}
+    return {"keys": [{k: v for k, v in k_.items() if k not in ("key", "key_hash")} for k_ in keys]}
 
 
 @router.post("/admin/api-keys")
@@ -885,9 +911,7 @@ def _write_env_dict(path: Path, updates: dict[str, str]) -> bool:
     # a truncated .env — the service would not start after a restart.
     # Write to a temp file in the same directory, fsync, then os.replace.
     try:
-        fd, tmp_name = tempfile.mkstemp(
-            prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
-        )
+        fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(content)
@@ -953,8 +977,10 @@ async def telegram_config_get(request: Request):
     env_vars = _read_env_dict(env_path)
 
     backend = env_vars.get("ANBAR_BACKEND", s.backend.value)
-    bot_tokens_raw = env_vars.get("ANBAR_BOT_TOKENS") or s.bot_tokens_raw or (
-        s.bot_token.get_secret_value() if s.bot_token else ""
+    bot_tokens_raw = (
+        env_vars.get("ANBAR_BOT_TOKENS")
+        or s.bot_tokens_raw
+        or (s.bot_token.get_secret_value() if s.bot_token else "")
     )
     tokens_list = [t.strip() for t in (bot_tokens_raw or "").split(",") if t.strip()]
     masked_tokens = [_mask_secret(t, 6) for t in tokens_list]
@@ -973,9 +999,7 @@ async def telegram_config_get(request: Request):
     except ValueError:  # corrupted .env row → fall back to the live setting
         chunk_size_mb = s.chunk_size_mb
     db = request.app.state.db
-    hybrid_runtime = bool(
-        runtime.get_int(db, "hybrid_enabled", 1 if s.hybrid_enabled else 0)
-    )
+    hybrid_runtime = bool(runtime.get_int(db, "hybrid_enabled", 1 if s.hybrid_enabled else 0))
     hybrid_env = env_vars.get("ANBAR_HYBRID_ENABLED", "").lower() in ("true", "1", "yes")
     hybrid_enabled = hybrid_runtime or hybrid_env
 
@@ -1175,7 +1199,7 @@ async def restart_service(request: Request):
         await asyncio.sleep(0.4)
         os.kill(os.getpid(), signal.SIGTERM)
 
-    asyncio.create_task(_bye())
+    spawn_background_task(_bye(), name="admin:bye")
     return {"status": "restarting"}
 
 
@@ -1252,138 +1276,20 @@ async def link_manage_page(request: Request, obj_id: str, exp: int):
         for v, lbl in ttl_opts
     )
     maxdl = int(row["max_dl"] or 0)
-    return HTMLResponse(f"""<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>anbar · مدیریت لینک</title>
-<style>
-:root{{--bg:#0b0f17;--bg2:#121826;--bg3:#1a2234;--line:#232c40;--line2:#2d3852;
---tx:#e7ecf5;--tx2:#aab3c5;--tx3:#6b7690;--brand:#2f6bff;--ok:#31c48d;--err:#ff5d6c}}
-@media(prefers-color-scheme:light){{:root{{--bg:#f3f6fb;--bg2:#ffffff;--bg3:#eaeff7;
---line:#dde3ee;--line2:#cbd3e4;--tx:#17202f;--tx2:#48536a;--tx3:#8590a8}}}}
-*{{box-sizing:border-box;margin:0}}
-body{{font-family:'Vazirmatn',system-ui,'Segoe UI',Tahoma,sans-serif;min-height:100vh;
-display:flex;align-items:center;justify-content:center;padding:16px;color:var(--tx);
-background:radial-gradient(1200px 600px at 70% -10%,
-rgba(47,107,255,.12),transparent 60%),var(--bg)}}
-.card{{width:100%;max-width:430px;background:var(--bg2);border:1px solid var(--line);
-border-radius:18px;padding:26px 22px;box-shadow:0 18px 50px rgba(0,0,0,.25)}}
-h1{{font-size:16px;font-weight:700;margin-bottom:4px}}
-.fname{{font-size:12px;color:var(--tx3);margin-bottom:18px;direction:ltr;text-align:left}}
-.row{{margin-bottom:14px}}
-label{{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}}
-input[type=text],input[type=number],select{{width:100%;padding:10px 12px;
-border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);
-color:var(--tx);font-family:inherit;font-size:13.5px;outline:none}}
-input:focus,select:focus{{border-color:var(--brand)}}
-.check{{display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}}
-.check input{{width:16px;height:16px;accent-color:var(--brand)}}
-.actions{{display:flex;gap:8px;margin-top:20px}}
-button{{flex:1;padding:11px 14px;border:none;border-radius:11px;font-family:inherit;
-font-size:13.5px;font-weight:700;cursor:pointer}}
-.primary{{background:var(--brand);color:#fff}}
-.danger{{background:transparent;border:1.5px solid var(--err);color:var(--err);flex:0 0 auto;
-padding-inline:18px}}
-.msg{{display:none;margin-top:14px;padding:10px 12px;border-radius:10px;
-font-size:12.5px;line-height:1.9}}
-.msg.ok{{background:rgba(49,196,141,.12);color:var(--ok);word-break:break-word}}
-.msg.err{{background:rgba(255,93,108,.12);color:var(--err)}}
-.linkout{{margin-top:14px;display:none;background:var(--bg3);border:1px solid var(--line);
-border-radius:10px;padding:10px 12px;font-family:ui-monospace,monospace;
-font-size:11.5px;direction:ltr;text-align:left;word-break:break-all;user-select:all}}
-@media(max-width:480px){{.card{{padding:20px 14px}}.actions{{flex-direction:column}}
-.danger{{flex:auto}}}}
-</style>
-</head>
-<body>
-<div class="card">
-  <h1>مدیریت لینک اشتراک</h1>
-  <div class="fname">{fname}</div>
-  <form id="mf">
-    <div class="row">
-      <label for="ttl">انقضای لینک</label>
-      <select id="ttl">{opts}</select>
-    </div>
-    <div class="row">
-      <label class="check"><input type="checkbox" id="haspw" {pw_checked}>
-        محافظت با رمز عبور</label>
-    </div>
-    <div class="row" id="pwrow" style="display:none">
-      <label for="npw">رمز عبور جدید</label>
-      <input type="text" id="npw" autocomplete="off" placeholder="رمز دلخواه">
-    </div>
-    <div class="row">
-      <label for="maxdl">سقف تعداد دانلود (۰ = بی‌نهایت)</label>
-      <input type="number" id="maxdl" min="0" value="{maxdl}">
-    </div>
-    <div class="actions">
-      <button type="submit" class="primary">ذخیره و ساخت لینک جدید</button>
-      <button type="button" class="danger" id="revBtn">ابطال لینک</button>
-    </div>
-  </form>
-  <div class="msg ok" id="mok"></div>
-  <div class="msg err" id="merr"></div>
-  <div class="linkout" id="lout"></div>
-</div>
-<script>
-const OID = {obj_id!r}, OLD_EXP = {exp};
-const SLUG = {slug_js!r};
-const H = {{'Content-Type': 'application/json'}};
+    from ..templates import render_links_manage_page
 
-function show(id, txt) {{
-  const e = document.getElementById(id);
-  e.textContent = txt; e.style.display = 'block';
-}}
-document.getElementById('haspw').onchange = e => {{
-  document.getElementById('pwrow').style.display =
-    e.target.checked ? 'block' : 'none';
-}};
-document.getElementById('mf').onsubmit = async ev => {{
-  ev.preventDefault();
-  const ttl = parseInt(document.getElementById('ttl').value, 10);
-  const hasPw = document.getElementById('haspw').checked;
-  const npw = document.getElementById('npw').value.trim();
-  if (hasPw && !npw) {{
-    show('merr', 'برای محافظت با رمز، یک رمز وارد کنید.');
-    return;
-  }}
-  const maxdl = parseInt(document.getElementById('maxdl').value, 10) || 0;
-  try {{
-    // revoke the current window first (idempotent; 404 is fine)
-    await fetch('/api/v1/admin/links/' + OID + '/revoke/' + OLD_EXP,
-      {{method: 'POST', headers: H}});
-    let q = 'ttl=' + ttl + (hasPw ? '&password=' + encodeURIComponent(npw) : '')
-      + (maxdl ? '&max_dl=' + maxdl : '')
-      + (SLUG ? '&slug=' + encodeURIComponent(SLUG) : '');
-    const r = await fetch('/f/' + OID + '/link?' + q,
-      {{method: 'POST', headers: H}});
-    if (!r.ok) throw new Error((await r.json()).detail || r.status);
-    const j = await r.json();
-    document.getElementById('merr').style.display = 'none';
-    show('mok', 'لینک جدید ساخته شد — لینک قبلی ابطال شد:');
-    const lo = document.getElementById('lout');
-    lo.textContent = j.pretty_url || j.url;
-    lo.style.display = 'block';
-  }} catch (e) {{ show('merr', e.message || String(e)); }}
-}};
-document.getElementById('revBtn').onclick = async () => {{
-  if (!confirm('این لینک برای همیشه ابطال شود؟')) return;
-  try {{
-    await fetch('/api/v1/admin/links/' + OID + '/revoke/' + OLD_EXP,
-      {{method: 'POST', headers: H}});
-    document.getElementById('mok').style.display = 'none';
-    document.getElementById('lout').style.display = 'none';
-    show('merr', 'لینک ابطال شد — این صفحه دیگر کار نمی‌کند.');
-  }} catch (e) {{ show('merr', e.message || String(e)); }}
-}};
-document.getElementById('pwrow').style.display =
-  document.getElementById('haspw').checked ? 'block' : 'none';
-</script>
-</body>
-</html>""")
+    return HTMLResponse(
+        render_links_manage_page(
+            obj_id=obj_id,
+            exp=exp,
+            row=row,
+            opts=opts,
+            maxdl=maxdl,
+            fname=fname,
+            pw_checked=pw_checked,
+            slug_js=slug_js,
+        )
+    )
 
 
 @router.get("/admin/trash")
@@ -1431,19 +1337,22 @@ async def folder_create(request: Request):
         return {"status": "exists", "folder": folder_name}
 
     import uuid
+
     dummy_manifest = json.dumps({"version": 1, "total_size": 0, "chunks": []})
     obj_id = uuid.uuid4().hex[:12]
     now = int(time.time())
-    db.insert_object({
-        "id": obj_id,
-        "file_id": f"folder_{obj_id}",
-        "backend": "virtual",
-        "filename": folder_name,
-        "size": 0,
-        "content_type": "application/x-directory",
-        "manifest": dummy_manifest,
-        "created_at": now,
-    })
+    db.insert_object(
+        {
+            "id": obj_id,
+            "file_id": f"folder_{obj_id}",
+            "backend": "virtual",
+            "filename": folder_name,
+            "size": 0,
+            "content_type": "application/x-directory",
+            "manifest": dummy_manifest,
+            "created_at": now,
+        }
+    )
     return {"status": "created", "folder": folder_name, "id": obj_id}
 
 
@@ -1467,10 +1376,12 @@ async def folder_rename(request: Request):
 
     # Emit background event to Telegram channel
     from ..self_healing import emit_meta_event
+
     env_sec = s.hmac_secret.get_secret_value() if s.hmac_secret else None
     sec = effective_hmac_secret(db, env_sec)
-    asyncio.create_task(
-        emit_meta_event(backend, {"op": "rn_dir", "old": old_path, "new": new_path}, secret=sec)
+    spawn_background_task(
+        emit_meta_event(backend, {"op": "rn_dir", "old": old_path, "new": new_path}, secret=sec),
+        name="admin:emit-rename",
     )
 
     return {"status": "renamed", "moved_count": moved_count, "new_path": new_path}
@@ -1530,12 +1441,14 @@ async def objects_move(request: Request):
 
     # Emit background event to Telegram channel
     from ..self_healing import emit_meta_event
+
     env_sec = s.hmac_secret.get_secret_value() if s.hmac_secret else None
     sec = effective_hmac_secret(db, env_sec)
-    asyncio.create_task(
+    spawn_background_task(
         emit_meta_event(
             backend, {"op": "mv_obj", "ids": [str(i) for i in ids], "dest": dest}, secret=sec
-        )
+        ),
+        name="admin:emit-move",
     )
 
     return {
@@ -1696,7 +1609,7 @@ async def object_copy(request: Request):
 @router.delete("/admin/trash/{obj_id:path}")
 async def trash_purge_one(request: Request, obj_id: str):
     """Permanently destroy one trashed object (blobs + metadata) now."""
-    from ..api.download import _purge_object_blobs
+    from ..object_service import purge_object_blobs as _purge_object_blobs
 
     require_admin(request)
     db = request.app.state.db
@@ -1789,4 +1702,3 @@ async def jobs_delete(request: Request, job_id: str):
             raise HTTPException(404, "unknown job")
         raise HTTPException(409, f"job is {row['state']}; only finished jobs can be deleted")
     return {"deleted": job_id}
-

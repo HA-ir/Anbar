@@ -33,8 +33,7 @@ def test_verify_telegram_init_data():
 
     # 2. Tampered data fails
     tampered = (
-        f"auth_date={params['auth_date']}&query_id=hacked"
-        f"&user={params['user']}&hash={valid_hash}"
+        f"auth_date={params['auth_date']}&query_id=hacked&user={params['user']}&hash={valid_hash}"
     )
     assert verify_telegram_init_data(tampered, bot_token) is False
 

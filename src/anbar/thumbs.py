@@ -69,16 +69,15 @@ def _encode(original: bytes, obj_id: str, settings) -> bool:
             im.load()
             if getattr(im, "is_animated", False):
                 im.seek(0)  # first frame only
-            if im.mode not in ("RGB", "RGBA", "L"):
-                im = im.convert("RGB")
-            im.thumbnail((THUMB_MAX_PX, THUMB_MAX_PX), Image.Resampling.LANCZOS)
-            if im.mode == "RGBA":
+            im_thumb: Image.Image = im.convert("RGB") if im.mode not in ("RGB", "RGBA", "L") else im
+            im_thumb.thumbnail((THUMB_MAX_PX, THUMB_MAX_PX), Image.Resampling.LANCZOS)
+            if im_thumb.mode == "RGBA":
                 tmp = out_webp.with_suffix(".webp.tmp")
-                im.save(tmp, format=THUMB_FORMAT, quality=THUMB_QUALITY, method=4)
+                im_thumb.save(tmp, format=THUMB_FORMAT, quality=THUMB_QUALITY, method=4)
                 os.replace(tmp, out_webp)
             else:
                 tmp = out_jpg.with_suffix(".jpg.tmp")
-                im.convert("RGB").save(tmp, format="JPEG", quality=THUMB_QUALITY)
+                im_thumb.convert("RGB").save(tmp, format="JPEG", quality=THUMB_QUALITY)
                 os.replace(tmp, out_jpg)
             return True
     except Exception as e:  # noqa: BLE001 — corrupt/unsupported image must not break upload

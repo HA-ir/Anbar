@@ -45,12 +45,14 @@ def test_upload_with_wrong_key(backend, client):
 def test_download_anon_rejected(backend, client):
     obj = _upload(client)
     assert client.get(f"/f/{obj}").status_code == 401
+    assert client.get(f"/f/{obj}/info").status_code == 401
 
 
 def test_download_with_bearer_key(backend, client):
     obj = _upload(client)
     assert client.get(f"/f/{obj}", headers=AUTH).status_code == 200
     assert client.get(f"/f/{obj}", headers=ADMIN).status_code == 200
+    assert client.get(f"/f/{obj}/info", headers=AUTH).status_code == 200
 
 
 def test_download_with_signed_link(backend, client):
@@ -118,7 +120,7 @@ def test_rotate_secret_invalidates_old_links(backend, client):
     assert client.get(old_url).status_code == 200
 
     r = client.post("/api/v1/admin/auth/rotate-secret", headers=ADMIN)
-    assert r.status_code == 200 and "hmac_secret" in r.json()
+    assert r.status_code == 200 and "masked" in r.json()
 
     # old link is now invalid; new link works with the new secret
     assert client.get(old_url).status_code == 403

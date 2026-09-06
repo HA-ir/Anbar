@@ -3,7 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   check:
@@ -11,16 +16,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install system dependencies (ffmpeg)
+        run: |
+          sudo apt-get update -qy
+          sudo apt-get install -qy ffmpeg
+
       - uses: astral-sh/setup-uv@v4
 
       - name: Install
         run: uv sync --extra dev
 
+      - name: Install Playwright browsers
+        run: uv run playwright install --with-deps chromium
+
       - name: Lint
-        run: uv run ruff check src tests
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+
+      - name: Typecheck (mypy)
+        run: uv run mypy src
 
       - name: Test
-        run: uv run pytest -q
+        run: uv run pytest -v
 
   docker:
     runs-on: ubuntu-latest

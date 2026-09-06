@@ -74,8 +74,7 @@ def reset(db: Database, name: str) -> bool:
     """Remove an override (restore the env default). True if removed."""
     if db.kv_get(KV_PREFIX + name) is None:
         return False
-    db._conn.execute("DELETE FROM kv WHERE k = ?", (KV_PREFIX + name,))
-    db._conn.commit()
+    db.kv_delete(KV_PREFIX + name)
     return True
 
 

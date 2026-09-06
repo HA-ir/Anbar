@@ -11,6 +11,7 @@ import asyncio
 import threading
 import zipfile
 from collections.abc import AsyncIterator
+from typing import IO, cast
 
 _END = object()  # sentinel: archive complete
 
@@ -58,7 +59,7 @@ async def stream_zip(entries: list[tuple[str, str, dict]], fetch_chunk) -> Async
         try:
             bridge = _LoopBridge(q, q_loop)
             with zipfile.ZipFile(
-                bridge, "w", compression=zipfile.ZIP_STORED, allowZip64=True
+                cast(IO[bytes], bridge), "w", compression=zipfile.ZIP_STORED, allowZip64=True
             ) as zf:
                 for name, obj_id, manifest in entries:
                     info = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))

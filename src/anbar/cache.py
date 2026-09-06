@@ -176,7 +176,7 @@ class ChunkMicroCache:
 
     def get(self, obj_id: int | str, index: int) -> bytes | None:
         """Return the cached chunk bytes, or None on miss/expiry."""
-        key = (obj_id, index)
+        key = (str(obj_id), index)
         e = self._entries.get(key)
         if e is None:
             self.misses += 1
@@ -195,7 +195,7 @@ class ChunkMicroCache:
         """Admit a fetched chunk. Oversized chunks are silently dropped."""
         if not self.enabled() or len(data) > self._max_bytes:
             return
-        key = (obj_id, index)
+        key = (str(obj_id), index)
         old = self._entries.pop(key, None)
         if old is not None:
             self._bytes -= len(old[0])

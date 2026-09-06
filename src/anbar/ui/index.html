@@ -204,7 +204,8 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .gcell:hover{border-color:var(--line2)}
 .gcell:has(.gmenu-pop.on), .gcell.menu-open{z-index:999 !important}
 .gthumb{height:110px;background:var(--bg2);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;border-radius:11px 11px 0 0}
-.gthumb img,.gthumb video{width:100%;height:100%;object-fit:cover}
+.gthumb img{width:100%;height:100%;object-fit:cover}
+.gthumb video{width:100%;height:100%;object-fit:cover;pointer-events:none}
 .gicon{font-size:22px;font-weight:700;color:var(--tx3);letter-spacing:.05em}
 /* select mode toggle & checkboxes */
 body:not(.select-mode) .selbox{display:none !important}
@@ -255,15 +256,16 @@ html[dir="ltr"] .date-cell{direction:ltr;text-align:left}
 .busy svg, .btn.busy svg, .icon-btn.busy svg, button.busy svg { animation: spin 0.65s linear infinite !important; }
 /* table */
 .tbl-wrap{background:var(--bg2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
-.tbl-wrap:has(.gallery), #tblWrap:has(.gallery){overflow:visible !important}
-/* BUG-v0.15.26: in gallery mode the table chrome (header row + card
-   background/shadow behind the tiles) must disappear completely — the old
-   rule only reset overflow, leaving the "name size date downloads actions"
-   strip and a white plate visible behind the cards. */
+.tbl-wrap.view-gallery, .tbl-wrap:has(.gallery), #tblWrap:has(.gallery){overflow:visible !important}
+/* BUG-v0.15.26 / BUG-19: in gallery mode the table chrome (header row + card
+   background/shadow behind the tiles) must disappear completely without flickering. */
+.tbl-wrap.view-gallery thead,
 .tbl-wrap:has(.gallery) thead,
 #tblWrap:has(.gallery) thead{display:none !important}
+.tbl-wrap.view-gallery table,
 .tbl-wrap:has(.gallery) table,
 #tblWrap:has(.gallery) table{display:none !important}
+.tbl-wrap.view-gallery,
 .tbl-wrap:has(.gallery),
 #tblWrap:has(.gallery){
   background:transparent !important;
@@ -2123,7 +2125,12 @@ function renderRows(){
   if(badge){badge.textContent="💾 "+humanSize(totalBytes);badge.title=totalBytes+" bytes";}
   $("#empty").style.display=files.length?"none":"block";
   const wrap=$("#tblWrap");
-  wrap.querySelectorAll(".gallery").forEach(g=>g.remove());
+  if(viewMode==="gallery"){
+    wrap.classList.add("view-gallery");
+  }else{
+    wrap.classList.remove("view-gallery");
+    wrap.querySelectorAll(".gallery").forEach(g=>g.remove());
+  }
   const nm0=$("#noMatch");
   if(files.length&&!list.length){
     /* BUG-v0.15.35: in gallery mode an empty folder must keep the gallery
@@ -2136,6 +2143,7 @@ function renderRows(){
     nm.innerHTML='<p>'+esc(curFolderPrefix ? t("emptyFolder") : t("noMatch"))+'</p>';
     nm.style.display="block";
     if(viewMode==="gallery"){
+      wrap.querySelectorAll(".gallery:not(#noMatch)").forEach(g=>g.remove());
       nm.classList.add("gallery");
       nm.style.gridColumn="";
     } else {
@@ -2392,8 +2400,10 @@ function renderGallery(list){
   const tb=$("#rows");
   tb.innerHTML="";
   const wrap=$("#tblWrap");
-  wrap.querySelectorAll(".gallery").forEach(g=>g.remove());
+  wrap.classList.add("view-gallery");
+  let g=wrap.querySelector(".gallery:not(#noMatch)");
   if(!list.length){
+    if(g)g.remove();
     /* BUG-v0.15.35: empty folder in gallery mode — re-tag the visible
        #noMatch empty-note as a .gallery item so the gallery chrome
        (transparent plate, hidden thead) stays instead of list look. */
@@ -2401,8 +2411,13 @@ function renderGallery(list){
     if(nm&&nm.style.display!=="none"){nm.classList.add("gallery");nm.style.gridColumn="";}
     return;
   }
-  const g=document.createElement("div");
-  g.className="gallery";
+  if(!g){
+    g=document.createElement("div");
+    g.className="gallery";
+    wrap.insertBefore(g,wrap.firstChild);
+  }else{
+    g.innerHTML="";
+  }
   const MV_ICON='<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg>';
   const RN_ICON='<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
   const CP_ICON='<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
@@ -2414,8 +2429,8 @@ function renderGallery(list){
     cell.className="gcell"+(kind && previewsEnabled?" has":"");
     let inner;
     if(isDir)inner='<div class="gicon" style="font-size:26px">📁</div>';
-    else if(previewsEnabled && kind==="image")inner='<img loading="lazy" src="'+(o.hasThumb?"/f/"+encodeURIComponent(o.id)+"/thumb":url)+'" alt="" onerror="this.onerror=null;this.src=\''+url+'\'">';
-    else if(previewsEnabled && kind==="video")inner='<video src="'+url+'" preload="metadata" muted playsinline></video><span class="gplay">▶</span>';
+    else if(previewsEnabled && kind==="image")inner='<img src="'+(o.hasThumb?"/f/"+encodeURIComponent(o.id)+"/thumb":url)+'" alt="" onerror="this.onerror=null;this.src=\''+url+'\'">';
+    else if(previewsEnabled && kind==="video")inner='<video src="'+url+'#t=0.001" preload="metadata" muted playsinline style="pointer-events:none"></video><span class="gplay">▶</span>';
     else if(previewsEnabled && kind==="audio")inner='<div class="gaudio"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
       +'<audio src="'+url+'" controls preload="metadata"></audio></div>';
     else if(previewsEnabled && kind==="pdf")inner='<div class="gpdf"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg><span>PDF</span></div>';
@@ -2555,7 +2570,7 @@ function renderGallery(list){
     }
     // whole card click: toggle sel in selectMode, otherwise open/navigate
     cell.onclick=e=>{
-      if(e.target.closest(".gacts,.selbox,a,button,audio,video"))return;
+      if(e.target.closest(".gacts,.selbox,a,button,audio"))return;
       if(isDir){
         navigateToFolder(o.fullPrefix);
         return;
@@ -2579,7 +2594,7 @@ function renderGallery(list){
     if(selSet.has(o.id)){cell.querySelector(".selbox").checked=true;cell.classList.add("selected");}
     g.appendChild(cell);
   });
-  wrap.insertBefore(g,wrap.firstChild);
+  if(!g.parentNode){wrap.insertBefore(g,wrap.firstChild);}
 }
 document.addEventListener("click", () => {
   document.querySelectorAll(".gmenu-pop.on").forEach(p => p.classList.remove("on"));
@@ -3084,6 +3099,17 @@ async function openFileModal(o){
   }else if(kind==="video"){
     pv.classList.add("has","video-col");
     pv.innerHTML='<video id="fmVid" src="'+url+'" controls preload="metadata" playsinline style="max-height:360px;width:100%;border-radius:10px"></video>';
+    const vEl=pv.querySelector("#fmVid");
+    if(vEl){
+      vEl.onerror=()=>{
+        const fallback=document.createElement("div");
+        fallback.className="fm-fallback";
+        fallback.style.cssText="padding:16px;text-align:center;font-size:13px;color:var(--tx2);display:flex;flex-direction:column;gap:6px;align-items:center";
+        fallback.innerHTML='<span>🎬 '+(lang==="fa"?"امکان پیش‌نمایش مستقیم این ویدیو در مرورگر نیست":"Direct playback not supported in browser")+'</span>'
+          +'<span style="font-size:11.5px;color:var(--tx3)">'+(lang==="fa"?"برای مشاهده، ویدیو را دانلود کنید":"Download the file to view locally")+'</span>';
+        pv.prepend(fallback);
+      };
+    }
     loadSubsStrip(o,pv);
   }else if(kind==="audio"){
     pv.classList.add("has","audio");
@@ -3096,7 +3122,7 @@ async function openFileModal(o){
     pv.classList.add("has");
     pv.innerHTML='<div class="spin"></div>';
     try{
-      const res=await fetch(url,{headers:_apiKey?{"Authorization":"Bearer "+_apiKey}:{}});
+      const res=await fetch(url,{credentials:"same-origin",headers:_apiKey?{"Authorization":"Bearer "+_apiKey}:{}});
       if(res.ok){
         const txt=await res.text();
         const ext = extOf(o.filename);
@@ -4233,7 +4259,10 @@ async function loadSettings(){
     $("#s_cache_mb").value=v("cache_mb");
     try {
       const sc = await api("/api/v1/admin/auth/secret");
-      if($("#s_enc_secret")) $("#s_enc_secret").value = sc.secret || "";
+      if($("#s_enc_secret")) {
+        $("#s_enc_secret").value = "";
+        $("#s_enc_secret").placeholder = sc.masked || "HMAC / Master Secret...";
+      }
     } catch(e){}
     await loadTelegramConfig();
     await loadSystemStats();
@@ -4644,7 +4673,10 @@ $("#btnRotateSecret").onclick=guardBtn($("#btnRotateSecret"),async()=>{
       method:"POST",
       body:JSON.stringify({})
     });
-    if($("#s_enc_secret"))$("#s_enc_secret").value=r.hmac_secret||"";
+    if($("#s_enc_secret")) {
+      $("#s_enc_secret").value = "";
+      $("#s_enc_secret").placeholder = r.masked || "••••••••";
+    }
     toast(t("secretRotated"));
   }catch(e){toast(e.message,"err");}
 });

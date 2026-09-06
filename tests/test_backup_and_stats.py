@@ -23,7 +23,7 @@ def test_backup_and_system_stats(client: TestClient):
     r_bk = client.get("/api/v1/admin/backup", headers=ADMIN)
     assert r_bk.status_code == 200
     assert len(r_bk.content) > 0
-    assert "attachment; filename=\"anbar_backup_" in r_bk.headers.get("content-disposition", "")
+    assert 'attachment; filename="anbar_backup_' in r_bk.headers.get("content-disposition", "")
 
     # 4. Test backup push to telegram (ARCH-02: queued via the job queue)
     r_tg = client.post("/api/v1/admin/backup/telegram", headers=ADMIN)
@@ -89,4 +89,3 @@ def test_backup_and_system_stats(client: TestClient):
     r_audit = client.get("/api/v1/admin/audit-logs", headers=ADMIN)
     assert r_audit.status_code == 200
     assert "logs" in r_audit.json()
-

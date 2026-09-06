@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
@@ -16,8 +16,9 @@ from fastapi.responses import JSONResponse
 from .. import runtime
 from ..auth import require_uploader
 from ..object_service import ObjectService, ResumeOutOfRange, describe_storage_error
-from ..objects import Manifest
+from ..objects import Manifest, UploadCeilingExceeded
 from ..ratelimit import limit_upload
+from ..tasks import spawn_background_task
 
 router = APIRouter()
 log = logging.getLogger("anbar.upload")
@@ -85,7 +86,7 @@ async def _commit(
             except Exception:  # noqa: BLE001 — thumbs are best-effort
                 pass
 
-        asyncio.create_task(_make_thumb())
+        spawn_background_task(_make_thumb(), name=f"upload:thumb:{obj_id}")
 
     # FEAT-SUBS-2: best-effort import of subtitle tracks embedded in the
     # video container (MKV soft subs). Runs in the background after commit;
@@ -110,7 +111,7 @@ async def _commit(
             except Exception:  # noqa: BLE001 — subs are best-effort
                 log.exception("embedded subs import failed for %s", obj_id)
 
-        asyncio.create_task(_import_embedded())
+        spawn_background_task(_import_embedded(), name=f"upload:embed-subs:{obj_id}")
     base = settings.base_url.rstrip("/")
     return JSONResponse(
         {
@@ -141,6 +142,8 @@ async def _store_stream(
     svc.harvester = getattr(request.app.state, "harvester", None)
     try:
         manifest, sha_hex = await svc.store_stream(stream)
+    except UploadCeilingExceeded as e:
+        raise HTTPException(413, "object exceeds configured ceiling") from e
     except ResumeOutOfRange as e:
         raise HTTPException(409, str(e)) from None
     except BodyReadTimeout as e:
@@ -172,9 +175,7 @@ def _chunk_fetcher(request: Request):
         row = db.get_object(obj_id)
         if row is None:
             return b"\0" * length
-        manifest = (
-            Manifest.from_json(row["manifest"]) if row["manifest"] else Manifest()
-        )
+        manifest = Manifest.from_json(row["manifest"]) if row["manifest"] else Manifest()
         chunks = manifest.chunks
         if chunk_index >= len(chunks):
             return b"\0" * length
@@ -189,7 +190,7 @@ def _chunk_fetcher(request: Request):
         )
         blob = await chunk_backend.open(ref)
         start = max(0, min(chunk_offset, len(blob)))
-        return blob[start : start + max(0, length)]
+        return cast(bytes, blob[start : start + max(0, length)])
 
     return fetch_chunk
 
@@ -211,6 +212,7 @@ def _service_for(
         resume_from=resume_from,
         # ARCH-01: multi-token uploads rotate across the pool members
         pool=getattr(request.app.state, "bot_pool", None),
+        max_bytes=_max_upload_bytes(request),
     )
 
 

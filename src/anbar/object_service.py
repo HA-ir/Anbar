@@ -9,9 +9,11 @@ HTTP/job semantics on top.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
+from typing import Any
 
 from .auth import effective_hmac_secret
 from .objects import Chunk, Manifest, chunk_stream, new_object_id, opaque_chunk_name
@@ -39,6 +41,7 @@ class ObjectService:
         resume_from: int = 0,
         checkpoint_prefix: str = "upres",
         pool=None,
+        max_bytes: int | None = None,
     ) -> None:
         self.backend = backend
         self.db = db
@@ -52,16 +55,15 @@ class ObjectService:
         # Hybrid deployments (mtproto primary + bot CDN pool) never distribute:
         # the pool does not hold the primary backend there.
         self.pool = pool
-        self._distribute = (
-            pool is not None and pool.size > 1 and pool.contains(backend)
-        )
+        self._distribute = pool is not None and pool.size > 1 and pool.contains(backend)
         # PERF-03: first chunk is kept aside for thumbnail generation
         self.first_chunk: bytes = b""
         # checkpointing is optional: the upload path resumes, ingest does not
         self.ck_key = f"{checkpoint_prefix}:{upload_id}" if upload_id else None
         self.resume_from = resume_from if self.ck_key else 0
         self.skip_remaining = self.resume_from
-        self.harvester = None  # optionally wired by the caller
+        self.harvester: Any = None  # optionally wired by the caller
+        self.max_bytes = max_bytes
 
     # ------------------------------------------------------------------ ckpt
     def _load_prior_chunks(self) -> list[dict]:
@@ -209,6 +211,7 @@ class ObjectService:
                 # ingest passes content_type=None → no media hint, identical
                 # to the old ingest `put()` path
                 is_first_chunk_media=bool(self.content_type),
+                max_bytes=self.max_bytes,
             )
         except BaseException:
             await self.rollback()
@@ -273,3 +276,53 @@ def describe_storage_error(e: BaseException) -> tuple[int, str]:
     if isinstance(e, TelegramError):
         return 502, f"telegram: {e.message}"
     return 502, f"storage error: {e}"
+
+
+async def purge_object_blobs(backend, db, row: dict, secret: str | None = None, pool=None) -> int:
+    """Hard-destroy one object row + its Telegram blobs. Returns blob count."""
+    obj_id = row["id"]
+    manifest = json.loads(row["manifest"]) if row.get("manifest") else {"chunks": []}
+    chunks = manifest.get("chunks", [])
+    total_chunks = len(chunks)
+    deleted = 0
+    for c in chunks:
+        chunk_backend = backend
+        chunk_name = c.get("k")
+        if chunk_name and pool is not None:
+            chunk_backend = pool.by_name(chunk_name) or backend
+        try:
+            ref = ObjectRef(
+                file_id=c["f"],
+                message_id=c.get("m"),
+                backend=chunk_backend.name,
+            )
+            if await chunk_backend.delete(ref):
+                deleted += 1
+        except Exception:  # noqa: BLE001 - best-effort remote cleanup
+            pass
+    db.delete_object(obj_id)
+    # drop per-object kv tags (pw, cap, slugs, link registrations/tombstones)
+    from .links import KV_PREFIX as _LK
+    from .links import REV_PREFIX as _RV
+
+    for k, v in list(db.kv_all()):
+        if (v == obj_id and k.startswith("slug:")) or (
+            k.startswith((_LK, _RV)) and len(k.split(":", 2)) == 3 and k.split(":", 2)[1] == obj_id
+        ):
+            db.kv_delete(k)
+    for tag in ("pw:", "maxdl:", "dlc:"):
+        db.kv_delete(f"{tag}{obj_id}")
+    # subtitle tracks (FEAT-SUBS) die with the object
+    from .subtitles import drop_for as _drop_subs
+
+    _drop_subs(db, obj_id)
+    # FEAT-SUBS-2: one-shot embedded-import flag dies with object
+    db.kv_delete(f"subs_imported:{obj_id}")
+    db.kv_delete(f"subsimported:{obj_id}")
+    if deleted < total_chunks:
+        from .self_healing import emit_meta_event
+
+        asyncio.create_task(
+            emit_meta_event(backend, {"op": "del_obj", "id": obj_id}, secret=secret)
+        )
+    return deleted

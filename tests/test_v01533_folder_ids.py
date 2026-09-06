@@ -16,6 +16,7 @@ Fix (two layers):
   fresh ids from the server, falling back to the old cache only if the
   API itself fails. shareFolder() no longer pre-blocks with the toast.
 """
+
 from __future__ import annotations
 
 from starlette.testclient import TestClient
@@ -36,9 +37,7 @@ def test_admin_objects_prefix_filter(client: TestClient):
     a = _upload(client, "fresh/x1.bin")
     b = _upload(client, "fresh/x2.bin")
     _upload(client, "other/y.bin")
-    r = client.get(
-        "/api/v1/admin/objects?limit=500&prefix=fresh", headers=UP
-    )
+    r = client.get("/api/v1/admin/objects?limit=500&prefix=fresh", headers=UP)
     assert r.status_code == 200
     ids = [o["id"] for o in r.json()["objects"]]
     # both files under the prefix are returned, nothing else
@@ -54,9 +53,7 @@ def test_admin_objects_prefix_excludes_folder_marker(client: TestClient):
     )
     assert r.status_code == 200
     _upload(client, "marktest/inner.bin")
-    r = client.get(
-        "/api/v1/admin/objects?limit=500&prefix=marktest", headers=UP
-    )
+    r = client.get("/api/v1/admin/objects?limit=500&prefix=marktest", headers=UP)
     rows = r.json()["objects"]
     names = [o["filename"] for o in rows]
     assert "marktest/inner.bin" in names

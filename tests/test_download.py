@@ -108,12 +108,12 @@ def test_invalid_ranges(backend, client):
 
 def test_download_not_found(backend, client):
     assert client.get("/f/doesnotexist").status_code == 404
-    assert client.get("/f/doesnotexist/info").status_code == 404
+    assert client.get("/f/doesnotexist/info", headers=AUTH).status_code == 404
 
 
 def test_info(backend, client):
     obj = _upload(client)
-    r = client.get(f"/f/{obj}/info")
+    r = client.get(f"/f/{obj}/info", headers=AUTH)
     assert r.status_code == 200
     body = r.json()
     assert body["id"] == obj
@@ -121,6 +121,29 @@ def test_info(backend, client):
     assert body["sha256"] == SHA
     assert body["chunks"] == 3
     assert body["filename"] == "three.bin"
+
+
+def test_info_requires_auth(backend, client):
+    obj = _upload(client)
+    # 1. /f/{id}/info returns 401 when auth=ON, no creds
+    r_no_auth = client.get(f"/f/{obj}/info")
+    assert r_no_auth.status_code == 401
+
+    # 2. /f/{id}/info returns 200 with valid bearer key
+    r_auth = client.get(f"/f/{obj}/info", headers=AUTH)
+    assert r_auth.status_code == 200
+    assert r_auth.json()["id"] == obj
+
+    r_admin = client.get(f"/f/{obj}/info", headers=ADMIN)
+    assert r_admin.status_code == 200
+    assert r_admin.json()["id"] == obj
+
+    # signed link also authenticates /info
+    signed_url = _signed_url(client, obj)
+    sig_and_exp = signed_url.split("?")[1]
+    r_signed = client.get(f"/f/{obj}/info?{sig_and_exp}")
+    assert r_signed.status_code == 200
+    assert r_signed.json()["id"] == obj
 
 
 def test_download_chunk_cache_reuse(backend, client):

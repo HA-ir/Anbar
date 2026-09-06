@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import secrets
 from dataclasses import dataclass, field
+from typing import Any
 
 # base62 alphabet, no ambiguous chars (0/O, 1/I/l)
 _ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789ABCDEFGHJKMNPQRSTUVWXYZ"
@@ -51,6 +52,7 @@ class Manifest:
 
     chunks: list[Chunk] = field(default_factory=list)
     total_size: int = 0
+    _svc: Any = field(default=None, repr=False)
 
     def to_json(self) -> str:
         import json
@@ -120,11 +122,16 @@ class Manifest:
         return out
 
 
+class UploadCeilingExceeded(Exception):
+    """Raised when streaming upload exceeds the configured size ceiling (SEC-B4)."""
+
+
 async def chunk_stream(
     stream,
     chunk_size: int,
     on_chunk,
     is_first_chunk_media: bool = False,
+    max_bytes: int | None = None,
 ) -> tuple[int, str]:
     """Drain an async byte stream, calling `on_chunk(bytes) -> file_id` per part.
 
@@ -132,6 +139,7 @@ async def chunk_stream(
     `is_first_chunk_media`: hint the backend that the FIRST chunk carries the
     real file content-type (media-aware backends send it as video/audio so
     Telegram shows a player; continuation chunks stay plain documents).
+    `max_bytes`: optional ceiling on total bytes read; raises UploadCeilingExceeded if exceeded.
     """
     h = hashlib.sha256()
     total = 0
@@ -143,6 +151,8 @@ async def chunk_stream(
             if not piece:
                 break
             buf.extend(piece)
+            if max_bytes is not None and (total + len(buf)) > max_bytes:
+                raise UploadCeilingExceeded("object exceeds configured ceiling")
         if not buf:
             break
         await on_chunk(bytes(buf), media=(index == 0 and is_first_chunk_media))

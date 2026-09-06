@@ -1,4 +1,5 @@
 """v0.15.37 — cache master switch is runtime-tunable (no .env/restart needed)."""
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient

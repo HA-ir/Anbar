@@ -147,9 +147,7 @@ class TestSeekCacheE2E:
         obj, url = small_payload_app
         _get_range(client, url, 0, 1023)
         _get_range(client, url, 100, 1123)  # hit
-        r = client.get(
-            "/api/v1/admin/status", headers={"Authorization": "Bearer test-admin-key"}
-        )
+        r = client.get("/api/v1/admin/status", headers={"Authorization": "Bearer test-admin-key"})
         assert r.status_code == 200
         cc = r.json()["chunk_cache"]
         assert cc["enabled"] is True

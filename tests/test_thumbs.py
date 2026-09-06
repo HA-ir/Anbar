@@ -52,9 +52,7 @@ def test_thumb_404_for_non_image_and_auth_matrix(client):
     assert r.status_code == 200
     obj_id = r.json()["id"]
     time.sleep(0.2)
-    resp = client.get(
-        f"/f/{obj_id}/thumb", headers={"Authorization": "Bearer test-admin-key"}
-    )
+    resp = client.get(f"/f/{obj_id}/thumb", headers={"Authorization": "Bearer test-admin-key"})
     assert resp.status_code == 404
 
     # corrupt "image" upload must not break anything; no thumb either
@@ -93,9 +91,7 @@ def test_purge_removes_thumb(client):
         time.sleep(0.05)
     assert thumbs.has_thumb(settings, obj_id)
 
-    d = client.delete(
-        f"/f/{obj_id}?purge=true", headers={"Authorization": "Bearer test-admin-key"}
-    )
+    d = client.delete(f"/f/{obj_id}?purge=true", headers={"Authorization": "Bearer test-admin-key"})
     assert d.status_code == 200, d.text
     assert not thumbs.has_thumb(settings, obj_id)
 

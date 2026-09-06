@@ -22,9 +22,7 @@ MAX_SUB_BYTES = 2 * 1024 * 1024  # a subtitle is text; 2 MB is already absurd
 MAX_TRACKS = 16
 KV_PREFIX = "subs:"
 
-_VTT_TAG_WHITELIST = re.compile(
-    r"</?(?:i|b|u|v|c|ruby|rt|rp)(?:\s[^>\n]*)?>", re.IGNORECASE
-)
+_VTT_TAG_WHITELIST = re.compile(r"</?(?:i|b|u|v|c|ruby|rt|rp)(?:\s[^>\n]*)?>", re.IGNORECASE)
 _STRAY_TAG = re.compile(r"<[^>\n]{0,200}>")
 # SRT timing line: 00:00:01,500 --> 00:00:03,000 (ms separator is a comma;
 # some rips also use a dot or a colon — normalize all to the VTT dot)

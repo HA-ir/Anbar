@@ -4,6 +4,7 @@
 
 | version | supported |
 |---------|-----------|
+| 0.15.x  | ✅ |
 | 0.10.x  | ✅ |
 | < 0.10  | ❌ upgrade first |
 
@@ -35,6 +36,20 @@ anbar's security model assumes:
 - admin/uploader keys are bearer credentials — treat them like passwords.
 - signed share links are capability URLs: anyone holding one can download the
   object until it expires or the HMAC secret rotates (`anbarctl rotate-secret`).
+- Telegram Mini App admin access: mini-app session exchange grants admin role
+  and must be restricted in production via `ANBAR_MINIAPP_ALLOWED_USERS`
+  (comma-separated Telegram user IDs).
+- metadata endpoints (`/f/{id}/info`): protected by the download authentication
+  matrix when `ANBAR_AUTH_ENABLED` is enabled.
+- admin signing secrets: `GET /admin/auth/secret` and `POST /admin/auth/rotate-secret`
+  return masked previews only (`***...abcd`) to avoid plaintext credential exposure.
+- password-protected links: `?pw=` authentication is enforced unconditionally even if
+  global `ANBAR_AUTH_ENABLED` is false.
+- S3 write endpoints: require valid credentials even if `ANBAR_AUTH_ENABLED` is false,
+  and enforce upload size limits and rate limiting.
+- URL ingest SSRF protection: remote URL fetch validates IP targets and blocks loopback,
+  private RFC1918, link-local, and cloud metadata addresses (169.254.169.254).
+- API keys: persisted as SHA-256 hashes in kv storage.
 
 Out of scope: self-XSS in single-user pages, missing rate limits behind your
 own trusted proxy, and anything requiring a malicious storage backend.

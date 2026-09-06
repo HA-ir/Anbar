@@ -23,8 +23,8 @@ class ChunkingMode(StrEnum):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-    env_prefix="ANBAR_", env_file=".env", extra="ignore", env_ignore_empty=True
-)
+        env_prefix="ANBAR_", env_file=".env", extra="ignore", env_ignore_empty=True
+    )
 
     # server
     host: str = "0.0.0.0"
@@ -74,6 +74,7 @@ class Settings(BaseSettings):
 
     # web UI sessions (F7)
     web_session_ttl: int = Field(default=43200, ge=300)  # 12 h
+    miniapp_allowed_users_raw: str | None = Field(default=None, alias="ANBAR_MINIAPP_ALLOWED_USERS")
 
     # cache
     cache_enabled: bool = False
@@ -92,6 +93,12 @@ class Settings(BaseSettings):
 
     # PERF-01: RAM budget (MB) for the per-chunk seek micro cache; 0 = off
     seek_cache_mb: int = Field(default=32, ge=0)
+
+    @property
+    def miniapp_allowed_users(self) -> set[int]:
+        if not self.miniapp_allowed_users_raw:
+            return set()
+        return {int(p) for p in self.miniapp_allowed_users_raw.split(",") if p.strip().isdigit()}
 
     @property
     def bot_tokens(self) -> list[str]:

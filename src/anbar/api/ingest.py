@@ -12,9 +12,12 @@ background; the UI polls `GET /api/v1/upload/url/{job_id}` for progress
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import logging
+import socket
 import time
+import urllib.parse
 import uuid
 from pathlib import PurePosixPath
 from urllib.parse import unquote, urlsplit
@@ -25,6 +28,7 @@ from fastapi import APIRouter, HTTPException, Request
 from ..auth import require_admin
 from ..object_service import ObjectService
 from ..objects import Manifest  # noqa: F401 (re-exported for job payload typing)
+from ..tasks import spawn_background_task
 
 router = APIRouter()
 log = logging.getLogger("anbar.ingest")
@@ -49,6 +53,8 @@ def _prune_jobs() -> int:
     for jid in stale:
         JOBS.pop(jid, None)
     return len(stale)
+
+
 MAX_CONCURRENT = 2
 _SEM = asyncio.Semaphore(MAX_CONCURRENT)
 
@@ -98,10 +104,64 @@ def _filename_from_url(url: str, headers: httpx.Headers | None) -> str:
 
 def _guess_content_type(headers: httpx.Headers | None, fallback: str) -> str:
     if headers:
-        ct = headers.get("content-type", "").split(";")[0].strip()
+        ct = str(headers.get("content-type") or "").split(";")[0].strip()
         if ct and ct != "application/octet-stream":
             return ct
-    return fallback
+    return str(fallback)
+
+
+def is_ip_allowed(ip_str: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        if (
+            ip.is_loopback
+            or ip.is_private
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
+            return False
+        if str(ip) == "169.254.169.254":
+            return False
+        return True
+    except ValueError:
+        return False
+
+
+def validate_url_target(url: str) -> None:
+    """SEC-B6: Validate URL scheme, host and resolved IPs to prevent SSRF."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise ValueError("URL must be http(s)")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("Invalid URL hostname")
+
+    h_lower = hostname.lower()
+    if h_lower in ("localhost", "metadata.google.internal") or h_lower.endswith(".localhost"):
+        raise ValueError(f"Access to host {hostname} is prohibited")
+
+    # Check direct IP
+    try:
+        ip = ipaddress.ip_address(hostname)
+        if not is_ip_allowed(str(ip)):
+            raise ValueError(f"Access to private/restricted IP {ip} is prohibited")
+        return
+    except ValueError:
+        pass
+
+    # Resolve DNS
+    try:
+        default_port = 443 if parsed.scheme == "https" else 80
+        addr_info = socket.getaddrinfo(hostname, parsed.port or default_port)
+        for item in addr_info:
+            ip_str = str(item[4][0])
+            if not is_ip_allowed(ip_str):
+                raise ValueError(f"Access to private/restricted IP {ip_str} is prohibited")
+    except socket.gaierror:
+        # If unresolvable in offline test env, httpx handles failure
+        pass
 
 
 async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
@@ -114,10 +174,16 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
     async with _SEM:
         try:
             timeout = httpx.Timeout(settings.ingest_read_timeout_s, connect=CONNECT_TIMEOUT)
+            validate_url_target(url)
+
+            async def _check_ssrf_hook(req: httpx.Request):
+                validate_url_target(str(req.url))
+
             async with httpx.AsyncClient(
                 follow_redirects=True,
                 max_redirects=MAX_REDIRECTS,
                 timeout=timeout,
+                event_hooks={"request": [_check_ssrf_hook]},
                 headers={"user-agent": "anbar-ingest/0.8"},
             ) as client:
                 async with client.stream("GET", url) as resp:
@@ -229,6 +295,10 @@ async def upload_url(request: Request):
         raise HTTPException(400, "url must be http(s)")
     if len(url) > 2048:
         raise HTTPException(400, "url too long")
+    try:
+        validate_url_target(url)
+    except ValueError as e:
+        raise HTTPException(400, f"Invalid URL target: {e}") from None
 
     job_id = uuid.uuid4().hex[:12]
     JOBS[job_id] = {
@@ -249,10 +319,13 @@ async def upload_url(request: Request):
                 "ingest_url",
                 job_id=job_id,
                 payload={"url": url, "filename": filename},
+                handler=lambda jid, payload, app=request.app: _run_job(
+                    app, jid, payload["url"], payload.get("filename")
+                ),
             )
         except Exception:  # noqa: BLE001 — queue must never block ingest
             log.warning("job row insert failed for %s", job_id)
-    asyncio.get_running_loop().create_task(_run_job(request.app, job_id, url, filename))
+    spawn_background_task(_run_job(request.app, job_id, url, filename), name=f"ingest:{job_id}")
     return {"job_id": job_id}
 
 
@@ -280,8 +353,6 @@ async def upload_url_status(request: Request, job_id: str):
                 "started": row.get("created_at") or 0.0,
                 "object": result,
                 "error": row.get("error"),
-                "elapsed": round(
-                    time.time() - (row.get("created_at") or time.time()), 1
-                ),
+                "elapsed": round(time.time() - (row.get("created_at") or time.time()), 1),
             }
     raise HTTPException(404, "unknown job")

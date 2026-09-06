@@ -13,7 +13,7 @@ status codes with a `{"detail": "..."}` body.
 | `POST /api/v1/upload` | uploader key | uploader key |
 | `POST /api/v1/upload/raw` | uploader key | uploader key |
 | `GET /f/{id}` | open | signed link, or admin key |
-| `GET /f/{id}/info` | open | open (metadata only) |
+| `GET /f/{id}/info` | open | signed link, bearer key, or admin key |
 | `POST /f/{id}/link?ttl=` | owner or admin key | owner or admin key |
 | `DELETE /f/{id}` | owner or admin key | owner or admin key |
 | `GET /api/v1/admin/objects` | admin key | admin key |
@@ -103,7 +103,7 @@ Headers: `Content-Type`, `Content-Length`, `Accept-Ranges: bytes`,
 
 ### `GET /f/{id}/info`  *(F3)*
 
-Metadata without the body (open when useful, see matrix).
+Metadata without the body (enforces download auth matrix when auth is ON).
 ```json
 {"id":"k3xQ9aB2mN0p","filename":"report.pdf","size":2097152,
  "content_type":"application/pdf","sha256":"9f2c…","chunks":1,
@@ -196,8 +196,8 @@ only toggles when needed (idempotent).
 ### `POST /api/v1/admin/auth/rotate-secret`  *(F4)*
 
 Admin only. Generates a fresh HMAC signing secret; every previously minted
-signed link becomes invalid immediately. Returns the new secret so it can be
-recorded in your secret store. `anbarctl rotate-secret` wraps this.
+signed link becomes invalid immediately. Returns `{"status": "rotated", "masked": "..."}`
+without exposing the raw secret. `anbarctl rotate-secret` wraps this.
 
 ### `GET /api/v1/admin/settings`  *(F8)*
 

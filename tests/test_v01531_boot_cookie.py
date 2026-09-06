@@ -6,6 +6,7 @@ expired/absent session cookie the UI still showed the app (Bearer works for
 carries the cookie — got 401. Fix: boot() (re)logins with the stored key to
 mint a fresh cookie BEFORE trusting /ui/me.
 """
+
 from __future__ import annotations
 
 from starlette.testclient import TestClient

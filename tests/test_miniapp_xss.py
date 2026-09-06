@@ -19,6 +19,4 @@ def test_miniapp_escapes_filename_in_render():
 
 
 def test_miniapp_has_escape_helper():
-    assert "const esc = s =>" in MINIAPP, (
-        "miniapp must define an HTML escape helper"
-    )
+    assert "const esc = s =>" in MINIAPP, "miniapp must define an HTML escape helper"

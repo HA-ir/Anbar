@@ -227,7 +227,7 @@ def _build_matrix(payload: bytes) -> list[list[bool]]:
     for c in range(size - 8, size):
         m[8][c] = fmt[idx] == "1"
         idx += 1
-    return m
+    return [[bool(cell) for cell in row] for row in m]
 
 
 def qr_svg(text: str, box_px: int = 160) -> str:

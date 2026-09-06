@@ -4,6 +4,31 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.44] — 2026-09-05
+
+### Quality & Infrastructure (Wave 2)
+- **Playwright E2E browser test suite**: Added comprehensive automated browser tests (`tests/test_e2e_playwright.py`) covering 12 core UI journeys: admin authentication, dashboard navigation, file uploads, gallery and table view switching, preview/details modal, real-time search filtering, QR-backed share link generation, password-protected download and browser unlock in a guest context, links manager modal and batch revocation, multi-select toolbar, runtime settings modal, Persian/English language switching, and logout.
+- **CI release gating**: Updated GitHub Actions CI and publish workflows (`.github/workflows/ci.yaml` and `.github/workflows/publish.yaml`) to install system dependencies (`ffmpeg`), `playwright`, `ruff`, `mypy`, and run all tests. Release publishing to GHCR is now strictly gated on all tests and checks passing before image build and push.
+- **Strict typing & mypy**: Added `mypy` configuration to `pyproject.toml` with strict typing on `src/anbar/api/`, added `py.typed` PEP 561 marker, and resolved all typing violations across all modules.
+
+### Security
+- **Telegram mini-app admin allowlist (Wave 0, CRITICAL)**: any Telegram user opening the mini-app previously received an admin session because HMAC verification only confirmed the data was signed by the bot without checking user identity. Added `ANBAR_MINIAPP_ALLOWED_USERS` configuration (comma-separated Telegram user IDs). When set, unlisted Telegram users are rejected with HTTP 403 and logged under audit event `auth.miniapp_denied_allowlist`. When empty/unset, previous behavior is retained for backward compatibility.
+- **Enforce authentication on `/f/{id}/info` (Wave 0, CRITICAL)**: `GET /f/{id}/info` previously exposed file metadata without authentication regardless of `auth_enabled`. The endpoint now enforces `_authenticate_download`, requiring valid bearer keys, admin sessions, or signed links when `auth_enabled` is active, returning HTTP 401 when unauthenticated.
+- **Mask HMAC signing secret on admin status and rotation (SEC-B1, HIGH)**: `GET /admin/auth/secret` and `POST /admin/auth/rotate-secret` now return masked previews (`***...abcd`) rather than raw plaintext secrets in responses.
+- **Enforce password authentication when auth is disabled (SEC-B2, HIGH)**: password-gated links now strictly verify `?pw=` even if global `ANBAR_AUTH_ENABLED` is false.
+- **S3 API hardening & anonymous write protection (SEC-B3, HIGH)**: S3 write endpoints require credentials when global auth is disabled; S3 downloads and uploads enforce configured rate limits; bucket listing is strictly scoped to prefix without fallback to default bucket enumeration.
+- **Running upload byte counter (SEC-B4, HIGH)**: chunk streaming enforces running byte ceilings (`UploadCeilingExceeded` -> HTTP 413) across standard, multipart, and S3 uploads to prevent bypassing size limits via chunked transfer encoding.
+- **Hashed API key storage (SEC-B5, HIGH)**: newly minted API keys are stored in kv hashed with SHA-256 (`key_hash`), with constant-time comparison and backwards compatibility for legacy plaintext records.
+- **URL ingest SSRF prevention (SEC-B6, HIGH)**: URL ingest validates URL scheme, checks against private/loopback/metadata IP ranges (including IPv4-mapped IPv6), and enforces validation across redirect hops.
+- **S3 overwrite orphan blob cleanup (SEC-B7, HIGH)**: overwriting an existing S3 object cleanly purges previous chunks, metadata, and subtitle records.
+- **Security headers middleware (SEC-B8, HIGH)**: added security headers to all responses, including `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: SAMEORIGIN`, and Content-Security-Policy on HTML responses.
+- **Sanitize and escape subtitle track metadata (SEC-B9, HIGH)**: subtitle track labels are escaped before insertion into album gallery HTML.
+
+### Reliability
+- **Database concurrency protection (REL-C1, MEDIUM)**: synchronized `Database` operations through a shared recursive lock (`threading.RLock`) and provided thread-safe `JobStore`.
+- **Background task lifecycle management (REL-C2, MEDIUM)**: asynchronous fire-and-forget tasks are registered in `spawn_background_task` to prevent premature garbage collection and capture unhandled exceptions.
+- **Optimized object counts and pagination (REL-C3, REL-C4, MEDIUM)**: database-backed object counting and S3 listing eliminates N+1 queries by leveraging persisted SHA-256 checksums.
+
 ## [0.15.19] — 2026-08-31
 
 ### Fixed

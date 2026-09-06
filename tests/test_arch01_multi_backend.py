@@ -166,8 +166,7 @@ def test_manifest_roundtrip_with_backend_key():
     m = Manifest(
         chunks=[
             # new-style: named member + bot_file_id must coexist
-            Chunk(index=0, size=4, file_id="f0", message_id=10,
-                  bot_file_id="bf", backend="bot:1"),
+            Chunk(index=0, size=4, file_id="f0", message_id=10, bot_file_id="bf", backend="bot:1"),
             # old-style: no backend recorded
             Chunk(index=1, size=5, file_id="f1", message_id=11),
         ],

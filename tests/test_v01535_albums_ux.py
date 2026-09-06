@@ -1,5 +1,6 @@
 """v0.15.35 — UI/UX round: albums in links manager, EN-only album pages,
 restart support, trash UX, gallery chrome for empty folders."""
+
 from __future__ import annotations
 
 from starlette.testclient import TestClient

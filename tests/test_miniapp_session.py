@@ -38,6 +38,16 @@ def _boot_with_token(client: TestClient, monkeypatch) -> None:
     )
 
 
+def _boot_with_allowlist(client: TestClient, monkeypatch, allowed_users: str) -> None:
+    _boot_with_token(client, monkeypatch)
+    allowed = {int(value.strip()) for value in allowed_users.split(",") if value.strip()}
+    monkeypatch.setattr(
+        type(client.app.state.settings),
+        "miniapp_allowed_users",
+        property(lambda self: allowed),
+    )
+
+
 def test_miniapp_session_requires_init_data(client: TestClient):
     r = client.post("/ui/miniapp/session", json={})
     assert r.status_code == 400
@@ -73,9 +83,7 @@ def test_miniapp_full_flow_sets_admin_session(client: TestClient, monkeypatch):
     # anon cannot list objects (auth on by default)
     assert client.get("/api/v1/admin/objects").status_code == 401
 
-    r = client.post(
-        "/ui/miniapp/session", json={"init_data": _signed_init_data(user_id=4242)}
-    )
+    r = client.post("/ui/miniapp/session", json={"init_data": _signed_init_data(user_id=4242)})
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["ok"] is True
@@ -99,3 +107,48 @@ def test_miniapp_session_cookie_role_is_admin_only(client: TestClient, monkeypat
     # admin-only endpoint proves the role
     status = client.get("/api/v1/admin/status")
     assert status.status_code == 200
+
+
+def test_miniapp_allowed_users_config_parsing():
+    from anbar.config import Settings
+
+    s1 = Settings(ANBAR_MINIAPP_ALLOWED_USERS="123, 456, 789")
+    assert s1.miniapp_allowed_users == {123, 456, 789}
+
+    s2 = Settings(ANBAR_MINIAPP_ALLOWED_USERS=None)
+    assert s2.miniapp_allowed_users == set()
+
+    s3 = Settings(ANBAR_MINIAPP_ALLOWED_USERS="")
+    assert s3.miniapp_allowed_users == set()
+
+    s4 = Settings(ANBAR_MINIAPP_ALLOWED_USERS="123, abc, -456,  999 ")
+    assert s4.miniapp_allowed_users == {123, 999}
+
+
+def test_miniapp_allowlist_rejects_unlisted_user(client: TestClient, monkeypatch):
+    _boot_with_allowlist(client, monkeypatch, "4242")
+    r = client.post("/ui/miniapp/session", json={"init_data": _signed_init_data(user_id=12345678)})
+    assert r.status_code == 403
+    assert "Telegram user not in miniapp allowlist" in r.text
+    assert "anbar_session" not in r.cookies
+    db = client.app.state.db
+    logs = db.list_audit_logs()
+    assert any(
+        log["event"] == "auth.miniapp_denied_allowlist" and log["actor"] == "12345678"
+        for log in logs
+    )
+
+
+def test_miniapp_allowlist_accepts_listed_user(client: TestClient, monkeypatch):
+    _boot_with_allowlist(client, monkeypatch, "12345678")
+    r = client.post("/ui/miniapp/session", json={"init_data": _signed_init_data(user_id=12345678)})
+    assert r.status_code == 200, r.text
+    assert r.json()["role"] == "admin"
+    assert "anbar_session" in r.cookies
+
+
+def test_miniapp_allowlist_disabled_accepts_any_valid_user(client: TestClient, monkeypatch):
+    _boot_with_allowlist(client, monkeypatch, "")
+    r = client.post("/ui/miniapp/session", json={"init_data": _signed_init_data(user_id=12345678)})
+    assert r.status_code == 200, r.text
+    assert r.json()["role"] == "admin"

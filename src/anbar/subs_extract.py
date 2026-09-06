@@ -108,8 +108,17 @@ def extract_stream_to_srt(video: Path, stream_index: int, out_srt: Path) -> bool
     try:
         subprocess.run(
             [
-                "ffmpeg", "-y", "-v", "error", "-i", str(video),
-                "-map", f"0:{stream_index}", "-c:s", "srt", str(out_srt),
+                "ffmpeg",
+                "-y",
+                "-v",
+                "error",
+                "-i",
+                str(video),
+                "-map",
+                f"0:{stream_index}",
+                "-c:s",
+                "srt",
+                str(out_srt),
             ],
             capture_output=True,
             text=True,

@@ -137,6 +137,15 @@ async def miniapp_session(request: Request):
     except Exception:  # noqa: BLE001
         tg_user = None
 
+    allowed = settings.miniapp_allowed_users
+    if allowed and tg_user not in allowed:
+        db.log_audit(
+            "auth.miniapp_denied_allowlist",
+            actor=str(tg_user) if tg_user is not None else "anon",
+            ip=request.client.host if request.client else None,
+        )
+        raise HTTPException(403, "Telegram user not in miniapp allowlist")
+
     ttl = runtime.get_int(db, "session_ttl", settings.web_session_ttl)
     db.log_audit(
         "auth.miniapp",
