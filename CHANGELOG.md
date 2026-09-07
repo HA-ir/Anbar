@@ -206,3 +206,9 @@ versioning follows [SemVer](https://semver.org/).
 - Bugfix release: hardening around body idle timeouts and flood-budget
   handling; benchmark harness rewritten for streaming (low-RSS) operation;
   OSS packaging pass (SECURITY.md, CONTRIBUTING.md, CI, GHCR publishing).
+
+## [0.15.45] — 2026-09-07
+
+### Added
+- **UI/UX Revamp**: Complete visual redesign per VP of Engineering specifications.
+
