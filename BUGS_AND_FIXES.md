@@ -26,9 +26,12 @@ curl http://127.0.0.1:8318/healthz
 
 ## Time Completed
 
-2026-09-07 ~21:35 UTC
+2026-09-07T21:35Z
 
-## Current (v0.15.46)
+---
 
-Deployed: 2026-09-07T21:35Z
-Commit: 90c9271
+## Previous Versions
+
+### v0.15.45
+Deployed: 2026-09-07 (previous release)
+Commit: be4db29
