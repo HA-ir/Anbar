@@ -212,3 +212,8 @@ versioning follows [SemVer](https://semver.org/).
 ### Added
 - **UI/UX Revamp**: Complete visual redesign per VP of Engineering specifications.
 
+## [0.15.46] — 2026-09-07
+
+### Added
+- **UI/UX Revamp Frontend Assets**: Complete UI/UX revamp frontend code across `src/anbar/ui/index.html`, `src/anbar/ui/miniapp.html`, and `src/anbar/templates.py` (design tokens, bilingual typography, 36px command bar rhythm, stroke SVG icons, WCAG 2.1 AA accessibility, and responsive layouts).
+

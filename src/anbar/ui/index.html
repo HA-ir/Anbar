@@ -11,32 +11,105 @@
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ============ design tokens ============ */
-:root{
-  --bg:#f5f7fa; --bg2:#ffffff; --bg3:#eef1f5; --hover:#e9edf3;
-  --tx:#1a2230; --tx2:#5a6578; --tx3:#8b95a8;
-  --line:#e3e8ef; --line2:#d3dae4;
-  --brand:#2f6bff; --brand2:#1d4ed8; --brand-soft:rgba(47,107,255,.10);
-  --ok:#16a34a; --ok-soft:rgba(22,163,74,.10);
-  --warn:#d97706; --err:#dc2626; --err-soft:rgba(220,38,38,.08);
-  --shadow:0 1px 3px rgba(16,24,40,.07),0 8px 24px rgba(16,24,40,.06);
-  --shadow-lg:0 4px 12px rgba(16,24,40,.10),0 20px 48px rgba(16,24,40,.14);
-  --r:12px; --r-sm:9px;
-  --font:'Inter','Vazirmatn',Tahoma,system-ui,sans-serif;
+:root {
+  --bg-canvas: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-hover: #e2e8f0;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --tx-primary: #0f172a;
+  --tx-secondary: #475569;
+  --tx-muted: #64748b;
+  --brand-primary: #2563eb;
+  --brand-soft: rgba(37,99,235,0.08);
+  --status-success: #16a34a;
+  --status-danger: #dc2626;
+  --status-warn: #d97706;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --height-control: 36px;
+
+  /* legacy alias mappings */
+  --bg: var(--bg-canvas);
+  --bg2: var(--bg-surface);
+  --bg3: var(--bg-subtle);
+  --hover: var(--bg-hover);
+  --line: var(--border-subtle);
+  --line2: var(--border-strong);
+  --tx: var(--tx-primary);
+  --tx2: var(--tx-secondary);
+  --tx3: var(--tx-muted);
+  --brand: var(--brand-primary);
+  --brand2: #1d4ed8;
+  --ok: var(--status-success);
+  --ok-soft: rgba(22,163,74,0.10);
+  --warn: var(--status-warn);
+  --err: var(--status-danger);
+  --err-soft: rgba(220,38,38,0.08);
+  --shadow: 0 1px 2px rgba(15,23,42,0.05), 0 1px 3px rgba(15,23,42,0.08);
+  --shadow-lg: 0 4px 12px rgba(15,23,42,0.08), 0 12px 32px rgba(15,23,42,0.12);
+  --r: var(--radius-lg);
+  --r-sm: var(--radius-sm);
+  --font: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
-html[data-theme="dark"]{
-  --bg:#0d1117; --bg2:#161b26; --bg3:#1c2333; --hover:#212a3d;
-  --tx:#e8edf5; --tx2:#98a4b8; --tx3:#64708a;
-  --line:#232c3f; --line2:#2d3a52;
-  --brand:#4d82ff; --brand2:#3b6ef5; --brand-soft:rgba(77,130,255,.14);
-  --ok:#34d399; --ok-soft:rgba(52,211,153,.12);
-  --warn:#fbbf24; --err:#f87171; --err-soft:rgba(248,113,113,.10);
-  --shadow:0 1px 3px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
-  --shadow-lg:0 4px 12px rgba(0,0,0,.5),0 20px 48px rgba(0,0,0,.55);
+html[dir="ltr"] {
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
-/* ============ base ============ */
+html[dir="rtl"] {
+  --font: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+html[data-theme="dark"] {
+  --bg-canvas: #0b0f17;
+  --bg-surface: #131924;
+  --bg-subtle: #1b2333;
+  --bg-hover: #232c3f;
+  --border-subtle: #232d3f;
+  --border-strong: #334155;
+  --tx-primary: #f1f5f9;
+  --tx-secondary: #94a3b8;
+  --tx-muted: #8598b0;
+  --brand-primary: #3b82f6;
+  --brand-soft: rgba(59,130,246,0.12);
+  --status-success: #22c55e;
+  --status-danger: #ef4444;
+  --status-warn: #f59e0b;
+
+  --bg: var(--bg-canvas);
+  --bg2: var(--bg-surface);
+  --bg3: var(--bg-subtle);
+  --hover: var(--bg-hover);
+  --line: var(--border-subtle);
+  --line2: var(--border-strong);
+  --tx: var(--tx-primary);
+  --tx2: var(--tx-secondary);
+  --tx3: var(--tx-muted);
+  --brand: var(--brand-primary);
+  --brand2: #2563eb;
+  --ok: var(--status-success);
+  --ok-soft: rgba(34,197,94,0.12);
+  --warn: var(--status-warn);
+  --err: var(--status-danger);
+  --err-soft: rgba(239,68,68,0.10);
+  --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.5), 0 20px 48px rgba(0,0,0,0.55);
+}
+/* ============ base & accessibility ============ */
 *{box-sizing:border-box;margin:0;padding:0}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 body{font-family:var(--font);background:var(--bg);color:var(--tx);min-height:100vh;
-  transition:background .25s,color .25s,opacity .12s ease;-webkit-font-smoothing:antialiased}
+  transition:background .2s ease,color .2s ease,opacity .12s ease;-webkit-font-smoothing:antialiased}
+/* ============ typography scale ============ */
+.text-xs{font-size:11px;line-height:14px}
+.text-sm{font-size:12px;line-height:16px}
+.text-base{font-size:13.5px;line-height:20px}
+.text-md{font-size:15px;line-height:22px}
+.text-lg{font-size:18px;line-height:26px}
+.text-xl{font-size:22px;line-height:28px}
+.num,.date-cell,code,pre{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 body.lang-fade{opacity:.55}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input{font-family:inherit}
@@ -46,13 +119,13 @@ input{font-family:inherit}
 ::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px;border:2px solid var(--bg)}
 /* ============ login ============ */
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
-  background:radial-gradient(1200px 600px at 70% -10%,var(--brand-soft),transparent 60%),var(--bg)}
-.login-card{width:100%;max-width:400px;background:var(--bg2);border:1px solid var(--line);
-  border-radius:20px;box-shadow:var(--shadow-lg);padding:38px 34px;animation:rise .4s cubic-bezier(.2,.9,.3,1.2)}
-@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
-.logo{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:6px}
-.logo-mark{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,var(--brand),var(--brand2));box-shadow:0 4px 14px var(--brand-soft)}
+  background:var(--bg)}
+.login-card{width:100%;max-width:380px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:34px 28px;animation:rise .25s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.logo{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:6px}
+.logo-mark{width:40px;height:40px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;
+  background:var(--brand);box-shadow:0 2px 8px var(--brand-soft)}
 .logo-mark svg{width:24px;height:24px;fill:#fff}
 .login-title{font-size:21px;font-weight:700;letter-spacing:-.02em}
 .login-sub{color:var(--tx2);font-size:13.5px;text-align:center;margin:8px 0 26px}
@@ -100,8 +173,8 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 /* ============ layout ============ */
 .wrap{max-width:min(1280px,96vw);margin:0 auto;padding:26px 20px 70px}
 /* dropzone */
-.drop{border:2px dashed var(--line2);border-radius:16px;background:var(--bg2);padding:34px 20px;text-align:center;
-  transition:.2s;cursor:pointer;margin-bottom:22px}
+.drop{border:1.5px dashed var(--line2);border-radius:var(--radius-lg);background:var(--bg2);padding:28px 20px;text-align:center;
+  transition:border-color .15s,background-color .15s;cursor:pointer;margin-bottom:20px}
 .drop:hover{border-color:var(--brand);background:var(--brand-soft)}
 .drop.over{border-color:var(--brand);background:var(--brand-soft);transform:scale(1.004)}
 .drop .ic{width:52px;height:52px;margin:0 auto 12px;border-radius:14px;background:var(--brand-soft);
@@ -186,8 +259,9 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 #refBtn.busy svg{animation:spin360 .8s linear infinite}
 @keyframes spin360{to{transform:rotate(360deg)}}
 /* toolbar */
-.toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
-.toolbar h2{font-size:15.5px;font-weight:700;letter-spacing:-.01em;flex:1;display:flex;align-items:center;gap:9px}
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.toolbar h2{font-size:15px;font-weight:700;letter-spacing:-.01em;flex:1;display:flex;align-items:center;gap:9px}
+.toolbar .btn,.toolbar select,.filterbar select{height:var(--height-control);border-radius:var(--radius-md);box-sizing:border-box}
 .count{font-size:11.5px;font-weight:600;color:var(--tx2);background:var(--bg3);border:1px solid var(--line);
   padding:2px 9px;border-radius:20px}
 .btn-ghost{border:1px solid var(--line);background:var(--bg2);color:var(--tx2);font-size:13px;padding:8px 14px}
@@ -318,11 +392,11 @@ tbody tr.selected .fname .fn{color:var(--brand)}
 .md-rendered table.md-table th{background:var(--bg3);font-weight:700}
 
 /* ============ breadcrumb bar ============ */
-.bc-wrap{display:flex;align-items:center;gap:6px;padding:6px 2px 10px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.bc-wrap{display:flex;align-items:center;gap:4px;padding:8px 12px;background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius-md);margin-bottom:12px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .bc-wrap::-webkit-scrollbar{display:none}
-.bc-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:12.5px;font-weight:600;background:var(--bg2);color:var(--tx2);border:1px solid var(--line);cursor:pointer;transition:all .15s ease;text-decoration:none;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,0.03)}
-.bc-pill:hover{background:var(--hover);color:var(--brand);border-color:var(--line2)}
-.bc-pill.active{background:var(--brand-soft);color:var(--brand);border-color:rgba(47,107,255,.3);font-weight:700}
+.bc-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:var(--radius-sm);font-size:12.5px;font-weight:500;background:transparent;color:var(--tx2);border:none;cursor:pointer;transition:all .15s ease;text-decoration:none;user-select:none}
+.bc-pill:hover{background:var(--hover);color:var(--tx)}
+.bc-pill.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
 .bc-sep{color:var(--tx3);font-size:12px;display:inline-flex;align-items:center;user-select:none;opacity:.7}
 .bc-back-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--bg2);border:1px solid var(--line);color:var(--tx2);cursor:pointer;transition:.15s;flex:none;box-shadow:0 1px 2px rgba(0,0,0,0.04)}
 .bc-back-btn:hover{background:var(--hover);color:var(--brand);border-color:var(--brand)}
@@ -352,11 +426,17 @@ html[dir="rtl"] .bc-back-btn svg{transform:rotate(180deg)}
 /* date cell */
 .date-cell{font-size:12.5px;color:var(--tx2);white-space:nowrap;unicode-bidi:embed}
 /* ============ settings drawer ============ */
-.scrim{position:fixed;inset:0;background:rgba(8,12,20,.45);opacity:0;pointer-events:none;transition:.25s;z-index:90}
+.scrim{position:fixed;inset:0;background:rgba(8,12,20,.5);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:.2s;z-index:90}
 .scrim.on{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(430px,100%);background:var(--bg2);
-  border-inline-start:1px solid var(--line);z-index:95;transform:translateX(var(--sx,100%));transition:transform .3s cubic-bezier(.3,.9,.3,1);
+.drawer{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(440px,100%);background:var(--bg2);
+  border-inline-start:1px solid var(--line);z-index:95;transform:translateX(var(--sx,100%));transition:transform .25s ease-out;
   display:flex;flex-direction:column;box-shadow:var(--shadow-lg)}
+.drawer-nav{display:flex;gap:4px;padding:8px 16px;background:var(--bg3);border-bottom:1px solid var(--line);
+  overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:none}
+.drawer-nav::-webkit-scrollbar{display:none}
+.dtab{padding:5px 10px;font-size:12px;font-weight:500;color:var(--tx2);background:transparent;border:none;border-radius:var(--radius-sm);cursor:pointer;transition:all .15s ease}
+.dtab:hover{color:var(--tx);background:var(--hover)}
+.dtab.active{color:var(--brand);background:var(--bg2);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.05)}
 html[dir="rtl"] .drawer{--sx:-100%}
 .drawer.on{transform:translateX(0)}
 .drawer-head{display:flex;align-items:center;gap:10px;padding:18px 22px;border-bottom:1px solid var(--line)}
@@ -394,23 +474,23 @@ html[dir="rtl"] .sw.on i{transform:translateX(-18px)}
 html[dir="rtl"] #toasts{transform:translateX(50%)}
 .toast{background:var(--bg2);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow-lg);
   padding:11px 18px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:9px;pointer-events:auto;
-  animation:toastin .3s cubic-bezier(.2,.9,.3,1.2);max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  animation:toastin .25s ease-out;max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html[dir="rtl"] .toast{direction:rtl;text-align:right}
 .toast.ok{border-color:var(--ok)}
 .toast.err{border-color:var(--err)}
 .toast i{width:8px;height:8px;border-radius:50%;flex:none}
 .toast.ok i{background:var(--ok)}
 .toast.err i{background:var(--err)}
-@keyframes toastin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes toastin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 /* link modal */
 /* BUG-v0.15.35: modals must sit ABOVE gallery cards — a card with its 3-dot
    menu open gets .menu-open (z-index:999), and opening share/rename from that
    menu left the class on the card, so the z-index:150 modal rendered UNDER it. */
 .modal{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;
-  background:rgba(8,12,20,.5);padding:20px}
+  background:rgba(8,12,20,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:20px}
 .modal.on{display:flex}
-.modal-card{background:var(--bg2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);
-  width:100%;max-width:460px;padding:26px;animation:rise .3s ease}
+.modal-card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);
+  width:100%;max-width:460px;padding:24px;animation:rise .25s ease-out}
 .modal-card h3{font-size:15.5px;font-weight:700;margin-bottom:6px}
 .modal-card p{font-size:12.5px;color:var(--tx2);margin-bottom:16px}
 .linkbox{display:flex;gap:8px}
@@ -597,7 +677,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <small data-i18n="dropS">چند فایلی · بدون ذخیره روی دیسک سرور — مستقیم در تلگرام</small>
         <div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
           <button class="btn btn-ghost" id="btnDropZkToggle" type="button" style="padding:4px 9px;font-size:11px;border-radius:6px;height:auto">
-            🔐 <span id="dropZkLabel">ZK: خاموش</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> <span id="dropZkLabel">ZK: خاموش</span>
           </button>
         </div>
         <span class="lim" id="limTag"></span>
@@ -731,6 +811,17 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
     </button>
   </div>
+  <div class="drawer-nav" role="tablist" aria-label="Settings categories">
+    <button type="button" class="dtab active" data-sec="all">همه</button>
+    <button type="button" class="dtab" data-sec="secUI" data-i18n="secUI">رابط کاربری</button>
+    <button type="button" class="dtab" data-sec="secAuth" data-i18n="secAuth">احراز هویت</button>
+    <button type="button" class="dtab" data-sec="secS3" data-i18n="secS3">فضای ذخیره‌سازی</button>
+    <button type="button" class="dtab" data-sec="secCrypto" data-i18n="secCrypto">امنیت</button>
+    <button type="button" class="dtab" data-sec="secRate" data-i18n="secRate">محدودیت‌ها</button>
+    <button type="button" class="dtab" data-sec="secTgConfig" data-i18n="secTgConfig">تلگرام</button>
+    <button type="button" class="dtab" data-sec="secBackup" data-i18n="secBackup">پشتیبان‌گیری</button>
+    <button type="button" class="dtab" data-sec="secAuditLogs" data-i18n="secAuditLogs">لاگ‌ها</button>
+  </div>
   <div class="drawer-body">
     <div class="sec">
       <h3 data-i18n="secUI">تنظیمات ظاهر و رابط کاربری</h3>
@@ -780,7 +871,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="lab"><span data-i18n="secretKeyLab">کلید مخفی اشتقاق رمزنگاری و امضا (Secret)</span><small data-i18n="secretKeySub">کلید اصلی جهت مشتق‌سازی کلید AES-256 و اعتبارسنجی لینک‌های موقت</small></div>
         <div style="display:flex;gap:8px;width:100%;box-sizing:border-box">
           <input type="password" id="s_enc_secret" placeholder="HMAC / Master Secret..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
-          <button type="button" class="btn btn-ghost" id="btnToggleSecretVis" style="width:auto;padding:8px 11px;font-size:12px">👁️</button>
+          <button type="button" class="btn btn-ghost" id="btnToggleSecretVis" style="width:auto;padding:8px 11px;font-size:12px" aria-label="toggle secret"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
         <div style="display:flex;gap:8px;width:100%">
           <button type="button" class="btn btn-ghost" id="btnSetCustomSecret" style="flex:1;font-size:12px" data-i18n="btnSetSecret">تنظیم کلید</button>
@@ -796,7 +887,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="lab"><span data-i18n="clientZkPassLab">رمز عبور اختصاصی کلاینت (اختیاری)</span><small data-i18n="clientZkPassSub">در صورت خالی بودن، از کلید ورود نشست استفاده می‌شود</small></div>
         <div style="display:flex;gap:8px;width:100%">
           <input type="password" id="s_client_zk_pass" placeholder="Client passphrase..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
-          <button type="button" class="btn btn-ghost" id="btnToggleClientZkVis" style="width:auto;padding:8px 11px;font-size:12px">👁️</button>
+          <button type="button" class="btn btn-ghost" id="btnToggleClientZkVis" style="width:auto;padding:8px 11px;font-size:12px" aria-label="toggle zk secret"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
       </div>
     </div>
@@ -860,7 +951,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       <!-- Telegram MTProto Authentication Box -->
       <div id="tgAuthConnectedBox" style="display:none;background:var(--ok-soft);border:1.5px solid var(--ok);border-radius:12px;padding:14px;margin-top:8px;align-items:center;justify-content:space-between;gap:12px">
         <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:32px;height:32px;min-width:32px;flex:none;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold;line-height:1">✓</div>
+          <div style="width:32px;height:32px;min-width:32px;flex:none;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
           <div>
             <div style="font-weight:700;font-size:13.5px;color:var(--ok)" data-i18n="tgAuthOnT">لاگین تلگرام فعال است</div>
             <small style="color:var(--tx2);font-size:11.5px" data-i18n="tgAuthOnS">کلاینت MTProto متصل و مجاز می‌باشد</small>
@@ -871,7 +962,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
 
       <div id="tgAuthLoginForm" class="set-row" style="flex-direction:column;align-items:stretch;gap:8px;background:var(--bg3);border:1.5px solid var(--line2);border-radius:10px;padding:12px;margin-top:6px">
         <div style="font-weight:600;font-size:13px;color:var(--tx);display:flex;align-items:center;gap:6px">
-          🔑 <span data-i18n="tgAuthLoginT">احراز هویت کلاینت MTProto تلگرام</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5L22 1l-2 3-3-1-1 3-3-1"/></svg> <span data-i18n="tgAuthLoginT">احراز هویت کلاینت MTProto تلگرام</span>
         </div>
         <small style="color:var(--tx2);font-size:11.5px" data-i18n="tgAuthLoginS">برای اسکن خودکار و بازسازی تاریخچه کانال بدون نیاز به ورود دستی سشن</small>
         <div style="display:flex;gap:6px">
@@ -892,7 +983,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       <div class="set-row col">
         <div class="lab"><span data-i18n="tgBackendLab">نوع بک‌اند ذخیره‌سازی</span><small data-i18n="tgBackendSub">استراتژی هیبریدی (توصیه‌شده)، MTProto یا Bot</small></div>
         <select id="s_tg_backend" data-dirty-key="backend" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
-          <option value="hybrid" data-i18n="tgBackendHybrid">🚀 Hybrid (MTProto + Bot CDN)</option>
+          <option value="hybrid" data-i18n="tgBackendHybrid">Hybrid (MTProto + Bot CDN)</option>
           <option value="mtproto" data-i18n="tgBackendMtproto">MTProto (Direct Client)</option>
           <option value="bot" data-i18n="tgBackendBot">Bot API (Bots Pool)</option>
         </select>
@@ -926,7 +1017,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
         <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
           <span data-i18n="tgApiHashLab">Telegram API Hash (ANBAR_API_HASH)</span>
-          <button type="button" class="btn btn-ghost" id="s_tg_hash_toggle" style="width:auto;padding:2px 8px;font-size:11px">👁 نمایش / پنهان</button>
+          <button type="button" class="btn btn-ghost" id="s_tg_hash_toggle" style="width:auto;padding:2px 8px;font-size:11px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>نمایش / پنهان</button>
         </div>
         <input type="password" id="s_tg_api_hash" data-dirty-key="api_hash" placeholder="••••••••••••••••••••••••••••••••" style="width:100%;direction:ltr;font-family:ui-monospace,monospace;font-size:12px">
       </div>
@@ -979,22 +1070,22 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="sw on" id="swSubsExtract" role="switch"><i></i></div>
       </div>
       <div class="set-row" style="flex-direction:column;align-items:stretch;gap:4px">
-        <div class="lab"><small data-i18n="subsEdgeNote" style="color:var(--tx3);line-height:1.7">⚠️ این قابلیت فقط روی سرور خودمیزی (Docker + ffmpeg) کار می‌کند. در نسخه‌ی Cloudflare Workers قابل اجرا نیست: ffmpeg در Workers وجود ندارد، سقف CPU پلن پولی ۳۰ ثانیه است و حافظه ۱۲۸MB برای فایل‌های ویدئوی حجیم کافی نیست.</small></div>
+        <div class="lab"><small data-i18n="subsEdgeNote" style="color:var(--tx3);line-height:1.7">این قابلیت فقط روی سرور خودمیزی (Docker + ffmpeg) کار می‌کند. در نسخه‌ی Cloudflare Workers قابل اجرا نیست: ffmpeg در Workers وجود ندارد، سقف CPU پلن پولی ۳۰ ثانیه است و حافظه ۱۲۸MB برای فایل‌های ویدئوی حجیم کافی نیست.</small></div>
       </div>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost" id="btnDownloadBackup" type="button" style="flex:1;min-width:130px;font-size:12px">
-          💾 <span data-i18n="btnDlBackup">دانلود بکاپ</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> <span data-i18n="btnDlBackup">دانلود بکاپ</span>
         </button>
         <button class="btn btn-ghost" id="btnImportBackup" type="button" style="flex:1;min-width:130px;font-size:12px">
-          📥 <span data-i18n="btnImportBackup">بازیابی و ایمپورت</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span data-i18n="btnImportBackup">بازیابی و ایمپورت</span>
         </button>
         <input type="file" id="backupFileInput" accept=".db,application/vnd.sqlite3,application/octet-stream" style="display:none">
         <button class="btn btn-ghost" id="btnPushTgBackup" type="button" style="width:100%;font-size:12px">
-          ☁️ <span data-i18n="btnTgBackup">ارسال بکاپ به تلگرام</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg> <span data-i18n="btnTgBackup">ارسال بکاپ به تلگرام</span>
         </button>
         <button class="btn btn-ghost" id="btnChannelRebuild" type="button" style="width:100%;font-size:12px;margin-top:2px">
-          🔄 <span data-i18n="btnChannelRebuild">اسکن و بازسازی دیتابیس از کانال تلگرام</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> <span data-i18n="btnChannelRebuild">اسکن و بازسازی دیتابیس از کانال تلگرام</span>
         </button>
       </div>
     </div>
@@ -1109,7 +1200,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       </div>
       <p id="mgWarn" style="display:none;font-size:11.5px;color:#e0a83c;margin-top:6px"></p>
       <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap">
-        <button type="button" class="btn btn-warn" id="mgRevoke" style="margin-inline-end:auto">✕ <span data-i18n="revokeB">ابطال لینک</span></button>
+        <button type="button" class="btn btn-warn" id="mgRevoke" style="margin-inline-end:auto"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> <span data-i18n="revokeB">ابطال لینک</span></button>
         <button type="button" class="btn btn-ghost" id="mgCancel" data-i18n="close">بستن</button>
         <button type="submit" class="btn btn-primary" id="mgSave" data-i18n="mgSaveB">ذخیره و ساخت لینک جدید</button>
       </div>
@@ -1200,7 +1291,7 @@ const I18N={
   autoBackupSub:"ارسال روزانه یک نسخه پشتیبان از دیتابیس به کانال ذخیره‌سازی",
   subsExtractLab:"استخراج زیرنویس تعبیه‌شده (ffmpeg)",
   subsExtractSub:"استخراج خودکار زیرنویس‌های داخل MKV/MP4 بعد از آپلود + دکمه «⤓ از داخل ویدئو»",
-  subsEdgeNote:"⚠️ این قابلیت فقط روی سرور خودمیزی (Docker + ffmpeg) کار می‌کند. در نسخه‌ی Cloudflare Workers قابل اجرا نیست: ffmpeg در Workers وجود ندارد، سقف CPU پلن پولی ۳۰ ثانیه است و حافظه ۱۲۸MB برای فایل‌های ویدئوی حجیم کافی نیست.",
+  subsEdgeNote:"این قابلیت فقط روی سرور خودمیزی (Docker + ffmpeg) کار می‌کند. در نسخه‌ی Cloudflare Workers قابل اجرا نیست: ffmpeg در Workers وجود ندارد، سقف CPU پلن پولی ۳۰ ثانیه است و حافظه ۱۲۸MB برای فایل‌های ویدئوی حجیم کافی نیست.",
   statStorage:"حجم کل ذخیره",
   statFiles:"تعداد فایل‌ها",
   statBots:"بات‌های فعال",
@@ -1241,7 +1332,7 @@ const I18N={
   tgApiHashPh:"Telegram API Hash...",
   tgBackendLab:"نوع بک‌اند ذخیره‌سازی",
   tgBackendSub:"استراتژی هیبریدی (توصیه‌شده)، MTProto یا Bot API",
-  tgBackendHybrid:"🚀 هیبریدی (آپلود MTProto + دانلود Bot CDN)",
+  tgBackendHybrid:"هیبریدی (آپلود MTProto + دانلود Bot CDN)",
   tgBackendMtproto:"MTProto (کلاینت مستقیم تلگرام)",
   tgBackendBot:"Bot API (مخزن بات‌های تلگرام)",
   tgTokensLab:"توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)",
@@ -1257,7 +1348,7 @@ const I18N={
   tgTokensEmpty:"هیچ توکنی ثبت نشده", tgTokenRemove:"حذف این توکن",
   tgTokenAdded:"توکن اضافه شد", tgTokenRemoved:"توکن حذف شد",
   tgTokenNeedVal:"توکن را وارد کنید", tgTokenDup:"این توکن قبلاً اضافه شده",
-  showHash:"👁 نمایش", hideHash:"🙈 پنهان", hashNotSet:"هش تنظیم نشده است",
+  showHash:"نمایش", hideHash:"پنهان", hashNotSet:"هش تنظیم نشده است",
   tgAuthOnT:"لاگین تلگرام فعال است", tgAuthOnS:"کلاینت MTProto متصل و مجاز می‌باشد",
   tgAuthLogout:"خروج از تلگرام", tgAuthLoginT:"احراز هویت کلاینت MTProto تلگرام",
   tgAuthLoginS:"برای اسکن خودکار و بازسازی تاریخچه کانال بدون نیاز به ورود دستی سشن",
@@ -1346,7 +1437,7 @@ const I18N={
   moveSel:"انتقال", movePrompt:"مسیر پوشهٔ مقصد را وارد کنید (خالی = ریشه):",
   movedOk:"انتقال شد", skippedOk:"به‌خاطر تداخل نام رد شد", moveFileQ:"انتقال فایل به کجا؟",
   moveTitle:"انتقال", moveToLab:"مسیر مقصد (پوشه)", moveDo:"انتقال",
-  quickPick:"انتخاب سریع پوشهٔ مقصد:", rootFolder:"🏠 خانه (ریشه)", emptyFolder:"📂 این پوشه خالی است",
+  quickPick:"انتخاب سریع پوشهٔ مقصد:", rootFolder:"خانه (ریشه)", emptyFolder:"این پوشه خالی است",
   nItems:"مورد", renameFile:"تغییر نام", foldRenameT:"تغییر نام", foldMoveT:"انتقال",
   foldCopyT:"کپی", foldDelT:"حذف", del:"حذف", delQ:"حذف",
   home:"خانه", select:"انتخاب", selectCancel:"لغو",
@@ -1368,7 +1459,7 @@ const I18N={
   autoBackupSub:"Automatically send daily SQLite backup to storage channel",
   subsExtractLab:"Embedded subtitle extraction (ffmpeg)",
   subsExtractSub:"Auto-extract subtitles inside MKV/MP4 after upload + the “⤓ From video” button",
-  subsEdgeNote:"⚠️ Works only on the self-hosted server (Docker + ffmpeg). Not possible on Cloudflare Workers: ffmpeg does not exist there, the paid CPU cap is 30s, and 128MB memory cannot hold large videos.",
+  subsEdgeNote:"Works only on the self-hosted server (Docker + ffmpeg). Not possible on Cloudflare Workers: ffmpeg does not exist there, the paid CPU cap is 30s, and 128MB memory cannot hold large videos.",
   statStorage:"Total Stored",
   statFiles:"Total Files",
   statBots:"Active Bots",
@@ -1409,7 +1500,7 @@ const I18N={
   tgApiHashPh:"Telegram API Hash...",
   tgBackendLab:"Storage Backend Strategy",
   tgBackendSub:"Hybrid (recommended), MTProto or Bot API",
-  tgBackendHybrid:"🚀 Hybrid (MTProto + Bot CDN)",
+  tgBackendHybrid:"Hybrid (MTProto + Bot CDN)",
   tgBackendMtproto:"MTProto (Direct Telegram Client)",
   tgBackendBot:"Bot API (Bots Pool)",
   tgTokensLab:"Bot API Tokens (ANBAR_BOT_TOKENS)",
@@ -1425,7 +1516,7 @@ const I18N={
   tgTokensEmpty:"No tokens configured", tgTokenRemove:"Remove this token",
   tgTokenAdded:"Token added", tgTokenRemoved:"Token removed",
   tgTokenNeedVal:"Enter a token", tgTokenDup:"Token already in the list",
-  showHash:"👁 Show", hideHash:"🙈 Hide", hashNotSet:"API hash is not configured",
+  showHash:"Show", hideHash:"Hide", hashNotSet:"API hash is not configured",
   tgAuthOnT:"Telegram login active", tgAuthOnS:"MTProto client connected and authorized",
   tgAuthLogout:"Sign out of Telegram", tgAuthLoginT:"Telegram MTProto Client Auth",
   tgAuthLoginS:"For automatic channel scans & rebuilds without a manual session",
@@ -1514,7 +1605,7 @@ const I18N={
   moveSel:"Move", movePrompt:"Destination folder path (empty = root):",
   movedOk:"moved", skippedOk:"skipped (name clash)", moveFileQ:"Move file to…",
   moveTitle:"Move", moveToLab:"Destination path (folder)", moveDo:"Move",
-  quickPick:"Quick pick destination:", rootFolder:"🏠 Root (Home)", emptyFolder:"📂 This folder is empty",
+  quickPick:"Quick pick destination:", rootFolder:"Root (Home)", emptyFolder:"This folder is empty",
   nItems:"items", renameFile:"Rename", foldRenameT:"Rename", foldMoveT:"Move",
   foldCopyT:"Copy", foldDelT:"Delete", del:"Delete", delQ:"Delete",
   home:"Home", select:"Select", selectCancel:"Done",
@@ -1555,8 +1646,8 @@ function applyI18n(){
   if($("#trashModal").classList.contains("on"))openTrash();
   // md preview toggle buttons inside an open text preview
   const mdR=$("#mdTabRender"),mdRaw=$("#mdTabRaw");
-  if(mdR)mdR.innerHTML="👁️ "+(lang==="fa"?"پیش‌نمایش":"Preview");
-  if(mdRaw)mdRaw.innerHTML="📝 "+(lang==="fa"?"کد خام":"Raw");
+  if(mdR)mdR.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'+(lang==="fa"?"پیش‌نمایش":"Preview");
+  if(mdRaw)mdRaw.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>'+(lang==="fa"?"کد خام":"Raw");
   $("#langFa").classList.toggle("on",lang==="fa");
   $("#langEn").classList.toggle("on",lang==="en");
   updateLimTag();
@@ -2122,7 +2213,7 @@ function renderRows(){
   $("#cnt").textContent=files.length;
   const totalBytes=files.reduce((acc,o)=>acc+(o.size||0),0);
   const badge=$("#storageBadge");
-  if(badge){badge.textContent="💾 "+humanSize(totalBytes);badge.title=totalBytes+" bytes";}
+  if(badge){badge.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-inline-end:4px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>'+humanSize(totalBytes);badge.title=totalBytes+" bytes";}
   $("#empty").style.display=files.length?"none":"block";
   const wrap=$("#tblWrap");
   if(viewMode==="gallery"){
@@ -2428,7 +2519,7 @@ function renderGallery(list){
     const cell=document.createElement("div");
     cell.className="gcell"+(kind && previewsEnabled?" has":"");
     let inner;
-    if(isDir)inner='<div class="gicon" style="font-size:26px">📁</div>';
+    if(isDir)inner='<div class="gicon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>';
     else if(previewsEnabled && kind==="image")inner='<img src="'+(o.hasThumb?"/f/"+encodeURIComponent(o.id)+"/thumb":url)+'" alt="" onerror="this.onerror=null;this.src=\''+url+'\'">';
     else if(previewsEnabled && kind==="video")inner='<video src="'+url+'#t=0.001" preload="metadata" muted playsinline style="pointer-events:none"></video><span class="gplay">▶</span>';
     else if(previewsEnabled && kind==="audio")inner='<div class="gaudio"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
@@ -2647,7 +2738,7 @@ $("#selDelBtn").onclick=guardBtn($("#selDelBtn"),async()=>{
     }catch(e){toast(e.message,"err");}
   }
   selSet.clear();
-  toast(ok+" ✓");
+  toast(ok, "ok");
   refresh();
 });
 /* bulk move: files via the move endpoint, folder markers via folder rename */
@@ -2757,7 +2848,7 @@ async function openLinks(){
      d.className="keyrow lnk-row";
      const badge=L.revoked?'<span class="tag bot lk-badge" style="background:var(--err-soft);color:var(--err)">'+esc(t("revoked"))+'</span>'
        :L.expired?'<span class="tag bot lk-badge">'+esc(t("expired"))+'</span>'
-       :'<span class="tag mtproto lk-badge">'+(L.album?'🖼 ':'')+humanTtl((L.exp||Math.floor(Date.now()/1000)+1)-Math.floor(Date.now()/1000))+'</span>';
+       :'<span class="tag mtproto lk-badge">'+(L.album?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-inline-end:3px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>':'')+humanTtl((L.exp||Math.floor(Date.now()/1000)+1)-Math.floor(Date.now()/1000))+'</span>';
      /* BUG-v0.15.35: shared-album rows (album:true) link to /f/a/<token> */
      let href;
      if(L.album&&L.slug)href=location.origin+"/f/a/"+encodeURIComponent(L.slug);
@@ -2765,7 +2856,7 @@ async function openLinks(){
      else href=location.origin+"/f/"+encodeURIComponent(L.obj_id)+"?sig="+(L.sig||"")+"&exp="+L.exp;
      d.innerHTML='<div class="lnk-main">'
        +'<div class="kn" style="direction:ltr;text-align:left;overflow:hidden;text-overflow:ellipsis">'
-       +esc((L.filename||L.obj_id))+(L.pw?' 🔒':'')+(L.max_dl?' <span style="color:var(--tx3);font-size:10.5px">⬇'+esc(String(L.max_dl))+'</span>':'')
+       +esc((L.filename||L.obj_id))+(L.pw?' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-inline-start:3px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>':'')+(L.max_dl?' <span style="color:var(--tx3);font-size:10.5px">⬇'+esc(String(L.max_dl))+'</span>':'')
        +'</div>'
        +(L.slug?'<div class="lnk-url" style="direction:ltr;text-align:left;color:var(--brand);font-size:11px;font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px">'+(L.album?'/f/a/':'/f/')+esc(L.slug)+'</div>':'')
        +'</div>'+badge
@@ -2773,7 +2864,7 @@ async function openLinks(){
        +(L.revoked||L.expired?''
          :'<button class="btn btn-ghost lkopn" title="'+esc(t("manageB"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">↗</button>'
           +'<button class="btn btn-ghost lkcpy" title="'+esc(t("copy"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">⧉</button>'
-          +'<button class="btn btn-warn lkrev" title="'+esc(t("revokeB"))+'" style="width:auto;padding:5px 9px;font-size:11.5px">✕</button>')
+          +'<button class="btn btn-warn lkrev" title="'+esc(t("revokeB"))+'" style="width:auto;padding:5px 9px;font-size:11.5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>')
        +'</div>';
        if(!L.revoked&&!L.expired){
        /* BUG-v0.15.35: albums have no per-object manage/revoke — open + copy only */
@@ -3030,7 +3121,7 @@ function highlightCode(raw, ext) {
 
   const truncBanner = isTruncated
     ? '<div style="padding:8px 12px;background:var(--warn-soft);color:var(--warn);font-size:11.5px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.08);gap:8px;flex-wrap:wrap">'
-      + '<span>⚠️ ' + t('codeTruncated') + '</span>'
+      + '<span style="display:inline-flex;align-items:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' + t('codeTruncated') + '</span>'
       + '<button class="btn btn-ghost" type="button" style="padding:2px 8px;font-size:11px;height:22px" id="fmOpenFullBtn">↗ ' + t('openFullPage') + '</button>'
       + '</div>'
     : '';
@@ -3105,7 +3196,7 @@ async function openFileModal(o){
         const fallback=document.createElement("div");
         fallback.className="fm-fallback";
         fallback.style.cssText="padding:16px;text-align:center;font-size:13px;color:var(--tx2);display:flex;flex-direction:column;gap:6px;align-items:center";
-        fallback.innerHTML='<span>🎬 '+(lang==="fa"?"امکان پیش‌نمایش مستقیم این ویدیو در مرورگر نیست":"Direct playback not supported in browser")+'</span>'
+        fallback.innerHTML='<span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-inline-end:6px"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>'+(lang==="fa"?"امکان پیش‌نمایش مستقیم این ویدیو در مرورگر نیست":"Direct playback not supported in browser")+'</span>'
           +'<span style="font-size:11.5px;color:var(--tx3)">'+(lang==="fa"?"برای مشاهده، ویدیو را دانلود کنید":"Download the file to view locally")+'</span>';
         pv.prepend(fallback);
       };
@@ -3128,8 +3219,8 @@ async function openFileModal(o){
         const ext = extOf(o.filename);
         if(ext === "md" || ext === "markdown"){
           pv.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:8px;justify-content:flex-end">'
-            + '<button class="btn btn-ghost" id="mdTabRender" style="padding:2px 8px;font-size:11.5px;height:24px;border-color:var(--brand);color:var(--brand)">👁️ ' + (lang==="fa"?"پیش‌نمایش":"Preview") + '</button>'
-            + '<button class="btn btn-ghost" id="mdTabRaw" style="padding:2px 8px;font-size:11.5px;height:24px">📝 ' + (lang==="fa"?"کد خام":"Raw") + '</button>'
+            + '<button class="btn btn-ghost" id="mdTabRender" style="padding:2px 8px;font-size:11.5px;height:24px;border-color:var(--brand);color:var(--brand)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:3px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' + (lang==="fa"?"پیش‌نمایش":"Preview") + '</button>'
+            + '<button class="btn btn-ghost" id="mdTabRaw" style="padding:2px 8px;font-size:11.5px;height:24px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:3px"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>' + (lang==="fa"?"کد خام":"Raw") + '</button>'
             + '</div>'
             + '<div id="mdRenderBox">' + renderMarkdown(txt) + '</div>'
             + '<div id="mdRawBox" style="display:none">' + highlightCode(txt, ext) + '</div>';
@@ -3154,7 +3245,7 @@ async function openFileModal(o){
           const ok=await copyText(txt);
           if(ok){
             const orig=btn.textContent;
-            btn.textContent="✓ "+t("copied");
+            btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-inline-end:4px"><polyline points="20 6 9 17 4 12"/></svg>'+t("copied");
             btn.style.color="var(--ok)";
             btn.style.borderColor="var(--ok)";
             toast(t("copied"));
@@ -3187,9 +3278,9 @@ async function openFileModal(o){
   const dlCount = (o.downloaded ?? 0);
   const dlText = "↓ " + dlCount + " " + (lang === "fa" ? "دانلود" : "downloads");
   $("#fmMeta").innerHTML=
-    '<span class="fm-chip num">💾 '+humanSize(o.size)+'</span>'
-    +'<span class="fm-chip date-cell" data-ts="'+(o.created_at||"")+'">📅 '+humanDate(o.created_at)+'</span>'
-    +'<span class="fm-chip num">📦 '+chunkText+'</span>'
+    '<span class="fm-chip num"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-inline-end:4px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>'+humanSize(o.size)+'</span>'
+    +'<span class="fm-chip date-cell" data-ts="'+(o.created_at||"")+'"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-inline-end:4px"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'+humanDate(o.created_at)+'</span>'
+    +'<span class="fm-chip num"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-inline-end:4px"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'+chunkText+'</span>'
     +'<span class="fm-chip num">'+dlText+'</span>';
   $("#fileModal").classList.add("on");
 }
@@ -3226,8 +3317,8 @@ function renderSubsStrip(o,pv){
   for(const trk of fmSubs){
     html+='<span class="subchip'+(trk.default?" on":"")+'" data-tid="'+esc(trk.id)+'" title="'
       +esc(trk.label)+'">'
-      +(trk.default?"★ ":"")+esc(trk.label||trk.id)
-      +'<span class="sx" data-x="'+esc(trk.id)+'" title="'+esc(t("subDelete"))+'">✕</span></span>';
+      +(trk.default?'<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="vertical-align:-1px;margin-inline-end:3px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>':"")+esc(trk.label||trk.id)
+      +'<span class="sx" data-x="'+esc(trk.id)+'" title="'+esc(t("subDelete"))+'">×</span></span>';
   }
   html+='<span class="subadd" id="subAddBtn" role="button" tabindex="0">＋ '+esc(t("subAdd"))+'</span>';
   /* the import button only makes sense while the extraction feature is ON
@@ -3395,7 +3486,7 @@ async function shareLink(o,opts){
     $("#linkUrl").textContent=r.pretty_url||r.url;
     const sub=$("#linkS");
     const bits=[];
-    if(r.password_protected){sub.textContent=t("linkPw")+" — "+(opts.pw);bits.push("🔒");}
+    if(r.password_protected){sub.textContent=t("linkPw")+" — "+(opts.pw);bits.push('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-inline-start:3px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>');}
     else sub.textContent=t("linkS");
     if(r.max_downloads){bits.push("⬇ "+r.max_downloads);}
     if(bits.length)sub.textContent+="  "+bits.join(" ");
@@ -3544,7 +3635,7 @@ function openMoveModal(ids,subText){
       btn.type="button";
       btn.className="btn btn-ghost";
       btn.style.cssText="padding:4px 10px;font-size:12px;border-radius:20px;background:var(--bg2)";
-      btn.textContent="📁 "+fld;
+      btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'+esc(fld);
       btn.onclick=()=>{d.value=fld;d.focus();};
       chips.appendChild(btn);
     });
@@ -4127,6 +4218,23 @@ function guardBtn(btn,fn){
 /* ================= settings drawer ================= */
 const drawer=$("#drawer"),scrim=$("#scrim");
 $("#setBtn").onclick=openDrawer;
+document.querySelectorAll(".dtab").forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll(".dtab").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    const sec = b.dataset.sec;
+    const body = document.querySelector(".drawer-body");
+    if (!body) return;
+    if (sec === "all") {
+      body.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      const target = body.querySelector(`h3[data-i18n="${sec}"]`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  };
+});
 $("#setClose").onclick=closeDrawer;
 scrim.onclick=closeDrawer;
 
@@ -4427,14 +4535,14 @@ $("#btnChannelRebuild").onclick=async()=>{
       }
       if(!done)throw new Error("rebuild job timed out");
     }
-    toast("✅ " + t("channelRebuildDone") + ": " + (res.recovered_objects || 0) + " " + t("files"));
+    toast(t("channelRebuildDone") + ": " + (res.recovered_objects || 0) + " " + t("files"), "ok");
     closeDrawer();
     curFolderPrefix="";
     updateBreadcrumb();
     await loadSystemStats();
     await refresh();
   }catch(e){
-    toast("❌ " + (e.message || "خطا در بازسازی"), "err");
+    toast(e.message || "خطا در بازسازی", "err");
   }finally{
     btn.disabled=false;
     btn.style.opacity="";
@@ -4505,7 +4613,7 @@ function renderTgTokens(masked){
     const row=document.createElement("div");
     row.style.cssText="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:6px 10px";
     row.innerHTML='<span style="flex:1;direction:ltr;text-align:left;font-family:ui-monospace,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(m)+'</span>'
-      +'<button type="button" class="btn btn-ghost" data-i="'+i+'" title="'+esc(t("tgTokenRemove"))+'" style="width:auto;padding:3px 9px;font-size:11.5px;border-color:var(--err);color:var(--err)">✕</button>';
+      +'<button type="button" class="btn btn-ghost" data-i="'+i+'" title="'+esc(t("tgTokenRemove"))+'" style="width:auto;padding:3px 9px;font-size:11.5px;border-color:var(--err);color:var(--err)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
     row.querySelector("button").onclick=async()=>{
       try{
         await api("/api/v1/admin/telegram-config",{method:"POST",body:JSON.stringify({bot_remove_index:i})});
@@ -4686,7 +4794,7 @@ if (swZk) {
     clientZkOn = !clientZkOn;
     localStorage.setItem("anbar-client-zk", clientZkOn ? "1" : "0");
     syncClientZkUI();
-    toast((clientZkOn ? "🔐 " : "🔓 ") + (clientZkOn ? t("clientZkOnToast") : t("clientZkOffToast")));
+    toast(clientZkOn ? t("clientZkOnToast") : t("clientZkOffToast"), "ok");
   };
 }
 const dropBtnZk = $("#btnDropZkToggle");
@@ -4696,7 +4804,7 @@ if (dropBtnZk) {
     clientZkOn = !clientZkOn;
     localStorage.setItem("anbar-client-zk", clientZkOn ? "1" : "0");
     syncClientZkUI();
-    toast((clientZkOn ? "🔐 " : "🔓 ") + (clientZkOn ? t("clientZkOnToast") : t("clientZkOffToast")));
+    toast(clientZkOn ? t("clientZkOnToast") : t("clientZkOffToast"), "ok");
   };
 }
 const toggleVisZk = $("#btnToggleClientZkVis");

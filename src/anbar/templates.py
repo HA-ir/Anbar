@@ -24,21 +24,21 @@ def render_password_page(obj_id: str, sig: str, exp: int | None = 0, failed: boo
 <meta name="robots" content="noindex">
 <title>anbar · قفل</title>
 <style>
-:root{--bg:#0b0f17;--bg2:#121826;--bg3:#1a2234;--line:#232c40;--line2:#2d3852;
---tx:#e7ecf5;--tx2:#aab3c5;--tx3:#6b7690;--brand:#2f6bff;--err:#ff5d6c}
-@media(prefers-color-scheme:light){:root{--bg:#f3f6fb;--bg2:#ffffff;--bg3:#eaeff7;
---line:#dde3ee;--line2:#cbd3e4;--tx:#17202f;--tx2:#48536a;--tx3:#8590a8}}
+:root{--bg:#0b0f17;--bg2:#131924;--bg3:#1b2333;--line:#232d3f;--line2:#334155;
+--tx:#f1f5f9;--tx2:#94a3b8;--tx3:#8598b0;--brand:#3b82f6;--brand-soft:rgba(59,130,246,0.12);--err:#ef4444}
+@media(prefers-color-scheme:light){:root{--bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;
+--line:#e2e8f0;--line2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--brand:#2563eb;--brand-soft:rgba(37,99,235,0.08);--err:#dc2626}}
 *{box-sizing:border-box;margin:0}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 body{font-family:'Vazirmatn',system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;
 min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
-background:radial-gradient(1200px 600px at 70% -10%,
-rgba(47,107,255,.12),transparent 60%),var(--bg);color:var(--tx)}
+background:var(--bg);color:var(--tx)}
 .card{width:100%;max-width:380px;background:var(--bg2);border:1px solid var(--line);
-border-radius:20px;padding:38px 30px;text-align:center;
-box-shadow:0 18px 50px rgba(0,0,0,.25);animation:rise .35s cubic-bezier(.2,.9,.3,1.15)}
-@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
-.lock{width:58px;height:58px;margin:0 auto 16px;border-radius:16px;display:flex;
-align-items:center;justify-content:center;background:var(--bg3);color:var(--brand)}
+border-radius:12px;padding:32px 26px;text-align:center;
+box-shadow:0 1px 3px rgba(0,0,0,.08),0 12px 32px rgba(0,0,0,.15);animation:rise .25s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.lock{width:52px;height:52px;margin:0 auto 16px;border-radius:12px;display:flex;
+align-items:center;justify-content:center;background:var(--brand-soft);border:1px solid var(--line);color:var(--brand)}
 h1{font-size:16.5px;font-weight:700;margin-bottom:6px}
 p{font-size:12.5px;color:var(--tx2);margin-bottom:20px;line-height:1.9}
 form{display:flex;gap:8px}
@@ -121,13 +121,16 @@ def render_album_page(title: str, items: list[dict[str, Any]]) -> str:
 <meta name="robots" content="noindex">
 <title>{_html.escape(title)}</title>
 <style>
-:root{{--bg:#0b0f17;--bg2:#121826;--bg3:#1a2234;--line:#232c40;--line2:#2d3852;
---tx:#e7ecf5;--tx2:#aab3c5;--tx3:#6b7690;--brand:#2f6bff}}
-@media(prefers-color-scheme:light){{:root{{--bg:#f3f6fb;--bg2:#fff;--bg3:#eaeff7;
---line:#dde3ee;--line2:#cbd3e4;--tx:#17202f;--tx2:#48536a;--tx3:#8590a8}}}}
+:root{{--bg:#0b0f17;--bg2:#131924;--bg3:#1b2333;--line:#232d3f;--line2:#334155;
+--tx:#f1f5f9;--tx2:#94a3b8;--tx3:#8598b0;--brand:#3b82f6;--brand-soft:rgba(59,130,246,0.12)}}
+@media(prefers-color-scheme:light){{:root{{--bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;
+--line:#e2e8f0;--line2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--brand:#2563eb;--brand-soft:rgba(37,99,235,0.08)}}}}
 *{{box-sizing:border-box;margin:0}}
+:focus-visible{{outline:2px solid var(--brand);outline-offset:2px}}
 body{{background:var(--bg);color:var(--tx);
 font-family:'Vazirmatn',system-ui,'Segoe UI',Tahoma,sans-serif;padding:24px 16px}}
+html[lang="en"] body{{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif}}
+.num,.size{{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-variant-numeric:tabular-nums}}
 h1{{font-size:17px;font-weight:700;text-align:center;margin-bottom:4px}}
 .sub{{text-align:center;color:var(--tx3);font-size:12px;margin-bottom:22px}}
 .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;
@@ -264,17 +267,17 @@ def render_links_manage_page(
 <meta name="robots" content="noindex">
 <title>anbar · مدیریت لینک</title>
 <style>
-:root{{--bg:#0b0f17;--bg2:#121826;--bg3:#1a2234;--line:#232c40;--line2:#2d3852;
---tx:#e7ecf5;--tx2:#aab3c5;--tx3:#6b7690;--brand:#2f6bff;--ok:#31c48d;--err:#ff5d6c}}
-@media(prefers-color-scheme:light){{:root{{--bg:#f3f6fb;--bg2:#ffffff;--bg3:#eaeff7;
---line:#dde3ee;--line2:#cbd3e4;--tx:#17202f;--tx2:#48536a;--tx3:#8590a8}}}}
+:root{{--bg:#0b0f17;--bg2:#131924;--bg3:#1b2333;--line:#232d3f;--line2:#334155;
+--tx:#f1f5f9;--tx2:#94a3b8;--tx3:#8598b0;--brand:#3b82f6;--brand-soft:rgba(59,130,246,0.12);--ok:#22c55e;--err:#ef4444}}
+@media(prefers-color-scheme:light){{:root{{--bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;
+--line:#e2e8f0;--line2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--brand:#2563eb;--brand-soft:rgba(37,99,235,0.08);--ok:#16a34a;--err:#dc2626}}}}
 *{{box-sizing:border-box;margin:0}}
+:focus-visible{{outline:2px solid var(--brand);outline-offset:2px}}
 body{{font-family:'Vazirmatn',system-ui,'Segoe UI',Tahoma,sans-serif;min-height:100vh;
 display:flex;align-items:center;justify-content:center;padding:16px;color:var(--tx);
-background:radial-gradient(1200px 600px at 70% -10%,
-rgba(47,107,255,.12),transparent 60%),var(--bg)}}
+background:var(--bg)}}
 .card{{width:100%;max-width:430px;background:var(--bg2);border:1px solid var(--line);
-border-radius:18px;padding:26px 22px;box-shadow:0 18px 50px rgba(0,0,0,.25)}}
+border-radius:12px;padding:24px 20px;box-shadow:0 1px 3px rgba(0,0,0,.08),0 12px 32px rgba(0,0,0,.15)}}
 h1{{font-size:16px;font-weight:700;margin-bottom:4px}}
 .fname{{font-size:12px;color:var(--tx3);margin-bottom:18px;direction:ltr;text-align:left}}
 .row{{margin-bottom:14px}}

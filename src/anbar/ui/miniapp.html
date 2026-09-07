@@ -7,49 +7,64 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root {
-  --bg-color: var(--tg-theme-bg-color, #0d1117);
-  --text-color: var(--tg-theme-text-color, #e6edf3);
-  --hint-color: var(--tg-theme-hint-color, #8b949e);
-  --link-color: var(--tg-theme-link-color, #2f6bff);
-  --button-color: var(--tg-theme-button-color, #2f6bff);
+  --bg-color: var(--tg-theme-bg-color, #0b0f17);
+  --text-color: var(--tg-theme-text-color, #f1f5f9);
+  --hint-color: var(--tg-theme-hint-color, #94a3b8);
+  --link-color: var(--tg-theme-link-color, #3b82f6);
+  --button-color: var(--tg-theme-button-color, #3b82f6);
   --button-text-color: var(--tg-theme-button-text-color, #ffffff);
-  --secondary-bg-color: var(--tg-theme-secondary-bg-color, #161b22);
+  --secondary-bg-color: var(--tg-theme-secondary-bg-color, #131924);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Vazirmatn", sans-serif; }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: "Vazirmatn", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+:focus-visible { outline: 2px solid var(--button-color); outline-offset: 2px; }
 body { background: var(--bg-color); color: var(--text-color); padding: 14px; min-height: 100vh; }
 .header { text-align: center; margin-bottom: 16px; }
-.header h1 { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+.header h1 { font-size: 19px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .header p { font-size: 12.5px; color: var(--hint-color); }
-.card { background: var(--secondary-bg-color); border-radius: 14px; padding: 14px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.06); }
-.upload-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; background: var(--button-color); color: var(--button-text-color); border: none; border-radius: 10px; font-size: 14.5px; font-weight: 600; cursor: pointer; text-align: center; }
+.card { background: var(--secondary-bg-color); border-radius: var(--radius-lg); padding: 14px; margin-bottom: 14px; border: 1px solid var(--border-color); }
+.upload-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; background: var(--button-color); color: var(--button-text-color); border: none; border-radius: var(--radius-md); font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; transition: opacity .15s ease; }
 .upload-btn:active { opacity: 0.85; }
-.search-input { width: 100%; padding: 9px 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.1); background: var(--bg-color); color: var(--text-color); font-size: 13.5px; margin-bottom: 12px; }
+.search-input { width: 100%; padding: 9px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); font-size: 13.5px; margin-bottom: 12px; outline: none; }
+.search-input:focus { border-color: var(--button-color); }
 .file-list { margin-top: 8px; }
-.file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); gap: 10px; }
-.file-name { font-size: 13.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; direction: ltr; text-align: right; }
-.file-meta { font-size: 11.5px; color: var(--hint-color); margin-top: 2px; }
-.btn-act { padding: 5px 10px; border-radius: 7px; background: rgba(255,255,255,0.08); color: var(--text-color); text-decoration: none; font-size: 12px; font-weight: 600; border: none; cursor: pointer; }
+.file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color); gap: 8px; }
+.file-item:last-child { border-bottom: none; }
+.file-name { font-size: 13px; font-weight: 500; word-break: break-all; max-width: 200px; }
+.file-meta { font-size: 11.5px; color: var(--hint-color); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.btn-act { padding: 6px 10px; border-radius: var(--radius-sm); background: rgba(255,255,255,0.08); color: var(--text-color); text-decoration: none; font-size: 12px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .btn-act:hover { background: rgba(255,255,255,0.15); }
-.stat-pill { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; background: rgba(47,107,255,0.15); color: var(--button-color); font-weight: 700; margin-left: 6px; }
+.btn-act svg { width: 14px; height: 14px; }
+.stat-pill { display: inline-block; padding: 3px 8px; border-radius: var(--radius-sm); font-size: 11px; background: rgba(59,130,246,0.15); color: var(--button-color); font-weight: 700; margin-left: 6px; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>📦 انبار · Object Storage</h1>
+  <h1>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+    <span>انبار · Object Storage</span>
+  </h1>
   <p>فضای ذخیره‌سازی ابری مستقیم در تلگرام</p>
 </div>
 
 <div class="card">
   <input type="file" id="file-input" style="display: none;" onchange="handleFileUpload(event)">
   <button class="upload-btn" onclick="document.getElementById('file-input').click()">
-    <span>📤</span> انتخاب و آپلود فایل
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+    <span>انتخاب و آپلود فایل</span>
   </button>
   <div id="status" style="margin-top: 10px; font-size: 12.5px; text-align: center; color: var(--hint-color);"></div>
 </div>
 
 <div class="card">
   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-    <h3 style="font-size: 14.5px;">📁 فایل‌های ذخیره‌شده</h3>
+    <h3 style="font-size: 14.5px; display: flex; align-items: center; gap: 6px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <span>فایل‌های ذخیره‌شده</span>
+    </h3>
     <span id="fileCountBadge" class="stat-pill">0</span>
   </div>
   <input type="text" id="searchInput" class="search-input" placeholder="جستجو در فایل‌ها..." oninput="filterFiles()">
@@ -70,56 +85,48 @@ let allFiles = [];
 
 // QUAL-02: authenticate with Telegram initData before touching the API.
 // Telegram injects `tg.initData` (HMAC-signed by the bot); the server
-// verifies it and sets an HttpOnly session cookie. Without this the
-// mini app is anon and every admin API call 401s.
-async function ensureSession() {
+// verifies and drops an httpOnly `anbar_session` cookie for subsequent calls.
+async function initSession() {
+  const initData = tg?.initData || "";
+  if (!initData) return;
   try {
-    const me = await fetch('/ui/me', { credentials: 'include' });
-    const m = await me.json();
-    if (m.authed) return true; // already has a valid session
-  } catch (e) { /* fall through to initData exchange */ }
-  if (!tg || !tg.initData) return false; // opened outside Telegram
-  try {
-    const res = await fetch('/ui/miniapp/session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ init_data: tg.initData })
+    await fetch("/ui/miniapp/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ init_data: initData }),
     });
-    return res.ok;
   } catch (e) {
-    return false;
+    console.warn("miniapp session init failed", e);
   }
 }
 
 async function loadFiles() {
-  const authed = await ensureSession();
-  if (!authed) {
-    document.getElementById('files').innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">احراز هویت تلگرام برقرار نشد.</p>';
-    return;
-  }
   try {
-    const res = await fetch('/api/v1/admin/objects?limit=50', { credentials: 'include' });
-    if (!res.ok) {
-      document.getElementById('files').innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">خطا در دریافت لیست فایل‌ها.</p>';
-      return;
+    const res = await fetch("/api/v1/files", { credentials: "include" });
+    if (res.ok) {
+      const data = await res.json();
+      allFiles = data.items || [];
+      renderList(allFiles);
+    } else {
+      document.getElementById("files").innerHTML =
+        '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">خطا در دریافت لیست فایل‌ها</p>';
     }
-    const data = await res.json();
-    allFiles = data.objects || [];
-    document.getElementById('fileCountBadge').textContent = allFiles.length;
-    renderList(allFiles);
-  } catch(e) {
-    document.getElementById('files').innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">خطا در دریافت لیست</p>';
+  } catch (err) {
+    document.getElementById("files").innerHTML =
+      '<p style="color: var(--hint-color); font-size: 13px; text-align: center;">خطا در اتصال به سرور</p>';
   }
 }
 
 function renderList(list) {
-  const box = document.getElementById('files');
+  const box = document.getElementById("files");
+  const badge = document.getElementById("fileCountBadge");
+  if (badge) badge.textContent = list.length;
   if (!list.length) {
-    box.innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center; padding: 12px;">فایلی یافت نشد.</p>';
+    box.innerHTML = '<p style="color: var(--hint-color); font-size: 13px; text-align: center; padding: 12px 0;">هیچ فایلی یافت نشد.</p>';
     return;
   }
-  const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+  const esc = s => { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; };
   box.innerHTML = list.map(f => `
     <div class="file-item">
       <div>
@@ -127,55 +134,61 @@ function renderList(list) {
         <div class="file-meta">${(f.size / (1024*1024)).toFixed(2)} MB · ${f.downloaded || 0} دانلود</div>
       </div>
       <div style="display: flex; gap: 6px;">
-        <button class="btn-act" onclick="copyLink('${esc(f.id)}')">🔗</button>
-        <a href="/f/${encodeURIComponent(f.id)}" target="_blank" class="btn-act">⬇</a>
+        <button class="btn-act" onclick="copyLink('${esc(f.id)}')" title="کپی لینک" aria-label="کپی لینک">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </button>
+        <a href="/f/${encodeURIComponent(f.id)}" target="_blank" class="btn-act" title="دانلود" aria-label="دانلود">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </a>
       </div>
     </div>
-  `).join('');
+  `).join("");
 }
 
 function filterFiles() {
-  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const q = document.getElementById("searchInput").value.trim().toLowerCase();
   if (!q) { renderList(allFiles); return; }
   const filtered = allFiles.filter(f => (f.filename || f.id).toLowerCase().includes(q));
   renderList(filtered);
 }
 
 function copyLink(id) {
-  const url = location.origin + '/f/' + id;
+  const url = location.origin + "/f/" + id;
   if (navigator.clipboard) {
     navigator.clipboard.writeText(url);
-    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
   }
 }
 
 async function handleFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const status = document.getElementById('status');
-  status.textContent = '⏳ درحال آپلود: ' + file.name + '...';
+  const status = document.getElementById("status");
+  status.textContent = "درحال آپلود: " + file.name + "...";
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
   try {
-    const res = await fetch('/api/v1/upload', {
-      method: 'POST',
-      credentials: 'include',
+    const res = await fetch("/api/v1/upload", {
+      method: "POST",
+      credentials: "include",
       body: formData
     });
     if (res.ok) {
       const data = await res.json();
-      status.textContent = '✅ آپلود با موفقیت انجام شد: ' + (data.filename || data.id);
-      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      status.textContent = "آپلود با موفقیت انجام شد: " + (data.filename || data.id);
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
       loadFiles();
     } else {
-      status.textContent = '❌ خطا در آپلود (' + res.status + ')';
+      status.textContent = "خطا در آپلود (" + res.status + ")";
     }
   } catch (err) {
-    status.textContent = '❌ خطای شبکه';
+    status.textContent = "خطا در ارتباط با سرور";
   }
 }
 
-loadFiles();
+initSession().finally(() => {
+  loadFiles();
+});
 </script>
 </body>
 </html>
