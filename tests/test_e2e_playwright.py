@@ -397,11 +397,11 @@ def test_video_preview_modal_journey(authed_page: Page, tmp_path: Path):
 
     cell = page.locator(".gallery .gcell:has-text('stream_sample.mp4')").first
     assert cell.is_visible()
-    
+
     # Clicking directly on the card / video thumbnail opens modal
     cell.click()
     page.wait_for_selector("#fileModal", state="visible", timeout=4000)
-    
+
     vid = page.locator("#fmVid")
     assert vid.is_visible()
     assert vid.get_attribute("controls") is not None
@@ -418,17 +418,17 @@ def test_folder_navigation_preview_stability(authed_page: Page, tmp_path: Path):
     _upload_file(page, tmp_path, "stable_preview.txt")
 
     # Create a subfolder
-    page.evaluate('''async () => {
+    page.evaluate("""async () => {
         await api("/api/v1/admin/folders/create", {
             method: "POST",
             body: JSON.stringify({ path: "docs_folder" })
         });
         await refresh();
-    }''')
+    }""")
     page.wait_for_timeout(300)
 
     # Monitor for table chrome flash during navigation
-    page.evaluate('''() => {
+    page.evaluate("""() => {
         window.__tableBlinked = false;
         const obs = new MutationObserver(() => {
             const tbl = document.querySelector("#tblWrap table");
@@ -442,7 +442,7 @@ def test_folder_navigation_preview_stability(authed_page: Page, tmp_path: Path):
         });
         const el = document.getElementById("tblWrap");
         obs.observe(el, { childList: true, subtree: true, attributes: true });
-    }''')
+    }""")
 
     # Navigate into folder
     folder_cell = page.locator(".gallery .gcell:has-text('docs_folder')").first

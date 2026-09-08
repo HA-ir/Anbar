@@ -217,3 +217,8 @@ versioning follows [SemVer](https://semver.org/).
 ### Added
 - **UI/UX Revamp Frontend Assets**: Complete UI/UX revamp frontend code across `src/anbar/ui/index.html`, `src/anbar/ui/miniapp.html`, and `src/anbar/templates.py` (design tokens, bilingual typography, 36px command bar rhythm, stroke SVG icons, WCAG 2.1 AA accessibility, and responsive layouts).
 
+## [0.15.47] — 2026-09-08
+
+### Fixed
+- **E2E tests formatting**: Fix Ruff formatting errors in `tests/test_e2e_playwright.py` (multiline string quotes and blank lines) so CI passes.
+
