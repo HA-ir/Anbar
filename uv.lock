@@ -8,7 +8,7 @@ resolution-markers = [
 
 [[package]]
 name = "anbar"
-version = "0.15.47"
+version = "0.15.48"
 source = { editable = "." }
 dependencies = [
     { name = "cryptg" },

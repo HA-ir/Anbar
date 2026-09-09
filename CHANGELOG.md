@@ -222,3 +222,8 @@ versioning follows [SemVer](https://semver.org/).
 ### Fixed
 - **E2E tests formatting**: Fix Ruff formatting errors in `tests/test_e2e_playwright.py` (multiline string quotes and blank lines) so CI passes.
 
+## [0.15.48] — 2026-09-09
+
+### Fixed
+- **CI/CD Image Publishing & Trivy Scan**: Add `type=ref,event=tag` to Docker metadata action so images are pushed with the explicit git tag reference (`v0.15.48`) alongside semver tags, resolving Trivy vulnerability scan failures when resolving the published tag.
+
