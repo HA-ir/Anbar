@@ -206,9 +206,22 @@ def test_video_has_thumb_flag_query(client):
     assert r.status_code == 200, r.text
     obj_id = r.json()["id"]
 
-    rows = client.get(
-        "/api/v1/admin/objects?limit=10", headers={"Authorization": "Bearer test-admin-key"}
-    ).json()["objects"]
-    row = next((x for x in rows if x["id"] == obj_id), None)
+    deadline = time.time() + 5
+    row = None
+    while time.time() < deadline:
+        rows = client.get(
+            "/api/v1/admin/objects?limit=10", headers={"Authorization": "Bearer test-admin-key"}
+        ).json()["objects"]
+        row = next((x for x in rows if x["id"] == obj_id), None)
+        if row and row.get("hasThumb") is True:
+            break
+        time.sleep(0.05)
     assert row is not None, "video object missing from listing"
-    assert row.get("hasThumb") is True, "video objects must have hasThumb=True"
+    assert row.get("hasThumb") is True, "video objects must have hasThumb=True once generated"
+
+
+def test_has_thumb_requires_disk_file(client):
+    settings = client.app.state.settings
+    # Non-existent files must return False even if content-type is video and ffmpeg is available
+    assert not thumbs.has_thumb(settings, "nonexistent_obj_123", "video/mp4")
+    assert not thumbs.has_thumb(settings, "nonexistent_obj_123", "image/jpeg")

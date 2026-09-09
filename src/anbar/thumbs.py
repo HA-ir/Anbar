@@ -82,8 +82,6 @@ def has_thumb(settings, obj_id: str, content_type: str | None = None) -> bool:
         # RGB images are stored as JPEG, RGBA/WebP and video as WebP — check both
         if base.exists() or base.with_suffix(".jpg").exists():
             return True
-        if content_type and is_video(content_type) and FFMPEG_AVAILABLE:
-            return True
         return False
     except OSError:
         return False
