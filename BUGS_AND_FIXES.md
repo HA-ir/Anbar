@@ -30,6 +30,63 @@ curl http://127.0.0.1:8318/healthz
 
 ---
 
+## BUG-37: Missing files / wrong data directory on Falkenstein
+
+### Status: FIXED
+
+### Root Cause
+
+The v0.15.50 deploy (BUG-36) removed the old container and started a new one.
+The new container was created pointing at `/root/anbar/data` (1 object: `b.bin`)
+instead of `/opt/anbar/data` (20 objects: all real files).
+
+`/root/anbar/docker/compose.yaml` (local-dev compose) has a **relative**
+volume: `../data:/app/data`.  Running `docker compose up -d` from
+`/root/anbar/docker` resolves that to `/root/anbar/data` — NOT the
+production data directory at `/opt/anbar/data`.
+
+The production compose at `/opt/anbar/compose.yaml` correctly uses the
+absolute paths `/opt/anbar/data:/app/data` and `/opt/anbar/secrets:/app/secrets`.
+
+### Data Recovery
+
+No data loss. The production SQLite DB at `/opt/anbar/data/anbar.db`
+(376 KB, 20 objects, 331 audit logs) was intact the entire time.
+The container just wasn't reading from it.
+
+### Fix Applied
+
+```bash
+docker rm -f anbar-anbar-1
+cd /opt/anbar
+docker compose -f compose.yaml up -d
+```
+
+Container now mounts:
+- `/opt/anbar/data` -> `/app/data`  (20 objects)
+- `/opt/anbar/secrets` -> `/app/secrets`
+- `/opt/anbar/.env` -> `/opt/anbar/.env`
+
+### Verification
+
+```
+docker ps  ->  anbar-anbar-1  Up (healthy)  127.0.0.1:8318->8567/tcp
+curl 127.0.0.1:8318/healthz  ->  {"status":"ok","service":"anbar","version":"0.15.50"}
+docker exec anbar-anbar-1: /app/data/anbar.db -> 20 objects
+```
+
+### Prevention
+
+Future deploys must always use: `cd /opt/anbar && docker compose -f compose.yaml up -d`
+Never use `/root/anbar/docker/compose.yaml` for production deploys — its
+relative volume paths resolve to the wrong data directory.
+
+### Time Fixed
+
+2026-09-09T18:05Z
+
+---
+
 ## BUG-36: Deploy v0.15.50 to Falkenstein (gallery card size + Persian date fix)
 
 ### Status: DONE
@@ -68,7 +125,70 @@ curl https://dl.amiri-dev.ir/healthz
 
 ---
 
+## BUG-39: Deploy v0.15.51 to Falkenstein (lightweight preview caching & 0ms folder navigation)
+
+### Status: DONE
+
+### Deployment Summary
+
+- **Version**: v0.15.51 (commit 3f08bae, tag v0.15.51)
+- **Server**: Falkenstein (dl.amiri-dev.ir)
+- **Path**: /opt/anbar
+- **Port**: 8318
+- **Container**: anbar-anbar-1 (healthy)
+
+### What Changed (v0.15.51)
+
+- Video poster extraction via ffmpeg
+- HTTP cache headers for previews
+- Frontend folder view preservation (URL-based navigation state)
+- Lightweight preview caching
+- 0ms folder navigation (no redownloading when returning to Home)
+
+### Files Changed
+
+- `pyproject.toml` — version bump
+- `src/anbar/__init__.py` — version bump
+- `src/anbar/api/admin.py`
+- `src/anbar/api/download.py` — HTTP cache headers
+- `src/anbar/thumbs.py` — poster extraction + caching
+- `src/anbar/ui/index.html` — folder view preservation
+- `tests/test_e2e_playwright.py` — E2E tests
+- `tests/test_thumbs.py` — thumbnail/caching tests
+- `uv.lock` — lockfile update
+
+### Verification
+
+```bash
+curl http://127.0.0.1:8318/healthz
+# Response: {"status":"ok","service":"anbar","version":"0.15.51"}
+
+docker ps
+# anbar-anbar-1  Up (healthy)  127.0.0.1:8318->8567/tcp
+```
+
+### Actions Taken
+
+1. `cd /root/anbar && git pull origin main` — pulled v0.15.51 commits
+2. Verified `__version__` matches `pyproject.toml` (both = "0.15.51")
+3. `cd /root/anbar && docker build -f docker/Dockerfile -t anbar:prod .`
+4. `cd /opt/anbar && docker compose down`
+5. `docker rm -f anbar-anbar-1`
+6. `docker run -d --name anbar-anbar-1 --env-file .env -p 127.0.0.1:8318:8567 -v /opt/anbar/data:/app/data -v /opt/anbar/secrets:/app/secrets --security-opt no-new-privileges:true anbar:prod`
+7. Verified healthz returns version 0.15.51, container is healthy
+
+### Time Completed
+
+2026-09-09 (current session)
+
+---
+
 ## Previous Versions
+
+### v0.15.50
+Deployed: 2026-09-09
+Commit: 3d7b0db
+Note: Gallery card size increase, compact Persian date format
 
 ### v0.15.49
 Deployed: 2026-09-07
@@ -78,3 +198,5 @@ Note: __version__ mismatch bug — pyproject.toml said 0.15.50 but __init__.py h
 ### v0.15.46
 Deployed: 2026-09-07 (previous release)
 Commit: 90c9271
+
+---
