@@ -463,3 +463,52 @@ def test_folder_navigation_preview_stability(authed_page: Page, tmp_path: Path):
     page.wait_for_selector("#fileModal", state="visible", timeout=3000)
     page.click("#fmClose")
     page.wait_for_selector("#fileModal", state="hidden", timeout=3000)
+
+
+def test_folder_view_dom_preservation(authed_page: Page, tmp_path: Path):
+    """Test 15 (BUG-38): Bounded folder view preservation restores DOM elements in 0ms."""
+    page = authed_page
+    _upload_file(page, tmp_path, "preserve_sample.txt")
+
+    # Create a subfolder
+    page.evaluate("""async () => {
+        await api("/api/v1/admin/folders/create", {
+            method: "POST",
+            body: JSON.stringify({ path: "cache_subfolder" })
+        });
+        await refresh();
+    }""")
+    page.wait_for_timeout(300)
+
+    # Mark the current gallery element with an expando property to verify 0ms DOM preservation
+    page.evaluate("""() => {
+        const g = document.querySelector("#tblWrap .gallery:not(#noMatch)");
+        if (g) g.__rootPreservedMarker = 42;
+    }""")
+
+    # Navigate into subfolder
+    folder_cell = page.locator(".gallery .gcell:has-text('cache_subfolder')").first
+    folder_cell.click()
+    page.wait_for_timeout(200)
+
+    # Verify we are in subfolder
+    assert page.locator("#bcTrail").inner_text() != ""
+
+    # Navigate back to root via breadcrumb
+    page.click("#bcRoot")
+    page.wait_for_timeout(100)
+
+    # Verify the root gallery DOM element is preserved
+    marker = page.evaluate("""() => {
+        const g = document.querySelector("#tblWrap .gallery:not(#noMatch)");
+        return g ? g.__rootPreservedMarker : null;
+    }""")
+    assert marker == 42, "Expected root gallery DOM element to be preserved from LRU cache"
+
+    # Eviction test: upload a file and verify cache is invalidated
+    _upload_file(page, tmp_path, "new_file_evict.txt")
+    marker_after_evict = page.evaluate("""() => {
+        const g = document.querySelector("#tblWrap .gallery:not(#noMatch)");
+        return g ? g.__rootPreservedMarker : null;
+    }""")
+    assert marker_after_evict is None, "Cache should be evicted on file upload"

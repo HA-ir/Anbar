@@ -111,3 +111,104 @@ def test_objects_list_has_thumb_flag(client):
         time.sleep(0.05)
     assert row is not None, "object missing from listing"
     assert row.get("hasThumb") is True, "content_type must reach the flag via list_objects"
+
+
+def test_thumb_cache_headers_and_304(client):
+    r = _upload_image(client, _png_bytes())
+    assert r.status_code == 200, r.text
+    obj_id = r.json()["id"]
+
+    deadline = time.time() + 5
+    served = None
+    while time.time() < deadline:
+        t = client.get(f"/f/{obj_id}/thumb", headers={"Authorization": "Bearer test-admin-key"})
+        if t.status_code == 200:
+            served = t
+            break
+        time.sleep(0.05)
+    assert served is not None, "thumbnail never appeared within 5s"
+
+    # Verify HTTP cache headers
+    assert served.headers.get("cache-control") == "public, max-age=604800, immutable"
+    etag = served.headers.get("etag")
+    assert etag == f'"{obj_id}"'
+
+    # If-None-Match matching etag -> 304 Not Modified
+    not_mod = client.get(
+        f"/f/{obj_id}/thumb",
+        headers={"Authorization": "Bearer test-admin-key", "If-None-Match": etag},
+    )
+    assert not_mod.status_code == 304
+    assert not_mod.headers.get("etag") == etag
+    assert not_mod.headers.get("cache-control") == "public, max-age=604800, immutable"
+    assert not_mod.content == b""
+
+    # If-None-Match wildcard -> 304 Not Modified
+    wildcard = client.get(
+        f"/f/{obj_id}/thumb",
+        headers={"Authorization": "Bearer test-admin-key", "If-None-Match": "*"},
+    )
+    assert wildcard.status_code == 304
+
+    # If-None-Match mismatched -> 200 OK
+    mismatched = client.get(
+        f"/f/{obj_id}/thumb",
+        headers={"Authorization": "Bearer test-admin-key", "If-None-Match": '"different-tag"'},
+    )
+    assert mismatched.status_code == 200
+
+
+def test_video_thumb_generated_on_upload_and_served(client):
+    from pathlib import Path
+
+    mkv_path = Path(__file__).parent / "data" / "test_embedded.mkv"
+    assert mkv_path.exists(), "test_embedded.mkv fixture missing"
+    mkv_bytes = mkv_path.read_bytes()
+
+    r = _upload_image(client, mkv_bytes, name="clip.mkv", ct="video/x-matroska")
+    assert r.status_code == 200, r.text
+    obj_id = r.json()["id"]
+
+    deadline = time.time() + 5
+    served = None
+    while time.time() < deadline:
+        t = client.get(f"/f/{obj_id}/thumb", headers={"Authorization": "Bearer test-admin-key"})
+        if t.status_code == 200:
+            served = t
+            break
+        time.sleep(0.05)
+    assert served is not None, "video thumbnail never appeared within 5s"
+    assert served.headers["content-type"] == "image/webp"
+    assert served.headers.get("x-content-type-options") == "nosniff"
+    assert served.headers.get("cache-control") == "public, max-age=604800, immutable"
+    assert served.headers.get("etag") == f'"{obj_id}"'
+
+    # Decode thumb and verify dimensions
+    im = Image.open(io.BytesIO(served.content))
+    assert im.format == "WEBP"
+    assert max(im.size) <= thumbs.THUMB_MAX_PX
+
+    # 304 Not Modified check for video thumb
+    resp304 = client.get(
+        f"/f/{obj_id}/thumb",
+        headers={"Authorization": "Bearer test-admin-key", "If-None-Match": f'"{obj_id}"'},
+    )
+    assert resp304.status_code == 304
+
+
+def test_video_has_thumb_flag_query(client):
+    from pathlib import Path
+
+    mkv_path = Path(__file__).parent / "data" / "test_embedded.mkv"
+    mkv_bytes = mkv_path.read_bytes()
+
+    r = _upload_image(client, mkv_bytes, name="clip2.mp4", ct="video/mp4")
+    assert r.status_code == 200, r.text
+    obj_id = r.json()["id"]
+
+    rows = client.get(
+        "/api/v1/admin/objects?limit=10", headers={"Authorization": "Bearer test-admin-key"}
+    ).json()["objects"]
+    row = next((x for x in rows if x["id"] == obj_id), None)
+    assert row is not None, "video object missing from listing"
+    assert row.get("hasThumb") is True, "video objects must have hasThumb=True"

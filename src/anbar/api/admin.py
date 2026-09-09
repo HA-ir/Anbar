@@ -295,7 +295,7 @@ async def objects(request: Request, limit: int = 50, offset: int = 0, prefix: st
     for r in rows:
         ct = (r.get("content_type") or "").lower()
         if ct in thumbs.SUPPORTED:
-            r["hasThumb"] = thumbs.has_thumb(request.app.state.settings, r["id"])
+            r["hasThumb"] = thumbs.has_thumb(request.app.state.settings, r["id"], ct)
     return {"objects": rows, "count": len(rows)}
 
 

@@ -544,15 +544,42 @@ async def thumb(request: Request, obj_id: str):
     _authenticate_download(request, obj_id)
 
     data = thumbs.read_thumb(settings, obj_id)
+    if data is None and thumbs.SUPPORTED_OK(row.get("content_type")):
+        try:
+            from .upload import _chunk_fetcher
+
+            fetch_chunk = _chunk_fetcher(request)
+            first_chunk = await fetch_chunk(obj_id, 0, 0, 4 * 1024 * 1024)
+            if first_chunk:
+                await thumbs.generate(settings, obj_id, row.get("content_type", ""), first_chunk)
+                data = thumbs.read_thumb(settings, obj_id)
+        except Exception:  # noqa: BLE001
+            pass
+
     if data is None:
         raise HTTPException(404, "no thumbnail")
+
+    etag = f'"{obj_id}"'
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match:
+        matches = [tag.strip() for tag in if_none_match.split(",")]
+        if etag in matches or "*" in matches:
+            return Response(
+                status_code=304,
+                headers={
+                    "Cache-Control": "public, max-age=604800, immutable",
+                    "ETag": etag,
+                },
+            )
+
     ct = "image/webp" if data[:4] == b"RIFF" else "image/jpeg"
     return Response(
         content=data,
         media_type=ct,
         headers={
-            "Cache-Control": "private, max-age=86400",
+            "Cache-Control": "public, max-age=604800, immutable",
             "Content-Length": str(len(data)),
+            "ETag": etag,
             "X-Content-Type-Options": "nosniff",
         },
     )
