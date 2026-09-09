@@ -44,7 +44,7 @@ from ..templates import render_album_page, render_password_page
 
 router = APIRouter()
 
-_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
+_RANGE_RE = re.compile(r"^bytes\s*=\s*(\d*)\s*-\s*(\d*)$", re.IGNORECASE)
 _SLUG_RE = re.compile(r"[a-z0-9][a-z0-9-_]{0,63}")  # pretty link names
 DEFAULT_LINK_TTL = 3600  # seconds
 TTL_NEVER = 100 * 365 * 86400  # "never": ~100 years, signed but practically permanent
@@ -158,7 +158,7 @@ def _authenticate_download(request: Request, obj_id: str) -> None:
             )
 
 
-@router.get("/{obj_id}")
+@router.api_route("/{obj_id}", methods=["GET", "HEAD"])
 async def download(request: Request, obj_id: str):
     settings = request.app.state.settings
     db = request.app.state.db
@@ -228,7 +228,10 @@ async def download(request: Request, obj_id: str):
     manifest = Manifest.from_json(row["manifest"])
     total = manifest.total_size
     start, end = _parse_range(request.headers.get("range"), total)
-    if start is not None:
+    if total == 0:
+        length = 0
+        segments = []
+    elif start is not None:
         assert end is not None
         length = end - start + 1
         segments = manifest.map_range(start, end + 1)  # [start, end) exclusive
@@ -246,9 +249,17 @@ async def download(request: Request, obj_id: str):
 
     import mimetypes
 
+    mimetypes.add_type("video/x-matroska", ".mkv")
+    mimetypes.add_type("audio/x-matroska", ".mka")
+
     # Fallback to file extension guessing if content_type is generic octet-stream or missing
     resolved_ct = row["content_type"] or ""
-    if not resolved_ct or resolved_ct == "application/octet-stream":
+    fn_lower = (row["filename"] or "").lower()
+    if fn_lower.endswith(".mkv") or resolved_ct in ("video/matroska", "application/x-matroska"):
+        resolved_ct = "video/x-matroska"
+    elif fn_lower.endswith(".mka") or resolved_ct == "audio/matroska":
+        resolved_ct = "audio/x-matroska"
+    elif not resolved_ct or resolved_ct == "application/octet-stream":
         guessed, _ = mimetypes.guess_type(row["filename"] or "")
         if guessed:
             resolved_ct = guessed
@@ -320,20 +331,33 @@ async def download(request: Request, obj_id: str):
         except ValueError:
             pass
 
+    if request.method == "HEAD":
+        return Response(status_code=status, headers=headers)
+
     cache = getattr(request.app.state, "cache", None)
     use_cache = (
         cache is not None
-        and start is None  # full downloads only; ranges stay on the backend path
+        and start is None  # full downloads only fill the cache
         and total > 0
         and total <= runtime.get_int(db, "cache_mb", settings.cache_max_mb) * 1024 * 1024
     )
 
-    if cache is not None and use_cache and (path := cache.get(obj_id)) is not None:
-        # cache hit: stream the temp file, zero backend calls
+    if cache is not None and (path := cache.get(obj_id)) is not None:
+        # cache hit: stream the temp file with range support, zero backend calls
         async def cached_stream():
             with open(path, "rb") as f:
-                while chunk := f.read(1024 * 1024):
-                    yield chunk
+                if start is not None:
+                    f.seek(start)
+                    remaining = length
+                    while remaining > 0:
+                        chunk = f.read(min(1024 * 1024, remaining))
+                        if not chunk:
+                            break
+                        remaining -= len(chunk)
+                        yield chunk
+                else:
+                    while chunk := f.read(1024 * 1024):
+                        yield chunk
 
         return StreamingResponse(cached_stream(), status_code=status, headers=headers)
 

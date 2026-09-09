@@ -216,6 +216,24 @@ def _service_for(
     )
 
 
+def _resolve_upload_content_type(filename: str, content_type: str | None) -> str:
+    import mimetypes
+
+    mimetypes.add_type("video/x-matroska", ".mkv")
+    mimetypes.add_type("audio/x-matroska", ".mka")
+
+    ct = (content_type or "").strip()
+    fn_lower = (filename or "").lower()
+    if fn_lower.endswith(".mkv") or ct in ("video/matroska", "application/x-matroska"):
+        return "video/x-matroska"
+    if fn_lower.endswith(".mka") or ct == "audio/matroska":
+        return "audio/x-matroska"
+    if not ct or ct == "application/octet-stream":
+        guessed, _ = mimetypes.guess_type(filename or "")
+        if guessed:
+            return guessed
+    return ct or "application/octet-stream"
+
 @router.post("/upload")
 async def upload_multipart(request: Request, file: Annotated[UploadFile, File(...)]):
     """Multipart upload (field `file`). Streams to the backend in chunks.
@@ -229,7 +247,7 @@ async def upload_multipart(request: Request, file: Annotated[UploadFile, File(..
     require_uploader(request)
     limit_upload(request.app.state.db, request, _rate_upload(request))
     filename = file.filename or "upload.bin"
-    content_type = file.content_type or "application/octet-stream"
+    content_type = _resolve_upload_content_type(filename, file.content_type)
     if (await _peek_size(file)) > _max_upload_bytes(request):
         raise HTTPException(413, "object exceeds configured ceiling")
     upload_id = request.headers.get("x-upload-id", "").strip() or None
@@ -243,7 +261,7 @@ async def upload_multipart(request: Request, file: Annotated[UploadFile, File(..
         request,
         _UploadFileReader(file),
         filename,
-        content_type=file.content_type,
+        content_type=content_type,
         upload_id=upload_id,
         resume_from=resume_from,
     )
@@ -266,7 +284,9 @@ async def upload_raw(request: Request):
     require_uploader(request)
     limit_upload(request.app.state.db, request, _rate_upload(request))
     filename = request.headers.get("x-file-name", "upload.bin")
-    content_type = request.headers.get("content-type", "application/octet-stream")
+    content_type = _resolve_upload_content_type(
+        filename, request.headers.get("content-type", "application/octet-stream")
+    )
 
     declared = int(request.headers.get("content-length", "0") or 0)
     if declared and declared > _max_upload_bytes(request):

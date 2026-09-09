@@ -156,7 +156,7 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
    floated as a narrow strip and the files table overflowed its container.
    Fluid width with a sane cap + table-layout:fixed and internal ellipsis
    keeps the name column shrinkable so the table always fits its box. */
-.topbar-in{max-width:min(1280px,96vw);margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+.topbar-in{margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px clamp(20px,2.5vw,32px)}
 .topbar .logo{margin:0;gap:9px}
 .topbar .logo-mark{width:34px;height:34px;border-radius:10px}
 .topbar .logo-mark svg{width:18px;height:18px}
@@ -171,7 +171,7 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .seg button{padding:5px 11px;border-radius:7px;font-size:12.5px;font-weight:600;color:var(--tx2);transition:.15s}
 .seg button.on{background:var(--bg2);color:var(--tx);box-shadow:var(--shadow)}
 /* ============ layout ============ */
-.wrap{max-width:min(1280px,96vw);margin:0 auto;padding:26px 20px 70px}
+.wrap{margin:0 auto;padding:26px clamp(20px,2.5vw,32px) 70px}
 /* dropzone */
 .drop{border:1.5px dashed var(--line2);border-radius:var(--radius-lg);background:var(--bg2);padding:28px 20px;text-align:center;
   transition:border-color .15s,background-color .15s;cursor:pointer;margin-bottom:20px}
@@ -3189,15 +3189,44 @@ async function openFileModal(o){
     pv.innerHTML='<img src="'+url+'" alt="">';
   }else if(kind==="video"){
     pv.classList.add("has","video-col");
-    pv.innerHTML='<video id="fmVid" src="'+url+'" controls preload="metadata" playsinline style="max-height:360px;width:100%;border-radius:10px"></video>';
+    const isMkv=(extOf(o.filename)==="mkv");
+    let vHtml='<video id="fmVid" src="'+url+'" controls preload="metadata" playsinline style="max-height:360px;width:100%;border-radius:10px"></video>';
+    if(isMkv){
+      vHtml+='<div class="fm-mkv-note" style="font-size:11.5px;color:var(--tx3);margin-top:6px;text-align:center;line-height:1.4">'
+        +'<span>'+(lang==="fa"?"پخش آنلاین فایل‌های MKV به پشتیبانی مرورگر از کدک بستگی دارد. در صورت عدم پخش، فایل را دانلود کنید.":"MKV playback depends on browser codec support. If it does not play, download the file.")+'</span>'
+        +'</div>';
+    }
+    pv.innerHTML=vHtml;
     const vEl=pv.querySelector("#fmVid");
     if(vEl){
       vEl.onerror=()=>{
+        vEl.style.display="none";
+        pv.querySelectorAll(".fm-mkv-note").forEach(n=>n.remove());
+        pv.querySelectorAll(".fm-fallback").forEach(n=>n.remove());
         const fallback=document.createElement("div");
         fallback.className="fm-fallback";
-        fallback.style.cssText="padding:16px;text-align:center;font-size:13px;color:var(--tx2);display:flex;flex-direction:column;gap:6px;align-items:center";
-        fallback.innerHTML='<span style="display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-inline-end:6px"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>'+(lang==="fa"?"امکان پیش‌نمایش مستقیم این ویدیو در مرورگر نیست":"Direct playback not supported in browser")+'</span>'
-          +'<span style="font-size:11.5px;color:var(--tx3)">'+(lang==="fa"?"برای مشاهده، ویدیو را دانلود کنید":"Download the file to view locally")+'</span>';
+        fallback.style.cssText="padding:22px 16px;text-align:center;font-size:13px;color:var(--tx2);display:flex;flex-direction:column;gap:10px;align-items:center;width:100%;box-sizing:border-box";
+        const titleText=isMkv
+          ?(lang==="fa"?"امکان پخش فایل MKV در این مرورگر وجود ندارد":"MKV playback not supported in this browser")
+          :(lang==="fa"?"امکان پیش‌نمایش مستقیم این ویدیو در مرورگر نیست":"Direct playback not supported in browser");
+        const descText=isMkv
+          ?(lang==="fa"?"مرورگر شما قادر به دیکود کردن فرمت یا کدک‌های این فایل MKV نیست. فایل را دانلود کرده و با یک پخش‌کنندهٔ محلی (مانند VLC) مشاهده کنید.":"Your browser cannot decode this MKV container or its audio/video codecs. Download the file to view locally in a player like VLC.")
+          :(lang==="fa"?"کدک این ویدیو توسط مرورگر پشتیبانی نمی‌شود. برای مشاهده، فایل را دانلود کنید.":"This video codec is not supported by your browser. Download the file to view locally.");
+        const dlText=lang==="fa"?"دانلود ویدیو":"Download Video";
+        fallback.innerHTML='<div style="width:44px;height:44px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;margin-bottom:2px">'
+          +'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></div>'
+          +'<span style="font-size:14px;font-weight:600;color:var(--tx)">'+titleText+'</span>'
+          +'<span style="font-size:12px;color:var(--tx3);max-width:380px;line-height:1.5">'+descText+'</span>'
+          +'<button class="btn btn-primary fm-fallback-dl" style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;padding:8px 18px;font-size:12.5px">'
+          +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg>'
+          +dlText+'</button>';
+        const dlBtn=fallback.querySelector(".fm-fallback-dl");
+        if(dlBtn){
+          dlBtn.onclick=(e)=>{
+            e.stopPropagation();
+            downloadFileWithZk(o);
+          };
+        }
         pv.prepend(fallback);
       };
     }
