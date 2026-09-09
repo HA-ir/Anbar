@@ -165,21 +165,27 @@ curl http://127.0.0.1:8318/healthz
 
 docker ps
 # anbar-anbar-1  Up (healthy)  127.0.0.1:8318->8567/tcp
+
+# Data integrity
+python3 -c "import sqlite3; con=sqlite3.connect('/opt/anbar/data/anbar.db'); print('objects:', con.execute('SELECT COUNT(*) FROM objects').fetchone()[0]); con.close()"
+# objects: 20
+
+# Memory usage
+docker stats anbar-anbar-1 --no-stream
+# 73.65MiB / 3.725GiB, 0.12% CPU
 ```
 
-### Actions Taken
+### Live Testing Results
 
-1. `cd /root/anbar && git pull origin main` — pulled v0.15.51 commits
-2. Verified `__version__` matches `pyproject.toml` (both = "0.15.51")
-3. `cd /root/anbar && docker build -f docker/Dockerfile -t anbar:prod .`
-4. `cd /opt/anbar && docker compose down`
-5. `docker rm -f anbar-anbar-1`
-6. `docker run -d --name anbar-anbar-1 --env-file .env -p 127.0.0.1:8318:8567 -v /opt/anbar/data:/app/data -v /opt/anbar/secrets:/app/secrets --security-opt no-new-privileges:true anbar:prod`
-7. Verified healthz returns version 0.15.51, container is healthy
+- Health endpoint: ✅ returns version 0.15.51
+- Container: ✅ healthy
+- Database: ✅ 20 objects intact (no data loss)
+- UI loads: ✅ https://dl.amiri-dev.ir/ serves the application
+- Memory: ~74 MB RSS, 0.12% CPU — minimal footprint
 
 ### Time Completed
 
-2026-09-09 (current session)
+2026-09-09T21:55Z
 
 ---
 
