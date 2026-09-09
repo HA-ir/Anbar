@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-import pytest
 
 AUTH = {"Authorization": "Bearer test-key"}
 ADMIN = {"Authorization": "Bearer test-admin-key"}
 FIXTURE_MKV = Path(__file__).parent / "data" / "test_embedded.mkv"
 
+
 def _get_mkv_bytes() -> bytes:
     if FIXTURE_MKV.exists():
         return FIXTURE_MKV.read_bytes()
     return b"MKV_HEADER" + b"X" * 50000
+
 
 def test_mkv_upload_and_content_type(backend, client):
     mkv_bytes = _get_mkv_bytes()
@@ -39,6 +40,7 @@ def test_mkv_upload_and_content_type(backend, client):
     assert "inline" in r_dl.headers["content-disposition"]
     assert r_dl.headers["accept-ranges"] == "bytes"
     assert r_dl.content == mkv_bytes
+
 
 def test_mkv_range_requests(backend, client):
     mkv_bytes = _get_mkv_bytes()
@@ -81,6 +83,7 @@ def test_mkv_range_requests(backend, client):
     assert r_suffix.headers["content-range"] == f"bytes {total - 500}-{total - 1}/{total}"
     assert r_suffix.content == mkv_bytes[-500:]
 
+
 def test_mkv_head_request(backend, client):
     mkv_bytes = _get_mkv_bytes()
     total = len(mkv_bytes)
@@ -107,6 +110,7 @@ def test_mkv_head_request(backend, client):
     assert r_head_range.headers["content-length"] == "100"
     assert len(r_head_range.content) == 0
 
+
 def test_no_regression_mp4_webm(backend, client):
     for fn, ct in [("video.mp4", "video/mp4"), ("video.webm", "video/webm")]:
         data = b"test video content " * 500
@@ -130,6 +134,7 @@ def test_no_regression_mp4_webm(backend, client):
         assert r_range.status_code == 206
         assert r_range.headers["content-range"] == f"bytes 10-49/{len(data)}"
         assert r_range.content == data[10:50]
+
 
 def test_mkv_cached_range_seeking(backend, client):
     mkv_bytes = _get_mkv_bytes()

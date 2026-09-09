@@ -234,6 +234,7 @@ def _resolve_upload_content_type(filename: str, content_type: str | None) -> str
             return guessed
     return ct or "application/octet-stream"
 
+
 @router.post("/upload")
 async def upload_multipart(request: Request, file: Annotated[UploadFile, File(...)]):
     """Multipart upload (field `file`). Streams to the backend in chunks.
