@@ -3200,7 +3200,6 @@ async function openFileModal(o){
     const vEl=pv.querySelector("#fmVid");
     if(vEl){
       vEl.onerror=()=>{
-        vEl.style.display="none";
         pv.querySelectorAll(".fm-mkv-note").forEach(n=>n.remove());
         pv.querySelectorAll(".fm-fallback").forEach(n=>n.remove());
         const fallback=document.createElement("div");
