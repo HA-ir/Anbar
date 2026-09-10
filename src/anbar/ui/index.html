@@ -425,30 +425,37 @@ html[dir="rtl"] .bc-back-btn svg{transform:rotate(180deg)}
 .num{font-variant-numeric:tabular-nums;color:var(--tx2);font-size:12.5px;unicode-bidi:embed}
 /* date cell */
 .date-cell{font-size:12.5px;color:var(--tx2);white-space:nowrap;unicode-bidi:embed}
-/* ============ settings drawer ============ */
-.scrim{position:fixed;inset:0;background:rgba(8,12,20,.5);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:.2s;z-index:90}
+/* ============ settings drawer & desktop modal ============ */
+.scrim{position:fixed;inset:0;background:rgba(8,12,20,.52);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);opacity:0;pointer-events:none;transition:opacity .22s ease-out;z-index:950}
 .scrim.on{opacity:1;pointer-events:auto}
 .drawer{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(440px,100%);background:var(--bg2);
-  border-inline-start:1px solid var(--line);z-index:95;transform:translateX(var(--sx,100%));transition:transform .25s ease-out;
-  display:flex;flex-direction:column;box-shadow:var(--shadow-lg)}
-.drawer-nav{display:flex;gap:4px;padding:8px 16px;background:var(--bg3);border-bottom:1px solid var(--line);
-  overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:none}
-.drawer-nav::-webkit-scrollbar{display:none}
-.dtab{padding:5px 10px;font-size:12px;font-weight:500;color:var(--tx2);background:transparent;border:none;border-radius:var(--radius-sm);cursor:pointer;transition:all .15s ease}
-.dtab:hover{color:var(--tx);background:var(--hover)}
-.dtab.active{color:var(--brand);background:var(--bg2);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+  border-inline-start:1px solid var(--line);z-index:1000;transform:translateX(var(--sx,100%));transition:transform .25s ease-out;
+  display:flex;flex-direction:column;box-shadow:var(--shadow-lg);box-sizing:border-box}
 html[dir="rtl"] .drawer{--sx:-100%}
 .drawer.on{transform:translateX(0)}
-.drawer-head{display:flex;align-items:center;gap:10px;padding:18px 22px;border-bottom:1px solid var(--line)}
-.drawer-head b{font-size:15.5px;font-weight:700;flex:1}
-.drawer-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:20px 22px 40px;box-sizing:border-box}
-.sec{margin-bottom:24px;max-width:100%}
-.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3);font-weight:700;margin-bottom:13px}
-.set-row{display:flex;align-items:center;gap:12px;padding:10px 0;max-width:100%;box-sizing:border-box}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--bg2);flex:none}
+.drawer-title-wrap{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.drawer-head-ico{width:19px;height:19px;stroke:var(--brand);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.drawer-head b{font-size:15.5px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drawer-nav{display:flex;flex-direction:row;gap:6px;padding:9px 14px;background:var(--bg3);border-bottom:1px solid var(--line);
+  overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:none}
+.drawer-nav::-webkit-scrollbar{display:none}
+.dtab{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;font-size:12px;font-weight:500;color:var(--tx2);
+  background:var(--bg2);border:1px solid var(--line);border-radius:20px;cursor:pointer;transition:all .15s ease;flex:none;position:relative}
+.dtab:hover{color:var(--tx);border-color:var(--line2);background:var(--hover)}
+.dtab.active{color:#fff;background:var(--brand);border-color:var(--brand);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.dtab-icon{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;opacity:.9}
+.dtab.active .dtab-icon{opacity:1;stroke:#fff}
+.dtab span{white-space:nowrap}
+.drawer-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:20px 20px 40px;box-sizing:border-box;scroll-behavior:smooth}
+.sec{margin-bottom:28px;max-width:100%;scroll-margin-top:16px}
+.sec h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--brand);font-weight:700;margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.set-row{display:flex;align-items:center;gap:12px;padding:11px 0;max-width:100%;box-sizing:border-box;border-bottom:1px dashed var(--line)}
+.set-row:last-child{border-bottom:none}
 .set-row.col{flex-direction:column;align-items:stretch;gap:8px}
 .set-row select{max-width:100%;box-sizing:border-box}
 .set-row .lab{flex:1;font-size:13.5px;font-weight:500;min-width:0}
-.set-row .lab small{display:block;color:var(--tx3);font-size:11.5px;margin-top:2px;font-weight:400}
+.set-row .lab small{display:block;color:var(--tx3);font-size:11.5px;margin-top:3px;font-weight:400;line-height:1.45}
 .set-row input[type=number]{width:92px;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;
   background:var(--bg3);color:var(--tx);font-size:13.5px;text-align:center;outline:none;font-variant-numeric:tabular-nums}
 .set-row input[type=number]:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
@@ -460,7 +467,37 @@ html[dir="rtl"] .drawer{--sx:-100%}
   transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .sw.on i{transform:translateX(18px)}
 html[dir="rtl"] .sw.on i{transform:translateX(-18px)}
-.drawer-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:10px}
+.drawer-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--bg2);flex:none}
+
+/* Desktop Two-Column Settings Dialog (>=768px) */
+@media (min-width:768px){
+  .drawer{inset:0;margin:auto;position:fixed;
+    width:min(960px,92vw);height:min(720px,88vh);max-height:88vh;border-radius:16px;border:1px solid var(--line);
+    box-shadow:0 24px 64px rgba(0,0,0,.32),0 6px 20px rgba(0,0,0,.14);
+    display:grid;grid-template-columns:240px 1fr;grid-template-rows:auto 1fr auto;
+    grid-template-areas:"head head" "nav body" "nav foot";
+    overflow:hidden;opacity:0;pointer-events:none;
+    transform:scale(.98);
+    transition:opacity .22s cubic-bezier(.16,1,.3,1),transform .22s cubic-bezier(.16,1,.3,1)}
+  html[dir="rtl"] .drawer{--sx:0;transform:scale(.98)}
+  .drawer.on,html[dir="rtl"] .drawer.on{opacity:1;pointer-events:auto;transform:scale(1)}
+  .drawer-head{grid-area:head;padding:18px 24px;border-bottom:1px solid var(--line)}
+  .drawer-head b{font-size:16.5px}
+  .drawer-nav{grid-area:nav;display:flex;flex-direction:column;gap:4px;padding:14px 10px;
+    background:var(--bg3);border-inline-end:1px solid var(--line);border-bottom:none;overflow-y:auto;overflow-x:hidden}
+  .dtab{display:flex;align-items:center;gap:10px;width:100%;text-align:start;padding:9px 12px;font-size:13px;
+    font-weight:500;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--tx2);box-shadow:none;box-sizing:border-box}
+  .dtab:hover{color:var(--tx);background:var(--hover);border-color:transparent}
+  .dtab.active{color:var(--brand);background:var(--bg2);border-color:var(--line);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .dtab.active::before{content:'';position:absolute;inset-inline-start:0;top:6px;bottom:6px;width:3px;border-radius:2px;background:var(--brand)}
+  .dtab-icon{width:17px;height:17px;opacity:.8}
+  .dtab.active .dtab-icon{opacity:1;stroke:var(--brand)}
+  .drawer-body{grid-area:body;padding:26px 32px 40px}
+  .sec{margin-bottom:34px;scroll-margin-top:20px}
+  .sec h3{font-size:13px;margin-bottom:16px;padding-bottom:8px}
+  .drawer-foot{grid-area:foot;padding:16px 32px}
+  #auditLogList{max-height:260px !important}
+}
 .btn-warn{background:var(--err-soft);color:var(--err);font-size:13px;padding:9px 14px}
 .btn-warn:hover{background:var(--err);color:#fff}
 /* api key rows */
@@ -806,24 +843,54 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer">
   <div class="drawer-head">
-    <b data-i18n="setT">تنظیمات ادمین</b>
+    <div class="drawer-title-wrap">
+      <svg class="drawer-head-ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h0a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h0a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v0a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
+      <b data-i18n="setT">تنظیمات ادمین</b>
+    </div>
     <button class="icon-btn" id="setClose" aria-label="close">
       <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
     </button>
   </div>
-  <div class="drawer-nav" role="tablist" aria-label="Settings categories">
-    <button type="button" class="dtab active" data-sec="all">همه</button>
-    <button type="button" class="dtab" data-sec="secUI" data-i18n="secUI">رابط کاربری</button>
-    <button type="button" class="dtab" data-sec="secAuth" data-i18n="secAuth">احراز هویت</button>
-    <button type="button" class="dtab" data-sec="secS3" data-i18n="secS3">فضای ذخیره‌سازی</button>
-    <button type="button" class="dtab" data-sec="secCrypto" data-i18n="secCrypto">امنیت</button>
-    <button type="button" class="dtab" data-sec="secRate" data-i18n="secRate">محدودیت‌ها</button>
-    <button type="button" class="dtab" data-sec="secTgConfig" data-i18n="secTgConfig">تلگرام</button>
-    <button type="button" class="dtab" data-sec="secBackup" data-i18n="secBackup">پشتیبان‌گیری</button>
-    <button type="button" class="dtab" data-sec="secAuditLogs" data-i18n="secAuditLogs">لاگ‌ها</button>
-  </div>
+  <nav class="drawer-nav" role="tablist" aria-label="Settings categories">
+    <button type="button" class="dtab active" data-sec="all">
+      <svg class="dtab-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span data-i18n="tabAll">همه</span>
+    </button>
+    <button type="button" class="dtab" data-sec="secUI">
+      <svg class="dtab-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.96-4.48-9-10-9z"/><circle cx="6.5" cy="11.5" r="1.5" fill="currentColor"/><circle cx="9.5" cy="7.5" r="1.5" fill="currentColor"/><circle cx="14.5" cy="7.5" r="1.5" fill="currentColor"/><circle cx="17.5" cy="11.5" r="1.5" fill="currentColor"/></svg>
+      <span data-i18n="tabUI">ظاهر و رابط کاربری</span>
+    </button>
+    <button type="button" class="dtab" data-sec="secAuth">
+      <svg class="dtab-icon" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5L22 1l-2 3-3-1-1 3-3-1"/></svg>
+      <span data-i18n="tabAuth">احراز هویت</span>
+    </button>
+    <button type="button" class="dtab" data-sec="secS3">
+      <svg class="dtab-icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      <span data-i18n="tabS3">فضای ذخیره‌سازی و S3</span>
+    </button>
+    <button type="button" class="dtab" data-sec="secCrypto">
+      <svg class="dtab-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span data-i18n="tabCrypto">امنیت و رمزنگاری</span>
+    </button>
+    <button type="button" class="dtab" data-sec="secRate">
+      <svg class="dtab-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span data-i18n="tabRate">محدودیت‌ها و سقف‌ها</span>
+    </button>
+    <button type="button" class="dtab" data-sec="secTgConfig">
+      <svg class="dtab-icon" viewBox="0 0 24 24"><path d="M21.5 2L2 9.5l7 3 1.5 6.5 3.5-3.5 5 3.5 2.5-17z"/></svg>
+      <span data-i18n="tabTg">پیکربندی تلگرام</span>
+    </button>
+    <button type="button" class="dtab" data-sec="secBackup">
+      <svg class="dtab-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span data-i18n="tabBackup">پشتیبان‌گیری و سیستم</span>
+    </button>
+    <button type="button" class="dtab" data-sec="secAuditLogs">
+      <svg class="dtab-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <span data-i18n="tabAudit">لاگ‌های امنیتی</span>
+    </button>
+  </nav>
   <div class="drawer-body">
-    <div class="sec">
+    <div class="sec" id="secUI">
       <h3 data-i18n="secUI">تنظیمات ظاهر و رابط کاربری</h3>
       <div class="set-row">
         <div class="lab"><span data-i18n="defView">نمای پیش‌فرض</span></div>
@@ -844,14 +911,14 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="sw on" id="swPreview" role="switch"><i></i></div>
       </div>
     </div>
-    <div class="sec">
+    <div class="sec" id="secAuth">
       <h3 data-i18n="secAuth">احراز هویت</h3>
       <div class="set-row">
         <div class="lab"><span data-i18n="authLab">احراز هویت API</span><small data-i18n="authSub">با غیرفعال‌سازی، دانلود بدون کلید آزاد است</small></div>
         <div class="sw" id="swAuth" role="switch"><i></i></div>
       </div>
     </div>
-    <div class="sec">
+    <div class="sec" id="secS3">
       <h3 data-i18n="secS3">سرویس S3 و تلگرام</h3>
       <div class="set-row">
         <div class="lab"><span data-i18n="s3Endpoint">اندپوینت S3</span><small style="direction:ltr;text-align:left;font-family:ui-monospace,monospace">/s3/{bucket}/{key}</small></div>
@@ -861,7 +928,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <a href="/tg-app" target="_blank" class="btn btn-ghost" style="width:auto;padding:6px 12px;font-size:12px" data-i18n="openTgApp">باز کردن ↗</a>
       </div>
     </div>
-    <div class="sec">
+    <div class="sec" id="secCrypto">
       <h3 data-i18n="secCrypto">امنیت و رمزنگاری</h3>
       <div class="set-row">
         <div class="lab"><span data-i18n="encLab">رمزنگاری caption و متادیتا (AES-256-GCM)</span><small data-i18n="encSub">رمزنگاری کپشن چانک‌ها روی تلگرام — خود فایل‌ها رمز نمی‌شوند؛ برای رمز واقعی، Client ZK را فعال کنید</small></div>
@@ -891,7 +958,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         </div>
       </div>
     </div>
-    <div class="sec">
+    <div class="sec" id="secRate">
       <h3 data-i18n="secRate">محدودیت سرعت (در دقیقه)</h3>
       <div class="set-row">
         <div class="lab"><span data-i18n="rDl">دانلود</span><small data-i18n="rDlS">به ازای هر IP + فایل · ۰ = بدون محدودیت</small></div>
@@ -945,7 +1012,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     </div>
 
     <!-- Telegram & MTProto Configuration (v0.14.1) -->
-    <div class="sec">
+    <div class="sec" id="secTgConfig">
       <h3 data-i18n="secTgConfig">پیکربندی تلگرام و متغیرها (.env)</h3>
       
       <!-- Telegram MTProto Authentication Box -->
@@ -1033,7 +1100,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     </div>
 
     <!-- Backup & System Health (v0.15.0) -->
-    <div class="sec">
+    <div class="sec" id="secBackup">
       <h3 data-i18n="secBackup">پشتیبان‌گیری و سلامت سیستم</h3>
       <div class="stat-grid">
         <div class="stat-box"><span class="title" data-i18n="statStorage">حجم کل ذخیره</span><span class="val" id="statStorageVal">-</span></div>
@@ -1091,7 +1158,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     </div>
 
     <!-- Audit Logs (v0.14.3) -->
-    <div class="sec">
+    <div class="sec" id="secAuditLogs">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <h3 data-i18n="secAuditLogs">لاگ‌های امنیتی و رویدادها</h3>
         <button class="btn btn-ghost" id="refreshAuditBtn" type="button" style="width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:7px" title="به‌روزرسانی لاگ‌ها" aria-label="refresh audit logs">
@@ -1285,6 +1352,9 @@ const I18N={
   dropT:"فایل‌ها را اینجا رها کن یا کلیک کن", dropS:"چند فایلی · بدون ذخیره روی دیسک سرور — مستقیم در تلگرام",
   files:"فایل‌ها", refresh:"به‌روزرسانی",
   thName:"نام فایل", thSize:"حجم", thItems:"تعداد فایل‌ها", thDate:"تاریخ", thDl:"دانلود", thAct:"عملیات",
+  tabAll:"همه", tabUI:"ظاهر و رابط کاربری", tabAuth:"احراز هویت", tabS3:"فضای ذخیره‌سازی و S3",
+  tabCrypto:"امنیت و رمزنگاری", tabRate:"محدودیت‌ها و سقف‌ها", tabTg:"پیکربندی تلگرام",
+  tabBackup:"پشتیبان‌گیری و سیستم", tabAudit:"لاگ‌های امنیتی",
   secTgConfig:"پیکربندی تلگرام و متغیرها (.env)",
   secBackup:"پشتیبان‌گیری و سلامت سیستم",
   autoBackupLab:"بکاپ روزانه خودکار به تلگرام",
@@ -1453,6 +1523,9 @@ const I18N={
   dropT:"Drop files here or click to browse", dropS:"Multiple files · never stored on server disk — straight to Telegram",
   files:"Files", refresh:"Refresh",
   thName:"File name", thSize:"Size", thItems:"Items", thDate:"Date", thDl:"Downloads", thAct:"Actions",
+  tabAll:"All", tabUI:"Appearance & UI", tabAuth:"Authentication", tabS3:"S3 & Storage",
+  tabCrypto:"Security & Crypto", tabRate:"Rate Limits", tabTg:"Telegram Config",
+  tabBackup:"Backup & System", tabAudit:"Audit Logs",
   secTgConfig:"Telegram & MTProto Config (.env)",
   secBackup:"System Backup & Health",
   autoBackupLab:"Daily Auto-Backup to Telegram",
@@ -4308,28 +4381,77 @@ function guardBtn(btn,fn){
   };
 }
 
-/* ================= settings drawer ================= */
+/* ================= settings drawer & desktop modal ================= */
 const drawer=$("#drawer"),scrim=$("#scrim");
 $("#setBtn").onclick=openDrawer;
+$("#setClose").onclick=closeDrawer;
+scrim.onclick=closeDrawer;
+
+let _navClickScroll = false, _navClickTimer = null;
+const _secKeys = ["secUI", "secAuth", "secS3", "secCrypto", "secRate", "secTgConfig", "secBackup", "secAuditLogs"];
+
+function setActiveTab(secKey) {
+  document.querySelectorAll(".dtab").forEach(tab => {
+    const isMatch = tab.dataset.sec === secKey;
+    tab.classList.toggle("active", isMatch);
+    if (isMatch && tab.scrollIntoView) {
+      tab.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    }
+  });
+}
+
 document.querySelectorAll(".dtab").forEach(b => {
   b.onclick = () => {
-    document.querySelectorAll(".dtab").forEach(x => x.classList.remove("active"));
-    b.classList.add("active");
     const sec = b.dataset.sec;
     const body = document.querySelector(".drawer-body");
     if (!body) return;
+    _navClickScroll = true;
+    clearTimeout(_navClickTimer);
+    _navClickTimer = setTimeout(() => { _navClickScroll = false; }, 700);
+    setActiveTab(sec);
+
     if (sec === "all") {
       body.scrollTo({ top: 0, behavior: "smooth" });
     } else {
-      const target = body.querySelector(`h3[data-i18n="${sec}"]`);
+      const target = document.getElementById(sec) || body.querySelector(`h3[data-i18n="${sec}"]`);
       if (target) {
         target.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }
   };
 });
-$("#setClose").onclick=closeDrawer;
-scrim.onclick=closeDrawer;
+
+const _drawerBody = document.querySelector(".drawer-body");
+if (_drawerBody) {
+  let _scrollTicking = false;
+  _drawerBody.addEventListener("scroll", () => {
+    if (_navClickScroll) return;
+    if (!_scrollTicking) {
+      requestAnimationFrame(() => {
+        if (_drawerBody.scrollTop < 40) {
+          setActiveTab("all");
+        } else if (_drawerBody.scrollTop + _drawerBody.clientHeight >= _drawerBody.scrollHeight - 25) {
+          setActiveTab("secAuditLogs");
+        } else {
+          const bodyTop = _drawerBody.getBoundingClientRect().top;
+          let matched = "all";
+          for (const key of _secKeys) {
+            const el = document.getElementById(key) || _drawerBody.querySelector(`h3[data-i18n="${key}"]`);
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              if (rect.top <= bodyTop + 110) {
+                matched = key;
+              }
+            }
+          }
+          setActiveTab(matched);
+        }
+        _scrollTicking = false;
+      });
+      _scrollTicking = true;
+    }
+  }, { passive: true });
+}
 
 /* ── MTProto Interactive Auth UI logic ── */
 let _tgPhoneCodeHash = "";
@@ -4414,6 +4536,9 @@ function initTgAuthUI() {
 function openDrawer(){
   if(!openDrawer._tgAuthInit){ initTgAuthUI(); openDrawer._tgAuthInit = true; }
   drawer.classList.add("on");scrim.classList.add("on");
+  const body = document.querySelector(".drawer-body");
+  if (body) body.scrollTop = 0;
+  setActiveTab("all");
   loadSettings();renderKeys();
 }
 /* BUG-v0.15.35: the settings drawer has a Restart button — .env-backed
