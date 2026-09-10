@@ -96,9 +96,7 @@ def _encode(original: bytes, obj_id: str, settings) -> bool:
             im.load()
             if getattr(im, "is_animated", False):
                 im.seek(0)  # first frame only
-            im_thumb: Image.Image = (
-                im.convert("RGB") if im.mode not in ("RGB", "RGBA", "L") else im
-            )
+            im_thumb: Image.Image = im.convert("RGB") if im.mode not in ("RGB", "RGBA", "L") else im
             im_thumb.thumbnail((THUMB_MAX_PX, THUMB_MAX_PX), Image.Resampling.LANCZOS)
             if im_thumb.mode == "RGBA":
                 tmp = out_webp.with_suffix(".webp.tmp")

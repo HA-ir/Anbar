@@ -53,7 +53,7 @@ def test_category_section_ids():
         "secAuditLogs",
     ]
     for eid in expected_ids:
-        assert f'id="{eid}"' in SRC, f"Missing id=\"{eid}\" on section element"
+        assert f'id="{eid}"' in SRC, f'Missing id="{eid}" on section element'
 
 
 def test_scrollspy_js_present():
