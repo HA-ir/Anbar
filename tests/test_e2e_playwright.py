@@ -354,6 +354,18 @@ def test_settings_modal(authed_page: Page):
     page.click("#setClose")
     page.wait_for_timeout(300)
 
+def test_settings_modal_inputs_visible(authed_page: Page):
+    """Regression: runtime settings inputs render in the settings modal."""
+    page = authed_page
+    page.click("#setBtn")
+    page.wait_for_selector("#s_cache_mb", timeout=3000)
+    for locator in [
+        page.locator("#s_cache_mb"),
+        page.locator("#s_max_upload_mb"),
+        page.locator("#setClose"),
+    ]:
+        assert locator.is_visible()
+
 
 def test_language_switch_fa_en(authed_page: Page):
     """Test 11: Switching between Persian and English alters document direction and labels."""

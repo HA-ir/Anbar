@@ -12,12 +12,12 @@
 <style>
 /* ============ design tokens ============ */
 :root {
-  --bg-canvas: #f1f3f5;
-  --bg-surface: #ffffff;
-  --bg-subtle: #eaedf1;
-  --bg-hover: #e2e6ea;
-  --border-subtle: #dbe0e6;
-  --border-strong: #c2c9d1;
+  --bg-canvas: #e5e7eb;
+  --bg-surface: #f8fafc;
+  --bg-subtle: #e2e8f0;
+  --bg-hover: #cbd5e1;
+  --border-subtle: #cbd5e1;
+  --border-strong: #94a3b8;
   --tx-primary: #0f172a;
   --tx-secondary: #334155;
   --tx-muted: #64748b;
@@ -4790,29 +4790,39 @@ function syncHashToggleBtn(){
    revealed value can never be accidentally saved back over the stored hash
    unless the admin edits it deliberately. */
 let _tgApiHashRaw="";   // last revealed raw hash (client-side only)
+let _tgApiHashBusy=false;
 $("#s_tg_hash_toggle").onclick=async()=>{
   const inp=$("#s_tg_api_hash");
   if(!inp)return;
+  if(_tgApiHashBusy)return;
+  _tgApiHashBusy=true;
   if(inp.type==="password"){
-    inp.type="text";
     const typed=inp.value.trim();
-    if(typed&&!typed.includes("•")){_tgApiHashRaw=typed;}   // admin typed a new one
-    if(!typed||typed===_tgApiHashMasked){
-      try{
+    if(typed&&!typed.includes("•")){_tgApiHashRaw=typed;}
+    try{
+      if(_tgApiHashRaw){
+        inp.type="text";
+        inp.value=_tgApiHashRaw;
+        inp.placeholder="";
+      }else if(!typed||typed===_tgApiHashMasked){
         const r=await api("/api/v1/admin/telegram-config/reveal-api-hash");
         _tgApiHashRaw=r.api_hash||"";
+        inp.type="text";
         inp.value=_tgApiHashRaw;
-        if(_tgApiHashRaw)inp.placeholder="";
-        else inp.placeholder=t("tgApiHashPh");
+        inp.placeholder=_tgApiHashRaw?"":t("tgApiHashPh");
         if(!_tgApiHashRaw)toast(t("hashNotSet"),"warn");
-      }catch(e){toast(e.message,"err");}
-    }else{
-      inp.value=_tgApiHashRaw||typed;
-    }
+      }else{
+        _tgApiHashRaw=typed;
+        inp.type="text";
+        inp.value=typed;
+      }
+    }catch(e){toast(e.message,"err");}
+    finally{_tgApiHashBusy=false;}
   }else{
+    const typed=inp.value.trim();
+    if(typed&&!typed.includes("•")){_tgApiHashRaw=typed;}
     inp.type="password";
-    // hide: blank the field unless the admin typed a fresh hash themselves
-    if(inp.value.trim()===_tgApiHashRaw)inp.value="";
+    if(typed===_tgApiHashRaw)inp.value="";
   }
   syncHashToggleBtn();
 };
