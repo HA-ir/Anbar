@@ -26,8 +26,8 @@ def render_password_page(obj_id: str, sig: str, exp: int | None = 0, failed: boo
 <style>
 :root{--bg:#0b0f17;--bg2:#131924;--bg3:#1b2333;--line:#232d3f;--line2:#334155;
 --tx:#f1f5f9;--tx2:#94a3b8;--tx3:#8598b0;--brand:#3b82f6;--brand-soft:rgba(59,130,246,0.12);--err:#ef4444}
-@media(prefers-color-scheme:light){:root{--bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;
---line:#e2e8f0;--line2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--brand:#2563eb;--brand-soft:rgba(37,99,235,0.08);--err:#dc2626}}
+@media(prefers-color-scheme:light){:root{--bg:#f1f3f5;--bg2:#ffffff;--bg3:#eaedf1;
+--line:#dbe0e6;--line2:#c2c9d1;--tx:#0f172a;--tx2:#334155;--tx3:#64748b;--brand:#2563eb;--brand-soft:rgba(37,99,235,0.08);--err:#dc2626}}
 *{box-sizing:border-box;margin:0}
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 body{font-family:'Vazirmatn',system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;
@@ -123,8 +123,8 @@ def render_album_page(title: str, items: list[dict[str, Any]]) -> str:
 <style>
 :root{{--bg:#0b0f17;--bg2:#131924;--bg3:#1b2333;--line:#232d3f;--line2:#334155;
 --tx:#f1f5f9;--tx2:#94a3b8;--tx3:#8598b0;--brand:#3b82f6;--brand-soft:rgba(59,130,246,0.12)}}
-@media(prefers-color-scheme:light){{:root{{--bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;
---line:#e2e8f0;--line2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--brand:#2563eb;--brand-soft:rgba(37,99,235,0.08)}}}}
+@media(prefers-color-scheme:light){{:root{{--bg:#f1f3f5;--bg2:#ffffff;--bg3:#eaedf1;
+--line:#dbe0e6;--line2:#c2c9d1;--tx:#0f172a;--tx2:#334155;--tx3:#64748b;--brand:#2563eb;--brand-soft:rgba(37,99,235,0.08)}}}}
 *{{box-sizing:border-box;margin:0}}
 :focus-visible{{outline:2px solid var(--brand);outline-offset:2px}}
 body{{background:var(--bg);color:var(--tx);
@@ -269,8 +269,8 @@ def render_links_manage_page(
 <style>
 :root{{--bg:#0b0f17;--bg2:#131924;--bg3:#1b2333;--line:#232d3f;--line2:#334155;
 --tx:#f1f5f9;--tx2:#94a3b8;--tx3:#8598b0;--brand:#3b82f6;--brand-soft:rgba(59,130,246,0.12);--ok:#22c55e;--err:#ef4444}}
-@media(prefers-color-scheme:light){{:root{{--bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;
---line:#e2e8f0;--line2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--brand:#2563eb;--brand-soft:rgba(37,99,235,0.08);--ok:#16a34a;--err:#dc2626}}}}
+@media(prefers-color-scheme:light){{:root{{--bg:#f1f3f5;--bg2:#ffffff;--bg3:#eaedf1;
+--line:#dbe0e6;--line2:#c2c9d1;--tx:#0f172a;--tx2:#334155;--tx3:#64748b;--brand:#2563eb;--brand-soft:rgba(37,99,235,0.08);--ok:#16a34a;--err:#dc2626}}}}
 *{{box-sizing:border-box;margin:0}}
 :focus-visible{{outline:2px solid var(--brand);outline-offset:2px}}
 body{{font-family:'Vazirmatn',system-ui,'Segoe UI',Tahoma,sans-serif;min-height:100vh;

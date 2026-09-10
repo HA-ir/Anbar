@@ -4,6 +4,13 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.55] — 2026-09-10
+
+### Fixed
+- **Telegram API hash reveal**: The settings toggle now falls back to directly injected `ANBAR_API_HASH` environment values, not only `.env` or settings, while preserving admin-only access and audit logging.
+- **Toggle affordance**: Show/hide labels retain their eye icons, and masked placeholders are cleared after a successful reveal so the raw hash is visibly shown.
+- **Save safety**: Reveal/save flows ignore masked and starred hash placeholders so existing values cannot be overwritten accidentally.
+
 ## [0.15.44] — 2026-09-05
 
 ### Quality & Infrastructure (Wave 2)
@@ -226,4 +233,3 @@ versioning follows [SemVer](https://semver.org/).
 
 ### Fixed
 - **CI/CD Image Publishing & Trivy Scan**: Add `type=ref,event=tag` to Docker metadata action so images are pushed with the explicit git tag reference (`v0.15.48`) alongside semver tags, resolving Trivy vulnerability scan failures when resolving the published tag.
-

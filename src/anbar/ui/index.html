@@ -12,14 +12,14 @@
 <style>
 /* ============ design tokens ============ */
 :root {
-  --bg-canvas: #f8fafc;
+  --bg-canvas: #f1f3f5;
   --bg-surface: #ffffff;
-  --bg-subtle: #f1f5f9;
-  --bg-hover: #e2e8f0;
-  --border-subtle: #e2e8f0;
-  --border-strong: #cbd5e1;
+  --bg-subtle: #eaedf1;
+  --bg-hover: #e2e6ea;
+  --border-subtle: #dbe0e6;
+  --border-strong: #c2c9d1;
   --tx-primary: #0f172a;
-  --tx-secondary: #475569;
+  --tx-secondary: #334155;
   --tx-muted: #64748b;
   --brand-primary: #2563eb;
   --brand-soft: rgba(37,99,235,0.08);
@@ -48,8 +48,8 @@
   --warn: var(--status-warn);
   --err: var(--status-danger);
   --err-soft: rgba(220,38,38,0.08);
-  --shadow: 0 1px 2px rgba(15,23,42,0.05), 0 1px 3px rgba(15,23,42,0.08);
-  --shadow-lg: 0 4px 12px rgba(15,23,42,0.08), 0 12px 32px rgba(15,23,42,0.12);
+  --shadow: 0 1px 3px rgba(15,23,42,0.08), 0 2px 6px -1px rgba(15,23,42,0.06);
+  --shadow-lg: 0 4px 14px -1px rgba(15,23,42,0.10), 0 12px 32px -4px rgba(15,23,42,0.12);
   --r: var(--radius-lg);
   --r-sm: var(--radius-sm);
   --font: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -4772,7 +4772,9 @@ function syncHashToggleBtn(){
   const inp=$("#s_tg_api_hash");
   if(!btn||!inp)return;
   const isVis=inp.type==="text";
-  btn.textContent=isVis?t("hideHash"):t("showHash");
+  const eye='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const eyeOff='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  btn.innerHTML=(isVis?eyeOff:eye)+esc(isVis?t("hideHash"):t("showHash"));
   btn.classList.toggle("btn-primary",isVis);
   btn.classList.toggle("btn-ghost",!isVis);
   btn.style.borderColor=isVis?"var(--brand)":"";
@@ -4800,6 +4802,8 @@ $("#s_tg_hash_toggle").onclick=async()=>{
         const r=await api("/api/v1/admin/telegram-config/reveal-api-hash");
         _tgApiHashRaw=r.api_hash||"";
         inp.value=_tgApiHashRaw;
+        if(_tgApiHashRaw)inp.placeholder="";
+        else inp.placeholder=t("tgApiHashPh");
         if(!_tgApiHashRaw)toast(t("hashNotSet"),"warn");
       }catch(e){toast(e.message,"err");}
     }else{
@@ -5079,7 +5083,7 @@ $("#saveBtn").onclick=guardBtn($("#saveBtn"),async()=>{
   if(enteredTokens)tgBody.bot_tokens=enteredTokens;
   const enteredHash=$("#s_tg_api_hash")?.value?.trim();
   // never save the revealed masked value back
-  if(enteredHash&&!enteredHash.includes("•"))tgBody.api_hash=enteredHash;
+  if(enteredHash&&!enteredHash.includes("•")&&!enteredHash.includes("*"))tgBody.api_hash=enteredHash;
   try{
     const r1 = await api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify(body)});
     curSettings=r1.settings;

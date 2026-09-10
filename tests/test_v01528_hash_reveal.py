@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from starlette.testclient import TestClient
 
 from anbar.api import admin as admin_mod
 
@@ -27,6 +28,15 @@ def isolated_env(tmp_path: Path, monkeypatch):
         "ANBAR_API_HASH=" + "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6" + "\n"
     )
     monkeypatch.setattr(admin_mod, "_get_env_file_path", lambda: env)
+    return env
+
+
+@pytest.fixture()
+def empty_env(tmp_path: Path, monkeypatch):
+    env = tmp_path / "test.env"
+    env.write_text("ANBAR_BOT_TOKEN=123456:AAA.BBB\n")
+    monkeypatch.setattr(admin_mod, "_get_env_file_path", lambda: env)
+    monkeypatch.delenv("ANBAR_API_HASH", raising=False)
     return env
 
 
@@ -65,3 +75,13 @@ def test_listing_still_masks_hash(client, isolated_env):
     body = r.json()
     assert "•" in body["api_hash"]
     assert body["api_hash"] != "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+
+
+def test_reveal_uses_direct_environment_when_env_file_empty(
+    client: TestClient, empty_env, monkeypatch
+):
+    direct_hash = "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e"
+    monkeypatch.setenv("ANBAR_API_HASH", direct_hash)
+    r = client.get("/api/v1/admin/telegram-config/reveal-api-hash", headers=ADMIN)
+    assert r.status_code == 200
+    assert r.json() == {"api_hash": direct_hash, "set": True}

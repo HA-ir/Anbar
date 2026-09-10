@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 import uuid
 from pathlib import Path
@@ -1155,7 +1156,12 @@ async def telegram_config_reveal_api_hash(request: Request):
     require_admin(request)
     settings = request.app.state.settings
     env_vars = _read_env_dict(_get_env_file_path())
-    raw = env_vars.get("ANBAR_API_HASH") or settings.api_hash or ""
+    raw = (
+        env_vars.get("ANBAR_API_HASH")
+        or os.environ.get("ANBAR_API_HASH")
+        or settings.api_hash
+        or ""
+    )
     request.app.state.db.log_audit(
         "cfg.reveal_api_hash",
         actor="admin",
