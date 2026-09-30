@@ -646,6 +646,8 @@ def test_file_move_validation_and_progress(authed_page: Page, tmp_path: Path):
     page.wait_for_selector("#moveModal", state="visible", timeout=2000)
 
     # Attempt circular move into child folder
+    if not page.is_visible("#moveDest"):
+        page.click("#moveManualToggle")
     page.fill("#moveDest", "parent_dir/child_dir")
     page.click("#moveOk")
     page.wait_for_selector("#moveErr", state="visible", timeout=2000)
@@ -664,6 +666,8 @@ def test_file_move_validation_and_progress(authed_page: Page, tmp_path: Path):
     page.evaluate(f"""() => {{
         openMoveModal(["{file_id}"], "1 file");
     }}""")
+    if not page.is_visible("#moveDest"):
+        page.click("#moveManualToggle")
     page.fill("#moveDest", "")  # already at root
     page.click("#moveOk")
     page.wait_for_selector("#moveErr", state="visible", timeout=2000)

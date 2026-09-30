@@ -269,6 +269,7 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 @keyframes spin360{to{transform:rotate(360deg)}}
 /* toolbar */
 .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.toolbar-group{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap}
 .toolbar h2{font-size:15px;font-weight:700;letter-spacing:-.01em;flex:1;display:flex;align-items:center;gap:9px}
 .toolbar .btn,.toolbar select,.filterbar select{height:var(--btn-h);min-height:var(--btn-h);border-radius:var(--btn-radius);box-sizing:border-box}
 .count{font-size:11.5px;font-weight:600;color:var(--tx2);background:var(--bg3);border:1px solid var(--line);
@@ -1406,13 +1407,12 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     <!-- Legacy / quick pick container preserved for compat -->
     <div id="moveChips" style="display:none"></div>
 
-    <!-- Destination path input (power-user editable, auto-synced with browser) -->
-    <div style="margin-top:10px">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <label style="font-size:11.5px;font-weight:600;color:var(--tx3)" data-i18n="moveToLab">مسیر مقصد (پوشه):</label>
-        <button type="button" id="moveManualToggle" style="display:none"></button>
-      </div>
-      <div id="moveManualWrap" style="margin-top:4px">
+    <!-- Destination path input (power-user editable toggle) -->
+    <div style="margin-top:8px">
+      <button type="button" id="moveManualToggle" style="background:none;border:none;color:var(--tx3);font-size:11.5px;cursor:pointer;padding:0;text-decoration:underline">
+        + مسیر دستی (پیشرفته)
+      </button>
+      <div id="moveManualWrap" style="display:none;margin-top:6px">
         <input type="text" id="moveDest" placeholder="folder/subfolder" autocomplete="off"
           style="width:100%;box-sizing:border-box;padding:7px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-size:12.5px;font-family:ui-monospace,monospace;direction:ltr">
       </div>
@@ -4179,7 +4179,7 @@ function openMoveModal(ids,subText){
   }
 
   const manualWrap=$("#moveManualWrap");
-  if(manualWrap)manualWrap.style.display="block";
+  if(manualWrap)manualWrap.style.display="none";
   const manualToggle=$("#moveManualToggle");
   if(manualToggle){
     manualToggle.onclick=()=>{
