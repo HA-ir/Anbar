@@ -597,6 +597,6 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 - **Deployment Status**:
   - Ready for Falkenstein production deployment (v0.15.58).
 - **Current Git Commit / Branch**:
-  - Working tree prepared for commit on `main`.
+  - `aacdcd6` on `main` (pushed to `origin main`).
 - **Exact Next Step for Next Session**:
-  - Execute remote deployment via `/home/hossein/anbar_deploy_falkenstein.sh` and perform live smoke tests on `https://dl.amiri-dev.ir/`.
+  - Execute remote deployment to Falkenstein via `/home/hossein/anbar_deploy_falkenstein.sh` and perform live smoke tests on `https://dl.amiri-dev.ir/`.
