@@ -114,6 +114,21 @@ reverse proxy.
 Back up `./data/anbar.db` periodically (a few MB). Backing up the DB does **not**
 restore file bytes — those live in Telegram; the DB only points at them.
 
+> **Production Server Invariant (Falkenstein / BUG-37 Prevention):**
+> On the production server (`dl.amiri-dev.ir` / Falkenstein), the production compose
+> configuration lives at `/opt/anbar/compose.yaml` and binds **absolute** volume paths:
+> - `/opt/anbar/data` -> `/app/data` (persistent SQLite DB & object rows)
+> - `/opt/anbar/secrets` -> `/app/secrets` (persistent MTProto session)
+> - `/opt/anbar/.env` -> `/opt/anbar/.env` (credentials)
+>
+> **Production deployments must ALWAYS run:**
+> ```bash
+> cd /opt/anbar && docker compose -f compose.yaml up -d
+> ```
+> Never execute `docker compose up -d` from `/root/anbar/docker` in production, as its
+> relative volume paths (`../data`) point to an empty directory, stranding production data.
+> The production container binds to `127.0.0.1:8318` on the host, proxied via Nginx.
+
 > **Ownership pitfall:** the container runs as the non-root `anbar` user
 > (UID 999). Host directories bind-mounted to `/app/data` and `/app/secrets`
 > must be writable by UID 999, otherwise startup fails with

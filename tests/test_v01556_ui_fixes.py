@@ -65,8 +65,13 @@ def test_softened_light_theme_tokens():
 
 
 def test_version_bumped_to_0_15_56():
-    assert '__version__ = "0.15.56"' in INIT
-    assert 'version = "0.15.56"' in PYPROJECT
+    import re
+
+    assert re.search(r'__version__ = "0\.15\.(56|57)"', INIT)
+    assert re.search(r'version = "0\.15\.(56|57)"', PYPROJECT)
+
 
 def test_uv_lock_version_bumped_to_0_15_56():
-    assert 'version = "0.15.56"' in UVLOCK
+    import re
+
+    assert re.search(r'version = "0\.15\.(56|57)"', UVLOCK)

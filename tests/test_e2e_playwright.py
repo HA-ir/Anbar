@@ -117,7 +117,8 @@ def authed_page(e2e_server: str, page: Page) -> Page:
 def _upload_file(page: Page, tmp_path: Path, filename: str) -> None:
     """Helper to upload a file through UI and wait for it to process."""
     f = tmp_path / filename
-    f.write_text(f"Content of {filename} for Playwright testing.")
+    if not f.exists():
+        f.write_text(f"Content of {filename} for Playwright testing.")
     page.set_input_files("#fileInput", str(f))
     page.wait_for_selector(".qitem.done", timeout=6000)
     page.wait_for_timeout(300)
@@ -354,6 +355,7 @@ def test_settings_modal(authed_page: Page):
     page.click("#setClose")
     page.wait_for_timeout(300)
 
+
 def test_settings_modal_inputs_visible(authed_page: Page):
     """Regression: runtime settings inputs render in the settings modal."""
     page = authed_page
@@ -524,3 +526,226 @@ def test_folder_view_dom_preservation(authed_page: Page, tmp_path: Path):
         return g ? g.__rootPreservedMarker : null;
     }""")
     assert marker_after_evict is None, "Cache should be evicted on file upload"
+
+
+def test_large_file_selection_performance(authed_page: Page):
+    """Test 16: Freeze-free in-place selection with 100+ files and DOM preservation."""
+    page = authed_page
+
+    # Inject 100 mock files into client state and render
+    page.evaluate("""() => {
+        const mockFiles = [];
+        for (let i = 0; i < 100; i++) {
+            mockFiles.push({
+                id: "mock_file_" + i,
+                filename: "benchmark_doc_" + i + ".txt",
+                size: 1024 * (i + 1),
+                content_type: "text/plain",
+                created_at: 1727712000 + i,
+                downloaded: 0
+            });
+        }
+        window.files = mockFiles;
+        evictFolderViewCache();
+        renderRows();
+    }""")
+    page.wait_for_selector(".gallery .gcell", timeout=4000)
+
+    # Attach marker to first DOM element to verify in-place preservation
+    page.evaluate("""() => {
+        const first = document.querySelector(".gallery .gcell");
+        if (first) first.__preserveMarker = "intact_node_123";
+    }""")
+
+    # Activate select mode
+    page.click("#selectModeBtn")
+    page.wait_for_selector("#selAllBtn", state="visible", timeout=2000)
+
+    # Click Select All and measure JS execution duration
+    duration_ms = page.evaluate("""() => {
+        const t0 = performance.now();
+        document.getElementById("selAllBtn").click();
+        return performance.now() - t0;
+    }""")
+    assert duration_ms < 100, f"Select all execution took {duration_ms}ms (expected <100ms)"
+
+    # Verify all items selected and marker preserved (no DOM rebuild)
+    sel_count, marker_preserved = page.evaluate("""() => {
+        const first = document.querySelector(".gallery .gcell");
+        return [window.selSet.size, first ? first.__preserveMarker : null];
+    }""")
+    assert sel_count == 100, f"Expected 100 selected items, got {sel_count}"
+    assert marker_preserved == "intact_node_123", (
+        "DOM nodes were destroyed and recreated during select all"
+    )
+
+    # Click Deselect All and verify in-place clearing
+    deselect_duration_ms = page.evaluate("""() => {
+        const t0 = performance.now();
+        document.getElementById("selAllBtn").click();
+        return performance.now() - t0;
+    }""")
+    assert deselect_duration_ms < 100, f"Deselect all execution took {deselect_duration_ms}ms"
+
+    sel_count_after = page.evaluate("() => window.selSet.size")
+    assert sel_count_after == 0, f"Expected 0 selected items after deselect, got {sel_count_after}"
+
+    # Deactivate select mode and confirm clean exit
+    page.click("#selectModeBtn")
+    is_select_mode = page.evaluate("() => window.selectMode")
+    assert not is_select_mode
+
+
+def test_cold_start_direct_file_loading(authed_page: Page, e2e_server: str, tmp_path: Path):
+    """Test 17: Cold restart directly loads files without opening Settings."""
+    page = authed_page
+    _upload_file(page, tmp_path, "cold_restart_probe.txt")
+    page.wait_for_selector(".gallery .gcell:has-text('cold_restart_probe.txt')", timeout=4000)
+
+    # Simulate cold start: clear session cookies while preserving localStorage API key
+    page.context.clear_cookies()
+
+    # Navigate directly to root dashboard
+    page.goto(f"{e2e_server}/")
+    page.wait_for_selector("#app", state="visible", timeout=4000)
+
+    # Assert files view populates directly without opening settings modal
+    cell = page.locator(".gallery .gcell:has-text('cold_restart_probe.txt')").first
+    page.wait_for_selector(".gallery .gcell:has-text('cold_restart_probe.txt')", timeout=4000)
+    assert cell.is_visible()
+
+    # Confirm settings modal was never opened
+    drawer_on = page.evaluate("() => document.getElementById('drawer').classList.contains('on')")
+    assert not drawer_on, "Settings drawer should not be opened during cold start initialization"
+
+
+def test_file_move_validation_and_progress(authed_page: Page, tmp_path: Path):
+    """Test 18: File move UX with client-side path validation and modal progress feedback."""
+    page = authed_page
+    _upload_file(page, tmp_path, "move_target.txt")
+    page.wait_for_selector(".gallery .gcell:has-text('move_target.txt')", timeout=4000)
+
+    # Create test folders
+    page.evaluate("""async () => {
+        await api("/api/v1/admin/folders/create", {
+            method: "POST",
+            body: JSON.stringify({ path: "parent_dir" })
+        });
+        await api("/api/v1/admin/folders/create", {
+            method: "POST",
+            body: JSON.stringify({ path: "parent_dir/child_dir" })
+        });
+        await refresh();
+    }""")
+    page.wait_for_timeout(300)
+
+    # 1. Validation test: circular folder move
+    page.evaluate("""() => {
+        openMoveModal(["folder:parent_dir/"], "1 folder");
+    }""")
+    page.wait_for_selector("#moveModal", state="visible", timeout=2000)
+
+    # Attempt circular move into child folder
+    page.fill("#moveDest", "parent_dir/child_dir")
+    page.click("#moveOk")
+    page.wait_for_selector("#moveErr", state="visible", timeout=2000)
+    err_text = page.inner_text("#moveErr")
+    assert "نمی‌توان" in err_text or "Cannot" in err_text or "امکان انتقال" in err_text
+
+    # Modal remains open on error
+    assert page.locator("#moveModal").is_visible()
+
+    # 2. Validation test: same destination for files
+    file_id = page.evaluate("""() => {
+        const f = window.files.find(x => x.filename === "move_target.txt");
+        return f ? f.id : null;
+    }""")
+    assert file_id is not None
+    page.evaluate(f"""() => {{
+        openMoveModal(["{file_id}"], "1 file");
+    }}""")
+    page.fill("#moveDest", "")  # already at root
+    page.click("#moveOk")
+    page.wait_for_selector("#moveErr", state="visible", timeout=2000)
+    err_text = page.inner_text("#moveErr")
+    assert "از قبل" in err_text or "already" in err_text
+
+    # 3. Successful move test
+    page.fill("#moveDest", "parent_dir")
+    page.click("#moveOk")
+    page.wait_for_selector("#moveModal", state="hidden", timeout=4000)
+    page.wait_for_timeout(300)
+
+    # Confirm file moved into parent_dir
+    moved_obj = page.evaluate("""() => {
+        return window.files.find(x => x.filename === "parent_dir/move_target.txt");
+    }""")
+    assert moved_obj is not None, "File should have been moved into parent_dir"
+
+
+def test_search_clear_race_safety(authed_page: Page, tmp_path: Path):
+    """Test 19: Search debounce cancellation on clear prevents stale query resurrection."""
+    page = authed_page
+    _upload_file(page, tmp_path, "search_alpha.txt")
+    _upload_file(page, tmp_path, "search_beta.txt")
+    page.wait_for_selector(".gallery .gcell:has-text('search_alpha.txt')", timeout=4000)
+
+    # 1. Type query and immediately clear within debounce window
+    page.fill("#fSearch", "alpha")
+    page.click("#fClear")
+    page.wait_for_timeout(300)
+
+    # Verify input is empty and both files remain visible
+    search_val = page.input_value("#fSearch")
+    assert search_val == "", f"Expected empty search, got {search_val}"
+    assert page.locator(".gallery .gcell:has-text('search_alpha.txt')").is_visible()
+    assert page.locator(".gallery .gcell:has-text('search_beta.txt')").is_visible()
+
+    # 2. Rapid typing followed by backspacing all characters
+    page.type("#fSearch", "beta", delay=20)
+    for _ in range(4):
+        page.keyboard.press("Backspace")
+    page.wait_for_timeout(300)
+
+    # Confirm query never resurrects after delay
+    search_val_after = page.input_value("#fSearch")
+    assert search_val_after == "", (
+        f"Expected empty search after backspacing, got {search_val_after}"
+    )
+    assert page.locator(".gallery .gcell:has-text('search_alpha.txt')").is_visible()
+    assert page.locator(".gallery .gcell:has-text('search_beta.txt')").is_visible()
+
+
+def test_mkv_video_playback_detection(authed_page: Page, tmp_path: Path):
+    """Test 20: Capability-aware MKV playback and error code discrimination."""
+    page = authed_page
+    mkv_path = tmp_path / "clip.mkv"
+    real_mkv = Path(__file__).parent / "data" / "test_embedded.mkv"
+    if real_mkv.exists():
+        mkv_path.write_bytes(real_mkv.read_bytes())
+    else:
+        mkv_path.write_bytes(
+            b"\x1a\x45\xdf\xa3\x9f\x42\x86\x81\x01\x42\xf7\x81\x01\x42\xf2\x81\x04\x42\xf3\x81\x08\x42\x82\x88matroska"
+            + b"\x00" * 4096
+        )
+    _upload_file(page, tmp_path, "clip.mkv")
+    page.wait_for_selector(".gallery .gcell:has-text('clip.mkv')", timeout=4000)
+
+    # Open preview modal
+    cell = page.locator(".gallery .gcell:has-text('clip.mkv')").first
+    cell.click()
+    page.wait_for_selector("#fileModal", state="visible", timeout=4000)
+
+    # Verify video element renders with proper MIME source
+    video = page.locator("#fmVid")
+    assert video.is_visible()
+    src_type = page.evaluate("() => document.querySelector('#fmVid source')?.getAttribute('type')")
+    assert src_type == "video/x-matroska"
+
+    # Verify no blanket false MKV error is shown
+    fallback = page.locator(".fm-fallback")
+    assert not fallback.is_visible(), "Should not show blanket MKV fallback on initial render"
+
+    # Close modal
+    page.click("#fmClose")
+    page.wait_for_selector("#fileModal", state="hidden", timeout=3000)

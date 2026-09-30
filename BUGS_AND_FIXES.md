@@ -1,3 +1,37 @@
+# BUG-38 to BUG-42: Stabilization & UX Reliability (v0.15.57)
+
+## Status: FIXED & VERIFIED E2E
+
+### Overview
+Addresses 5 core architectural and UX defects identified in Anbar stabilization specification (`specs/001-ux-reliability-stabilization`):
+
+1. **BUG-38 (File selection freezes main thread)**:
+   - *Root Cause*: `#selAllBtn.onclick` and `setSelectMode(false)` invoked `renderRows()` / `renderGallery()`, synchronously tearing down and recreating all DOM nodes (up to 500 cards/rows with media elements and listeners). Also `updateSelBar()` triggered a full array filter scan on every single click.
+   - *Fix*: Decoupled selection state from rendering. Selection toggles mutate `.selected` classes and checkbox `.checked` properties in-place without rebuilding DOM elements.
+   - *Verification*: Playwright E2E benchmark (`test_large_file_selection_performance`) asserts select all on 100+ files executes in <100ms with DOM nodes preserved intact.
+
+2. **BUG-39 (Search string resurrection on clear)**:
+   - *Root Cause*: Clearing `#fSearch` failed to cancel `searchDebounceTimer` (75ms). Overlapping timers or stale DOM trees in `folderViewCache` reinstated superseded search queries after a delay.
+   - *Fix*: `#fClear.onclick` and backspace clearing synchronously call `clearTimeout(searchDebounceTimer)`, reset `searchDebounceTimer = null`, evict search cache keys, and keep `fQuery` and input state atomically synchronized.
+   - *Verification*: Playwright E2E test `test_search_clear_race_safety` asserts query never resurfaces after typing and rapid clearing.
+
+3. **BUG-40 (Cold restart blank screen until Settings opened)**:
+   - *Root Cause*: `showApp()` fired `Promise.all([api("/admin/status"), api("/admin/objects")])` concurrently on startup. When the session cookie was missing/expired, both requests failed with 401. `api()` attempted re-login but threw 401 without retrying the original call, setting `files = []` and leaving the file list blank. Opening Settings issued sequential calls that repaired the cookie.
+   - *Fix*: Updated `api()` to await a coalesced singleton `_reLoginPromise` on 401 and transparently replay the failed request once before returning or throwing.
+   - *Verification*: Playwright E2E test `test_cold_start_direct_file_loading` verifies files load immediately on initial render without opening Settings.
+
+4. **BUG-41 (File move modal premature closing and circular folder move)**:
+   - *Root Cause*: `doMove()` closed `#moveModal` before network requests began, provided no progress feedback, and silently treated invalid moves (into self/subfolder) as false successes (`ok++`).
+   - *Fix*: Kept `#moveModal` visible with loading spinner and disabled buttons during flight; added client-side validation preventing circular folder moves and same-destination moves; added granular completion reporting.
+   - *Verification*: Playwright E2E test `test_file_move_validation_and_progress` verifies circular move rejection, progress feedback, and successful move reconciliation.
+
+5. **BUG-42 (False-negative MKV browser playback error)**:
+   - *Root Cause*: `openFileModal()` assumed `.mkv` extension meant unplayable and unconditionally rendered a failure banner on any video error, ignoring Chromium's native Matroska demuxing capability.
+   - *Fix*: Configured `<video>` with format-specific `<source type="video/x-matroska">` hints, enabled native Matroska playback in Chromium, and inspected `video.error.code` (`MEDIA_ERR_DECODE` vs `MEDIA_ERR_NETWORK`) before falling back.
+   - *Verification*: Playwright E2E test `test_mkv_video_playback_detection` verifies native MKV video playback in Chromium without false-negative error banners.
+
+---
+
 # BUG-28: Deploy v0.15.46 UI/UX Revamp to Falkenstein
 
 ## Status: COMPLETED

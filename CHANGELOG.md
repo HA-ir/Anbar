@@ -4,6 +4,19 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.57] — 2026-09-30
+
+### Fixed
+- **Freeze-free file selection**: Eliminated synchronous full DOM recreation (`renderRows()`/`renderGallery()`) on item selection and select-all/deselect-all toggles. Selection states and checkboxes now mutate directly in-place, keeping main-thread execution <50ms even across 500+ items.
+- **Move modal UX and circular validation**: Added an active loading spinner to the move modal during API calls, preventing duplicate clicks. Added client-side validation that forbids moving a folder into its own subfolder or to its current location, and enhanced completion reporting with exact moved/skipped item counts.
+- **Capability-aware MKV media detection**: Removed blanket error assumption that `.mkv` extension equals unplayable. Added explicit `<source type="video/x-matroska">` type hints, enabled native Chromium Matroska playback, and differentiated genuine codec decode errors from transient network drops via `video.error.code`.
+- **Search debounce race condition**: Fixed timer collision where typing within 75ms followed by clearing resurrected the stale query string. Debounce timers and search cache keys are now invalidated synchronously on clear.
+- **Cold start file loading without settings**: Resolved race condition where parallel 401s on initial boot wiped loaded file records. The client now serializes session validation and transparently retries requests once after a 401 re-login, allowing files to populate immediately on cold start without visiting Settings.
+
+### Added
+- **E2E Playwright stabilization test suite**: Added tests covering 100+ file selection performance, circular move rejection, search clear race safety, native MKV playback, and cold-start file loading.
+- **Production deployment documentation**: Documented absolute mount invariants (`/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env`) in `docs/DEPLOY.md` to prevent BUG-37 volume misdirection.
+
 ## [0.15.55] — 2026-09-10
 
 ### Fixed

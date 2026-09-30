@@ -44,15 +44,15 @@
 
 ### index.html (قطعات منطقی)
 - [ ] login screen
-- [ ] file list + rendering
+- [x] file list + rendering (freeze-free in-place selection, gallery preservation, search sync)
 - [ ] upload flow (multiple/chunk/resume)
-- [ ] folder nav + breadcrumbs
+- [x] folder nav + breadcrumbs
 - [ ] settings/theme (dark-light، دو زبانه)
 - [ ] MTProto login drawer
 - [ ] ZIP/export flow
-- [ ] modals (rename/delete/link/info)
+- [x] modals (rename/delete/link/info/move validation + spinner)
 - [ ] admin dashboard (stats، storage legend، settings)
-- [ ] JS توابع کمکی (esc، fetch wrapper، toast)
+- [x] JS توابع کمکی (esc، fetch wrapper with 401 transparent retry، toast)
 
 ### miniapp.html
 - [ ] renderList + esc

@@ -1334,6 +1334,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     <label style="font-size:12px;font-weight:600;color:var(--tx2)" data-i18n="moveToLab">مسیر مقصد (پوشه)</label>
     <input type="text" id="moveDest" placeholder="folder/subfolder" autocomplete="off"
       style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);color:var(--tx);font-size:13.5px;margin-top:5px;font-family:ui-monospace,monospace;direction:ltr">
+    <div id="moveErr" style="display:none;color:var(--err);font-size:12px;margin-top:6px;line-height:1.4"></div>
     <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-ghost" id="moveCancel" style="width:auto" data-i18n="close">بستن</button>
       <button class="btn btn-primary" id="moveOk" style="width:auto" data-i18n="moveDo">انتقال</button>
@@ -1888,31 +1889,41 @@ function mediaUrl(o){
      without ever exposing the key in a URL. */
   return"/f/"+encodeURIComponent(o.id);
 }
-let _sessionReLoginDone=false;
-async function api(path,opt={}){
-  const hdrs={};
-  if(opt.body&&!(opt.body instanceof FormData))hdrs["Content-Type"]="application/json";
-  if(_apiKey)hdrs["Authorization"]="Bearer "+_apiKey;
-  const r=await fetch(path,{credentials:"same-origin",headers:hdrs,...opt});
-  if(!r.ok){
-    let msg=r.status;
-    try{msg=(await r.json()).detail||msg}catch(e){}
-    /* BUG-v0.15.28: a 401 on an admin-API call while a stored key exists
-       usually means the session cookie expired. Re-login once (mints a fresh
-       cookie) so subsequent <img>/<video>/download URLs work again instead
-       of every preview silently 401-ing. */
-    if(r.status===401&&_apiKey&&!_sessionReLoginDone&&!opt.body&&!opt.method&&typeof path==="string"&&!path.includes("/login")){
-      _sessionReLoginDone=true;
-      try{
-        const rr=await fetch("/ui/login",{method:"POST",credentials:"same-origin",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({key:_apiKey})});
-        if(rr.ok){_sessionReLoginDone=false;}
-      }catch(e){}
+let _reLoginPromise = null;
+async function api(path, opt = {}) {
+  const hdrs = {};
+  if (opt.body && !(opt.body instanceof FormData)) hdrs["Content-Type"] = "application/json";
+  if (_apiKey) hdrs["Authorization"] = "Bearer " + _apiKey;
+  let r = await fetch(path, { credentials: "same-origin", headers: hdrs, ...opt });
+  if (r.status === 401 && _apiKey && typeof path === "string" && !path.includes("/login") && !path.includes("/logout")) {
+    if (!_reLoginPromise) {
+      _reLoginPromise = (async () => {
+        try {
+          const rr = await fetch("/ui/login", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: _apiKey })
+          });
+          return rr.ok;
+        } catch (e) {
+          return false;
+        } finally {
+          _reLoginPromise = null;
+        }
+      })();
     }
-    throw new Error(typeof msg==="string"?msg:JSON.stringify(msg));
+    const reloginOk = await _reLoginPromise;
+    if (reloginOk) {
+      r = await fetch(path, { credentials: "same-origin", headers: hdrs, ...opt });
+    }
   }
-  return r.status===204?null:r.json();
+  if (!r.ok) {
+    let msg = r.status;
+    try { msg = (await r.json()).detail || msg; } catch (e) {}
+    throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+  }
+  return r.status === 204 ? null : r.json();
 }
 
 /* ================= session ================= */
@@ -2000,6 +2011,7 @@ $("#outBtn").onclick=guardBtn($("#outBtn"),async()=>{
 
 /* ================= files ================= */
 let files=[];
+window.files = files;
 function updateLimTag(){
   $("#limTag").innerHTML=esc(t("limit"))+'<span style="direction:ltr;display:inline-block;unicode-bidi:isolate">'+humanSize(maxUploadBytes)+'</span>';
 }
@@ -2100,7 +2112,7 @@ $("#newFolderBtn").onclick = guardBtn($("#newFolderBtn"), async () => {
 });
 
 function visibleFiles() {
-  let list = files;
+  let list = (window.files !== undefined && window.files !== null) ? window.files : files;
   if (fQuery) {
     const q = fQuery.toLowerCase();
     list = list.filter(o => (o.filename || o.id || "").toLowerCase().includes(q));
@@ -2201,9 +2213,23 @@ function visibleFiles() {
     fQuery=e.target.value.trim();
     $("#fClear").style.display=fQuery?"flex":"none";
     clearTimeout(searchDebounceTimer);
+    if (!fQuery) {
+      searchDebounceTimer = null;
+      evictFolderViewCache();
+      renderRows();
+      return;
+    }
     searchDebounceTimer=setTimeout(renderRows,75);
   };
-$("#fClear").onclick=()=>{fQuery="";$("#fSearch").value="";$("#fClear").style.display="none";renderRows();};
+$("#fClear").onclick=()=>{
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = null;
+  fQuery="";
+  $("#fSearch").value="";
+  $("#fClear").style.display="none";
+  evictFolderViewCache();
+  renderRows();
+};
 $("#fSort").onchange=e=>{fSortMode=e.target.value;localStorage.setItem("anbar-sort",fSortMode);renderRows();};
 $("#fType").onchange=e=>{fType=e.target.value;renderRows();};
 {  // restore saved sort selection once the DOM is parsed
@@ -2232,7 +2258,18 @@ async function refresh(){
         // the old implicit 50-row cap made everything beyond it invisible
         const r=await api("/api/v1/admin/objects?limit=500");
         files=r.objects||[];
-      }catch(e){netOk=false;files=[];console.error('[anbar] /api/v1/admin/objects failed:',e.message);if(e.message==='401'||e.message.includes('authentication')){authed=false;showLogin();toast(t('badKey'),'err');}}
+        window.files=files;
+      }catch(e){
+        netOk=false;
+        console.error('[anbar] /api/v1/admin/objects failed:',e.message);
+        if(e.message==='401'||e.message.includes('authentication')){
+          files=[];
+          window.files=files;
+          authed=false;
+          showLogin();
+          toast(t('badKey'),'err');
+        }
+      }
     })()]);
     showNetBanner(!netOk);
     renderRows();
@@ -2566,6 +2603,8 @@ function renderRows(){
 }
 /* multi-select & select mode (v0.13) */
 const selSet=new Set();
+window.selSet = selSet;
+window.renderRows = renderRows;
 let selectMode=false;
 let viewMode=localStorage.getItem("anbar-view")||"gallery";
 function syncViewBtn(){
@@ -2611,20 +2650,36 @@ function setSelectMode(on){
   if(allBtn)allBtn.style.display=selectMode?"inline-block":"none";
   if(!selectMode){
     selSet.clear();
+    const container = viewMode === "gallery" ? document.querySelector(".gallery") : document.getElementById("rows");
+    if(container){
+      container.querySelectorAll(".selbox").forEach(sb => {
+        sb.checked = false;
+        const parent = sb.closest(".gcell, tr");
+        if(parent) parent.classList.remove("selected");
+      });
+    }
     updateSelBar();
-    renderRows();
   }
 }
 $("#selectModeBtn").onclick=()=>{
   setSelectMode(!selectMode);
-  if(selectMode)renderRows();
 };
 $("#selCancelBtn").onclick=()=>setSelectMode(false);
-/* selection UX */
+/* selection UX: in-place DOM updates without full renderRows rebuilds */
 function toggleSel(id){
-  if(selSet.has(id))selSet.delete(id);else selSet.add(id);
+  const willSel = !selSet.has(id);
+  if(willSel) selSet.add(id); else selSet.delete(id);
+  const container = viewMode === "gallery" ? document.querySelector(".gallery") : document.getElementById("rows");
+  if(container){
+    const sb = container.querySelector(`.selbox[data-id="${CSS.escape(id)}"]`);
+    if(sb){
+      sb.checked = willSel;
+      const parent = sb.closest(".gcell, tr");
+      if(parent) parent.classList.toggle("selected", willSel);
+    }
+  }
   updateSelBar();
-  return selSet.has(id);
+  return willSel;
 }
 function renderGallery(list){
   const tb=$("#rows");
@@ -2838,19 +2893,36 @@ function updateSelBar(){
 }
 function updateSelAllBtn(){
   const allBtn=$("#selAllBtn");
-  if(!allBtn)return;
-  const list=visibleFiles();
-  const all=selectMode&&list.length>0&&selSet.size>=list.length;
+  if(!allBtn || !selectMode)return;
+  const container = viewMode === "gallery" ? document.querySelector(".gallery") : document.getElementById("rows");
+  const totalInView = container ? container.querySelectorAll(".selbox").length : 0;
+  const all = totalInView > 0 && selSet.size >= totalInView;
   allBtn.classList.toggle("view-on",all);
   allBtn.dataset.i18n=all?"selNone":"selAll";
   allBtn.textContent=t(allBtn.dataset.i18n);
 }
 $("#selAllBtn").onclick=()=>{
   if(!selectMode)setSelectMode(true);
-  const list=visibleFiles();
-  if(selSet.size>=list.length){selSet.clear();}
-  else list.forEach(o=>selSet.add(o.id));
-  renderRows();
+  const container = viewMode === "gallery" ? document.querySelector(".gallery") : document.getElementById("rows");
+  const allBoxes = container ? Array.from(container.querySelectorAll(".selbox")) : [];
+  const totalInView = allBoxes.length;
+  const shouldSelectAll = totalInView > 0 && selSet.size < totalInView;
+  if(!shouldSelectAll){
+    selSet.clear();
+    allBoxes.forEach(sb => {
+      sb.checked = false;
+      const parent = sb.closest(".gcell, tr");
+      if(parent) parent.classList.remove("selected");
+    });
+  } else {
+    allBoxes.forEach(sb => {
+      const id = sb.dataset.id;
+      if(id) selSet.add(id);
+      sb.checked = true;
+      const parent = sb.closest(".gcell, tr");
+      if(parent) parent.classList.add("selected");
+    });
+  }
   updateSelBar();
 };
 $("#selDelBtn").onclick=guardBtn($("#selDelBtn"),async()=>{
@@ -3327,35 +3399,34 @@ async function openFileModal(o){
   }else if(kind==="video"){
     pv.classList.add("has","video-col");
     const isMkv=(extOf(o.filename)==="mkv");
-    let vHtml='<video id="fmVid" src="'+url+'" controls preload="metadata" playsinline style="max-height:360px;width:100%;border-radius:10px"></video>';
-    if(isMkv){
-      vHtml+='<div class="fm-mkv-note" style="font-size:11.5px;color:var(--tx3);margin-top:6px;text-align:center;line-height:1.4">'
-        +'<span>'+(lang==="fa"?"پخش آنلاین فایل‌های MKV به پشتیبانی مرورگر از کدک بستگی دارد. در صورت عدم پخش، فایل را دانلود کنید.":"MKV playback depends on browser codec support. If it does not play, download the file.")+'</span>'
-        +'</div>';
-    }
+    const mime=o.content_type || (isMkv ? "video/x-matroska" : "video/mp4");
+    let vHtml='<video id="fmVid" src="'+url+'" controls preload="metadata" playsinline style="max-height:360px;width:100%;border-radius:10px">'
+      +'<source src="'+url+'" type="'+esc(mime)+'">'
+      +'</video>';
     pv.innerHTML=vHtml;
     const vEl=pv.querySelector("#fmVid");
     if(vEl){
       vEl.onerror=()=>{
-        pv.querySelectorAll(".fm-mkv-note").forEach(n=>n.remove());
         pv.querySelectorAll(".fm-fallback").forEach(n=>n.remove());
+        const errCode=vEl.error?vEl.error.code:0;
+        const isNet=errCode===2; // MEDIA_ERR_NETWORK
         const fallback=document.createElement("div");
         fallback.className="fm-fallback";
         fallback.style.cssText="padding:22px 16px;text-align:center;font-size:13px;color:var(--tx2);display:flex;flex-direction:column;gap:10px;align-items:center;width:100%;box-sizing:border-box";
-        const titleText=isMkv
-          ?(lang==="fa"?"امکان پخش فایل MKV در این مرورگر وجود ندارد":"MKV playback not supported in this browser")
-          :(lang==="fa"?"امکان پیش‌نمایش مستقیم این ویدیو در مرورگر نیست":"Direct playback not supported in browser");
-        const descText=isMkv
-          ?(lang==="fa"?"مرورگر شما قادر به دیکود کردن فرمت یا کدک‌های این فایل MKV نیست. فایل را دانلود کرده و با یک پخش‌کنندهٔ محلی (مانند VLC) مشاهده کنید.":"Your browser cannot decode this MKV container or its audio/video codecs. Download the file to view locally in a player like VLC.")
-          :(lang==="fa"?"کدک این ویدیو توسط مرورگر پشتیبانی نمی‌شود. برای مشاهده، فایل را دانلود کنید.":"This video codec is not supported by your browser. Download the file to view locally.");
+        const titleText=isNet
+          ?(lang==="fa"?"خطا در دریافت ویدیو از سرور":"Network error streaming video")
+          :(lang==="fa"?"کدک یا فرمت ویدیو در این مرورگر پشتیبانی نمی‌شود":"Video format or codec not supported in this browser");
+        const descText=isNet
+          ?(lang==="fa"?"ارتباط با سرور هنگام استریم ویدیو قطع شد. برای مشاهده فایل را دانلود کنید.":"Connection was interrupted while streaming. Download the file to view locally.")
+          :(lang==="fa"?"مرورگر شما قادر به دیکود کردن جریان ویدیویی یا صوتی این فایل نیست. فایل را دانلود کرده و در برنامه‌ای مانند VLC مشاهده کنید.":"Your browser cannot decode this video or audio stream. Download the file to view in a local player like VLC.");
         const dlText=lang==="fa"?"دانلود ویدیو":"Download Video";
         fallback.innerHTML='<div style="width:44px;height:44px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;margin-bottom:2px">'
           +'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></div>'
-          +'<span style="font-size:14px;font-weight:600;color:var(--tx)">'+titleText+'</span>'
-          +'<span style="font-size:12px;color:var(--tx3);max-width:380px;line-height:1.5">'+descText+'</span>'
+          +'<span style="font-size:14px;font-weight:600;color:var(--tx)">'+esc(titleText)+'</span>'
+          +'<span style="font-size:12px;color:var(--tx3);max-width:380px;line-height:1.5">'+esc(descText)+'</span>'
           +'<button class="btn btn-primary fm-fallback-dl" style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;padding:8px 18px;font-size:12.5px">'
           +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg>'
-          +dlText+'</button>';
+          +esc(dlText)+'</button>';
         const dlBtn=fallback.querySelector(".fm-fallback-dl");
         if(dlBtn){
           dlBtn.onclick=(e)=>{
@@ -3768,8 +3839,11 @@ let moveIds=[];
 function openMoveModal(ids,subText){
   moveIds=ids;
   $("#moveSub").textContent=subText||"";
+  const errEl=$("#moveErr");
+  if(errEl){errEl.style.display="none";errEl.textContent="";}
   const d=$("#moveDest");
   d.value="";
+  d.oninput=()=>{if(errEl){errEl.style.display="none";errEl.textContent="";}};
   const chips=$("#moveChips");
   if(chips){
     chips.innerHTML="";
@@ -3778,7 +3852,7 @@ function openMoveModal(ids,subText){
     rootBtn.className="btn btn-ghost";
     rootBtn.style.cssText="padding:4px 10px;font-size:12px;border-radius:20px;background:var(--bg2)";
     rootBtn.textContent=t("rootFolder");
-    rootBtn.onclick=()=>{d.value="";d.focus();};
+    rootBtn.onclick=()=>{d.value="";d.focus();if(errEl){errEl.style.display="none";errEl.textContent="";}};
     chips.appendChild(rootBtn);
     const fldSet=new Set();
     files.forEach(o=>{
@@ -3801,54 +3875,121 @@ function openMoveModal(ids,subText){
       btn.className="btn btn-ghost";
       btn.style.cssText="padding:4px 10px;font-size:12px;border-radius:20px;background:var(--bg2)";
       btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'+esc(fld);
-      btn.onclick=()=>{d.value=fld;d.focus();};
+      btn.onclick=()=>{d.value=fld;d.focus();if(errEl){errEl.style.display="none";errEl.textContent="";}};
       chips.appendChild(btn);
     });
   }
   $("#moveModal").classList.add("on");
   setTimeout(()=>d.focus(),30);
 }
-function closeMoveModal(){$("#moveModal").classList.remove("on");}
+function closeMoveModal(){
+  const okBtn=$("#moveOk");
+  if(okBtn&&okBtn.disabled)return;
+  $("#moveModal").classList.remove("on");
+}
 async function doMove(){
   if(!moveIds.length)return;
   const dest=$("#moveDest").value.trim().replace(/\/+$/,"");
-  closeMoveModal();
+  const errEl=$("#moveErr");
+  if(errEl){errEl.style.display="none";errEl.textContent="";}
+
   const folders=moveIds.filter(id=>String(id).startsWith("folder:"));
   const realIds=moveIds.filter(id=>!String(id).startsWith("folder:"));
-  let ok=0;
-  // folder markers: rename prefix to the destination path
+
+  // Circular folder move validation
   for(const fid of folders){
     const fullPrefix=String(fid).slice("folder:".length);
     const fp=fullPrefix.replace(/\/+$/,"");
-    const base=fp.split("/").pop();
-    // no-op: destination already contains the folder (or IS the folder)
-    if(dest&&(fp===dest||fp.startsWith(dest+"/"))){ok++;continue;}
-    const newPath=(dest?dest+"/":"")+base;
-    if(newPath===fp){ok++;continue;}
-    try{
-      await api("/api/v1/admin/folders/rename",{method:"POST",
-        body:JSON.stringify({old_path:fullPrefix,new_path:newPath})});
-      ok++;
-    }catch(e){toast(e.message,"err");}
+    if(dest&&(dest===fp||dest.startsWith(fp+"/"))){
+      if(errEl){
+        errEl.textContent=lang==="fa"?"امکان انتقال پوشه به داخل خودش یا زیرپوشه‌های آن وجود ندارد":"Cannot move a folder into itself or its subfolders";
+        errEl.style.display="block";
+      }
+      return;
+    }
   }
-  // real objects: batch move endpoint
-  if(realIds.length){
-    try{
-      const r=await api("/api/v1/admin/objects/move",{method:"POST",
-        body:JSON.stringify({ids:realIds,dest:dest})});
-      ok+=r.moved||0;
-      if(r.skipped&&r.skipped.length)toast(r.skipped.length+" "+t("skippedOk"),"err");
-    }catch(e){toast(e.message,"err");}
+
+  // Same-destination validation
+  if(!folders.length&&realIds.length>0){
+    const allSameDest=realIds.every(id=>{
+      const o=files.find(x=>x.id===id);
+      if(!o)return false;
+      const fn=o.filename||"";
+      const curFolder=fn.includes("/")?fn.slice(0,fn.lastIndexOf("/")):"";
+      return curFolder===dest;
+    });
+    if(allSameDest){
+      if(errEl){
+        errEl.textContent=lang==="fa"?"فایل‌ها از قبل در این مسیر قرار دارند":"Items are already in this destination";
+        errEl.style.display="block";
+      }
+      return;
+    }
   }
-  selSet.clear();
-  evictFolderViewCache();
-  toast(ok+" "+t("movedOk"));
-  refresh();
+
+  const okBtn=$("#moveOk");
+  const cancelBtn=$("#moveCancel");
+  const origText=okBtn.innerHTML;
+  okBtn.disabled=true;
+  cancelBtn.disabled=true;
+  okBtn.innerHTML='<span class="spin">⟳</span> '+(lang==="fa"?"در حال انتقال…":"Moving…");
+
+  let ok=0;
+  let errors=[];
+  try{
+    // folder markers: rename prefix to destination
+    for(const fid of folders){
+      const fullPrefix=String(fid).slice("folder:".length);
+      const fp=fullPrefix.replace(/\/+$/,"");
+      const base=fp.split("/").pop();
+      const newPath=(dest?dest+"/":"")+base;
+      if(newPath===fp)continue;
+      try{
+        await api("/api/v1/admin/folders/rename",{method:"POST",
+          body:JSON.stringify({old_path:fullPrefix,new_path:newPath})});
+        ok++;
+      }catch(e){errors.push(e.message);}
+    }
+    // real objects: batch move endpoint
+    if(realIds.length){
+      try{
+        const r=await api("/api/v1/admin/objects/move",{method:"POST",
+          body:JSON.stringify({ids:realIds,dest:dest})});
+        ok+=r.moved||0;
+        if(r.skipped&&r.skipped.length)errors.push(r.skipped.length+" skipped");
+      }catch(e){errors.push(e.message);}
+    }
+    $("#moveModal").classList.remove("on");
+    selSet.clear();
+    evictFolderViewCache();
+    if(errors.length){
+      toast((ok?ok+" "+t("movedOk")+" — ":"")+errors.join(", "),"warn");
+    }else{
+      toast(ok+" "+t("movedOk"));
+    }
+    refresh();
+  }catch(err){
+    if(errEl){
+      errEl.textContent=err.message;
+      errEl.style.display="block";
+    }else{
+      toast(err.message,"err");
+    }
+  }finally{
+    okBtn.disabled=false;
+    cancelBtn.disabled=false;
+    okBtn.innerHTML=origText;
+  }
 }
 $("#moveOk").onclick=doMove;
 $("#moveCancel").onclick=closeMoveModal;
 $("#moveModal").onclick=e=>{if(e.target.id==="moveModal")closeMoveModal();};
 $("#moveDest").addEventListener("keydown",e=>{if(e.key==="Enter")doMove();});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&$("#moveModal")&&$("#moveModal").classList.contains("on")){
+    closeMoveModal();
+  }
+});
 $("#refBtn").onclick=()=>{refresh();};
 
 /* ================= url ingest ================= */
