@@ -590,6 +590,7 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - Playwright E2E suite (`tests/test_e2e_playwright.py`): 24/24 passed in headless Chromium.
   - Linters: `ruff check` (0 errors), `ruff format --check` (100% formatted), `mypy` (0 errors).
   - JavaScript syntax: `node -c` (0 syntax errors).
+  - Visual Browser Inspection: Headless Chromium visual checks captured and inspected across `specs/overhaul_move_modal.png`, `specs/overhaul_desktop.png`, and `specs/overhaul_mobile.png`. Polished `.toolbar-group` into single-row `inline-flex` clusters and collapsed manual path input into `+ مسیر دستی (پیشرفته)`.
 - **Tests Still Missing**:
   - None. Full test suite passing.
 - **Known Failures**:
@@ -597,6 +598,6 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 - **Deployment Status**:
   - Ready for Falkenstein production deployment (v0.15.58).
 - **Current Git Commit / Branch**:
-  - `aacdcd6` on `main` (pushed to `origin main`).
+  - `7d4399d` on `main` (pushed to `origin main`).
 - **Exact Next Step for Next Session**:
   - Execute remote deployment to Falkenstein via `/home/hossein/anbar_deploy_falkenstein.sh` and perform live smoke tests on `https://dl.amiri-dev.ir/`.
