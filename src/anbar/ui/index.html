@@ -29,7 +29,15 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
-  --height-control: 36px;
+  --btn-h: 36px;
+  --btn-h-sm: 30px;
+  --btn-radius: 10px;
+  --height-control: var(--btn-h);
+  --sp-xs: 4px;
+  --sp-sm: 8px;
+  --sp-md: 12px;
+  --sp-lg: 16px;
+  --sp-xl: 24px;
 
   /* legacy alias mappings */
   --bg: var(--bg-canvas);
@@ -138,7 +146,8 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
   display:flex;align-items:center;justify-content:center;border-radius:8px;color:var(--tx3);transition:.15s}
 .field .eye:hover{background:var(--hover);color:var(--tx)}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:14px;
-  padding:11px 20px;border-radius:var(--r-sm);transition:.15s;user-select:none}
+  padding:8px 16px;min-height:var(--btn-h);border-radius:var(--btn-radius);box-sizing:border-box;transition:.15s;user-select:none}
+.btn-sm{min-height:var(--btn-h-sm);height:var(--btn-h-sm);padding:4px 10px;font-size:12px;border-radius:calc(var(--btn-radius) - 2px)}
 .btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;width:100%;
   box-shadow:0 2px 8px var(--brand-soft)}
 .btn-primary:hover{filter:brightness(1.07);transform:translateY(-1px)}
@@ -261,7 +270,7 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 /* toolbar */
 .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .toolbar h2{font-size:15px;font-weight:700;letter-spacing:-.01em;flex:1;display:flex;align-items:center;gap:9px}
-.toolbar .btn,.toolbar select,.filterbar select{height:var(--height-control);border-radius:var(--radius-md);box-sizing:border-box}
+.toolbar .btn,.toolbar select,.filterbar select{height:var(--btn-h);min-height:var(--btn-h);border-radius:var(--btn-radius);box-sizing:border-box}
 .count{font-size:11.5px;font-weight:600;color:var(--tx2);background:var(--bg3);border:1px solid var(--line);
   padding:2px 9px;border-radius:20px}
 .btn-ghost{border:1px solid var(--line);background:var(--bg2);color:var(--tx2);font-size:13px;padding:8px 14px}
@@ -409,9 +418,13 @@ html[dir="rtl"] .bc-back-btn svg{transform:rotate(180deg)}
 .fic svg{width:17px;height:17px;fill:none;stroke:var(--brand);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:13px;
   font-family:ui-monospace,Menlo,Consolas,monospace}
-.empty{text-align:center;padding:60px 20px;color:var(--tx3)}
-.empty svg{width:44px;height:44px;fill:none;stroke:var(--line2);stroke-width:1.5;margin-bottom:12px}
-.empty p{font-size:14px}
+.empty{text-align:center;padding:48px 20px;color:var(--tx2);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.empty .empty-icon-wrap{width:60px;height:60px;border-radius:18px;background:var(--brand-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.empty .empty-icon-wrap svg{width:28px;height:28px;fill:none;stroke:var(--brand);stroke-width:1.9;margin:0}
+.empty .empty-title{font-size:15px;font-weight:700;color:var(--tx);margin:0 0 6px}
+.empty .empty-desc{font-size:13px;color:var(--tx3);margin:0 0 16px;max-width:320px;line-height:1.5}
+.empty .empty-action-btn{height:var(--btn-h);border-radius:var(--btn-radius);padding:0 18px;font-size:13px}
+.empty p{font-size:13.5px;margin:0}
 /* row actions */
 .acts{display:flex;gap:6px;justify-content:flex-end}
 .act{width:33px;height:33px;border-radius:9px;display:flex;align-items:center;justify-content:center;
@@ -534,6 +547,16 @@ html[dir="rtl"] .toast{direction:rtl;text-align:right}
 .linkbox code{flex:1;background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:10px 12px;
   font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;
   direction:ltr;text-align:left;user-select:all;max-height:40vh;overflow-y:auto}
+/* Move browser components */
+.move-folder-tile{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:var(--bg3);border:1px solid transparent;cursor:pointer;transition:.15s;user-select:none}
+.move-folder-tile:hover{background:var(--hover);border-color:var(--line2)}
+.move-folder-tile.disabled{opacity:.45;cursor:not-allowed;pointer-events:none;background:var(--bg2)}
+.move-folder-tile .tile-name{display:flex;align-items:center;gap:8px;font-weight:500;font-size:13px;color:var(--tx)}
+.move-folder-tile .tile-arrow{color:var(--tx3);font-size:14px}
+.move-crumb{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;color:var(--tx2);cursor:pointer;white-space:nowrap;transition:.15s;font-size:12px}
+.move-crumb:hover{background:var(--hover);color:var(--tx)}
+.move-crumb.active{font-weight:600;color:var(--brand);background:var(--brand-soft);cursor:default}
+.move-crumb-sep{color:var(--tx3);user-select:none;margin:0 2px;font-size:12px}
 /* file detail modal & lightbox */
 .file-card{max-width:620px;position:relative}
 .fm-nav-btn{display:inline-flex;align-items:center;justify-content:center;border-radius:8px;
@@ -596,6 +619,17 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
 .fm-actions .btn{width:100%;justify-content:center;padding:9px 8px;font-size:13px;white-space:nowrap}
 @media(max-width:520px){
   .fm-actions{grid-template-columns:repeat(2,1fr);gap:8px}
+}
+@media(max-width:480px){
+  .toolbar{gap:var(--sp-xs);justify-content:space-between}
+  .toolbar-group{gap:var(--sp-xs)}
+  .toolbar .btn{padding:6px 9px;min-height:var(--btn-h);height:var(--btn-h)}
+  .toolbar .btn span:not(.count){display:none}
+  .toolbar h2{font-size:14px;gap:6px;width:100%;margin-bottom:4px}
+  .filterbar{flex-direction:column;gap:8px}
+  #fSort{width:100%;min-width:100%}
+  #selBar{flex-wrap:wrap;gap:6px}
+  #selBar .btn{flex:1 1 calc(50% - 6px);text-align:center;justify-content:center;font-size:12px;padding:7px 6px}
 }
 .spin{width:15px;height:15px;border:2px solid var(--line2);border-top-color:var(--brand);border-radius:50%;
   animation:sp .7s linear infinite;display:inline-block;vertical-align:-2px}
@@ -748,40 +782,46 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <span data-i18n="files">فایل‌ها</span><span class="count" id="cnt">0</span>
         <span class="storage-badge" id="storageBadge" style="font-size:11.5px;font-weight:600;color:var(--tx2);background:var(--bg3);padding:3px 8px;border-radius:6px;border:1px solid var(--line2);margin-inline-start:8px;vertical-align:middle;display:inline-block"></span>
       </h2>
-      <button class="btn btn-primary" id="uploadToggleBtn" style="width:auto;padding:8px 13px;display:flex;align-items:center;gap:6px" title="Upload">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
-        <span data-i18n="upload">آپلود</span>
-      </button>
-      <select id="fType" aria-label="type filter" style="width:auto;min-width:110px">
-        <option value="" data-i18n="ftAll">همه انواع</option>
-        <option value="image" data-i18n="ftImage">عکس</option>
-        <option value="video" data-i18n="ftVideo">ویدیو</option>
-        <option value="audio" data-i18n="ftAudio">صدا</option>
-        <option value="pdf" data-i18n="ftPdf">PDF</option>
-        <option value="other" data-i18n="ftOther">سایر</option>
-      </select>
-      <button class="btn btn-ghost" id="selectModeBtn" style="width:auto;padding:8px 12px;display:flex;align-items:center;gap:5px" data-i18n-title="select" title="انتخاب">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px"><polyline points="20 6 9 17 4 12"/></svg>
-        <span data-i18n="select">انتخاب</span>
-      </button>
-      <button class="btn btn-ghost" id="selAllBtn" style="width:auto;display:none" data-i18n="selAll">همه</button>
-      <button class="btn btn-ghost" id="newFolderBtn" style="width:auto;padding:8px 11px" data-i18n-title="newFolder" title="پوشه جدید">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
-      </button>
-      <button class="btn btn-ghost" id="viewBtn" style="width:auto;padding:8px 11px" title="gallery">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      </button>
-      <button class="btn btn-ghost" id="trashBtn" style="width:auto;padding:8px 11px" title="trash">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg>
-        <span class="count" id="trashCnt" style="display:none"></span>
-      </button>
-      <button class="btn btn-ghost" id="linksBtn" style="width:auto;padding:8px 11px" title="links">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-      </button>
-      <button class="btn btn-ghost" id="refBtn">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"/></svg>
-        <span data-i18n="refresh">به‌روزرسانی</span>
-      </button>
+      <div class="toolbar-group toolbar-group-primary">
+        <button class="btn btn-primary" id="uploadToggleBtn" style="width:auto;padding:8px 13px;display:flex;align-items:center;gap:6px" title="Upload">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+          <span data-i18n="upload">آپلود</span>
+        </button>
+        <button class="btn btn-ghost" id="newFolderBtn" style="width:auto;padding:8px 11px" data-i18n-title="newFolder" title="پوشه جدید">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+        </button>
+      </div>
+      <div class="toolbar-group toolbar-group-view">
+        <button class="btn btn-ghost" id="viewBtn" style="width:auto;padding:8px 11px" title="gallery">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        </button>
+        <select id="fType" aria-label="type filter" style="width:auto;min-width:110px">
+          <option value="" data-i18n="ftAll">همه انواع</option>
+          <option value="image" data-i18n="ftImage">عکس</option>
+          <option value="video" data-i18n="ftVideo">ویدیو</option>
+          <option value="audio" data-i18n="ftAudio">صدا</option>
+          <option value="pdf" data-i18n="ftPdf">PDF</option>
+          <option value="other" data-i18n="ftOther">سایر</option>
+        </select>
+      </div>
+      <div class="toolbar-group toolbar-group-actions">
+        <button class="btn btn-ghost" id="selectModeBtn" style="width:auto;padding:8px 12px;display:flex;align-items:center;gap:5px" data-i18n-title="select" title="انتخاب">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px"><polyline points="20 6 9 17 4 12"/></svg>
+          <span data-i18n="select">انتخاب</span>
+        </button>
+        <button class="btn btn-ghost" id="selAllBtn" style="width:auto;display:none" data-i18n="selAll">همه</button>
+        <button class="btn btn-ghost" id="trashBtn" style="width:auto;padding:8px 11px" title="trash">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/></svg>
+          <span class="count" id="trashCnt" style="display:none"></span>
+        </button>
+        <button class="btn btn-ghost" id="linksBtn" style="width:auto;padding:8px 11px" title="links">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </button>
+        <button class="btn btn-ghost" id="refBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"/></svg>
+          <span data-i18n="refresh">به‌روزرسانی</span>
+        </button>
+      </div>
     </div>
     <div id="selBar">
       <strong id="selCnt">0</strong>
@@ -832,8 +872,15 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <tbody id="rows"></tbody>
       </table>
       <div class="empty" id="empty" style="display:none">
-        <svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></svg>
-        <p data-i18n="empty">هنوز فایلی آپلود نکرده‌ای</p>
+        <div class="empty-icon-wrap">
+          <svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></svg>
+        </div>
+        <h4 class="empty-title" data-i18n="empty">هنوز فایلی آپلود نکرده‌ای</h4>
+        <p class="empty-desc" data-i18n="emptyDesc">فایل‌های خود را به اینجا بکشید یا دکمه آپلود را بزنید.</p>
+        <button type="button" class="btn btn-primary empty-action-btn" onclick="openDropZone()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+          <span data-i18n="upload">آپلود فایل</span>
+        </button>
       </div>
     </div>
   </div>
@@ -1205,7 +1252,8 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <input type="number" id="shareMax" min="0" value="0" style="flex:1;padding:9px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);color:var(--tx);font-family:inherit;direction:ltr">
       </div>
       <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">
-        <button class="btn btn-primary" type="submit" style="width:auto" data-i18n="mkLink">ساخت لینک</button>
+        <button type="button" class="btn btn-ghost" id="soCancel" onclick="$('#shareOptsModal').classList.remove('on')" data-i18n="close">بستن</button>
+        <button class="btn btn-primary" id="shareOptsOk" type="submit" style="width:auto" data-i18n="mkLink">ساخت لینک</button>
       </div>
     </form>
   </div>
@@ -1235,7 +1283,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     <p id="linksSub" data-i18n="linksS">همه لینک‌های ساخته‌شده — امکان ابطال فوری</p>
     <div id="linksList" style="max-height:50vh;overflow-y:auto"></div>
     <div style="margin-top:14px;text-align:end;display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-warn" id="revokeAllLinksBtn" style="width:auto" data-i18n="revokeAllLinks">ابطال همه</button>
+      <button class="btn btn-danger" id="revokeAllLinksBtn" style="width:auto" data-i18n="revokeAllLinks">ابطال همه</button>
       <button class="btn btn-ghost" id="linksClose" data-i18n="close">بستن</button>
     </div>
   </div>
@@ -1267,7 +1315,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
       </div>
       <p id="mgWarn" style="display:none;font-size:11.5px;color:#e0a83c;margin-top:6px"></p>
       <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap">
-        <button type="button" class="btn btn-warn" id="mgRevoke" style="margin-inline-end:auto"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> <span data-i18n="revokeB">ابطال لینک</span></button>
+        <button type="button" class="btn btn-danger" id="mgRevoke" style="margin-inline-end:auto"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> <span data-i18n="revokeB">ابطال لینک</span></button>
         <button type="button" class="btn btn-ghost" id="mgCancel" data-i18n="close">بستن</button>
         <button type="submit" class="btn btn-primary" id="mgSave" data-i18n="mgSaveB">ذخیره و ساخت لینک جدید</button>
       </div>
@@ -1289,7 +1337,7 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     <p id="trashSub" data-i18n="trashS">موارد تا ۷ روز قابل بازیابی‌اند، بعد خودکار حذف می‌شوند.</p>
     <div id="trashList" style="max-height:50vh;overflow-y:auto"></div>
     <div style="margin-top:14px;text-align:end;display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-warn" id="trashEmptyBtn" style="width:auto" data-i18n="trashEmpty">خالی کردن سطل</button>
+      <button class="btn btn-danger" id="trashEmptyBtn" style="width:auto" data-i18n="trashEmpty">خالی کردن سطل</button>
       <button class="btn btn-ghost" id="trashClose" data-i18n="close">بستن</button>
     </div>
   </div>
@@ -1326,18 +1374,55 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
 
 <!-- move modal -->
 <div class="modal" id="moveModal">
-  <div class="modal-card" style="width:92%;max-width:440px">
-    <h3 data-i18n="moveTitle">انتقال به پوشه</h3>
-    <p id="moveSub" style="font-size:13px;color:var(--tx2);margin-bottom:12px"></p>
-    <label style="font-size:12px;font-weight:600;color:var(--tx2)" data-i18n="quickPick">انتخاب سریع پوشهٔ مقصد:</label>
-    <div id="moveChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px;max-height:120px;overflow-y:auto"></div>
-    <label style="font-size:12px;font-weight:600;color:var(--tx2)" data-i18n="moveToLab">مسیر مقصد (پوشه)</label>
-    <input type="text" id="moveDest" placeholder="folder/subfolder" autocomplete="off"
-      style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--line2);border-radius:10px;background:var(--bg3);color:var(--tx);font-size:13.5px;margin-top:5px;font-family:ui-monospace,monospace;direction:ltr">
-    <div id="moveErr" style="display:none;color:var(--err);font-size:12px;margin-top:6px;line-height:1.4"></div>
-    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-ghost" id="moveCancel" style="width:auto" data-i18n="close">بستن</button>
-      <button class="btn btn-primary" id="moveOk" style="width:auto" data-i18n="moveDo">انتقال</button>
+  <div class="modal-card" style="width:94%;max-width:520px;max-height:90vh;display:flex;flex-direction:column;padding:22px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3 data-i18n="moveTitle" style="margin:0">انتقال به پوشه</h3>
+      <button type="button" class="icon-btn" onclick="closeMoveModal()" style="width:30px;height:30px;border-radius:8px" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p id="moveSub" style="font-size:12.5px;color:var(--tx2);margin-bottom:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+
+    <!-- Destination indicator -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+      <label style="font-size:12px;font-weight:600;color:var(--tx2)" data-i18n="moveToLab">مسیر مقصد:</label>
+      <div id="moveTargetBadge" style="font-size:12px;font-weight:600;color:var(--brand);background:var(--brand-soft);border:1px solid var(--line);border-radius:6px;padding:3px 10px;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px">
+        /
+      </div>
+    </div>
+
+    <!-- Breadcrumbs bar -->
+    <div id="moveBreadcrumbs" style="display:flex;align-items:center;gap:4px;overflow-x:auto;padding:6px 8px;background:var(--bg3);border:1px solid var(--line);border-radius:8px;margin-bottom:10px;font-size:12px;min-height:32px;box-sizing:border-box"></div>
+
+    <!-- Folder filter search -->
+    <div style="position:relative;margin-bottom:10px">
+      <input type="text" id="moveFilterInp" placeholder="جستجوی پوشه…" style="width:100%;box-sizing:border-box;padding:7px 10px;padding-inline-start:30px;border:1px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx);font-size:12.5px;outline:none">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;inset-inline-start:9px;top:50%;transform:translateY(-50%);color:var(--tx3);pointer-events:none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    </div>
+
+    <!-- Child folder viewport -->
+    <div id="moveFolderList" style="flex:1;min-height:160px;max-height:220px;overflow-y:auto;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:4px"></div>
+
+    <!-- Legacy / quick pick container preserved for compat -->
+    <div id="moveChips" style="display:none"></div>
+
+    <!-- Destination path input (power-user editable, auto-synced with browser) -->
+    <div style="margin-top:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <label style="font-size:11.5px;font-weight:600;color:var(--tx3)" data-i18n="moveToLab">مسیر مقصد (پوشه):</label>
+        <button type="button" id="moveManualToggle" style="display:none"></button>
+      </div>
+      <div id="moveManualWrap" style="margin-top:4px">
+        <input type="text" id="moveDest" placeholder="folder/subfolder" autocomplete="off"
+          style="width:100%;box-sizing:border-box;padding:7px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-size:12.5px;font-family:ui-monospace,monospace;direction:ltr">
+      </div>
+    </div>
+
+    <div id="moveErr" style="display:none;color:var(--err);font-size:12px;margin-top:8px;line-height:1.4"></div>
+
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;align-items:center">
+      <button class="btn btn-ghost" id="moveCancel" type="button" style="width:auto;height:var(--btn-h)" data-i18n="close">بستن</button>
+      <button class="btn btn-primary" id="moveOk" type="button" style="width:auto;height:var(--btn-h);min-width:140px" data-i18n="moveHere">انتقال به این پوشه</button>
     </div>
   </div>
 </div>
@@ -1508,6 +1593,10 @@ const I18N={
   moveSel:"انتقال", movePrompt:"مسیر پوشهٔ مقصد را وارد کنید (خالی = ریشه):",
   movedOk:"انتقال شد", skippedOk:"به‌خاطر تداخل نام رد شد", moveFileQ:"انتقال فایل به کجا؟",
   moveTitle:"انتقال", moveToLab:"مسیر مقصد (پوشه)", moveDo:"انتقال",
+  moveHere:"انتقال به این پوشه", clearSearch:"پاک کردن جستجو",
+  emptyDesc:"فایل‌های خود را به اینجا بکشید یا دکمه آپلود را بزنید.",
+  emptyFolderDesc:"فایل‌های خود را به این پوشه انتقال دهید یا آپلود کنید.",
+  noMatchDesc:"فایلی مطابق با عبارت جستجو پیدا نشد.",
   quickPick:"انتخاب سریع پوشهٔ مقصد:", rootFolder:"خانه (ریشه)", emptyFolder:"این پوشه خالی است",
   nItems:"مورد", renameFile:"تغییر نام", foldRenameT:"تغییر نام", foldMoveT:"انتقال",
   foldCopyT:"کپی", foldDelT:"حذف", del:"حذف", delQ:"حذف",
@@ -1679,6 +1768,10 @@ const I18N={
   moveSel:"Move", movePrompt:"Destination folder path (empty = root):",
   movedOk:"moved", skippedOk:"skipped (name clash)", moveFileQ:"Move file to…",
   moveTitle:"Move", moveToLab:"Destination path (folder)", moveDo:"Move",
+  moveHere:"Move Here", clearSearch:"Clear Search",
+  emptyDesc:"Drag and drop files here or click Upload to get started.",
+  emptyFolderDesc:"Move items or upload files into this folder.",
+  noMatchDesc:"No files match your search query.",
   quickPick:"Quick pick destination:", rootFolder:"Root (Home)", emptyFolder:"This folder is empty",
   nItems:"items", renameFile:"Rename", foldRenameT:"Rename", foldMoveT:"Move",
   foldCopyT:"Copy", foldDelT:"Delete", del:"Delete", delQ:"Delete",
@@ -1809,9 +1902,18 @@ function askText(title,defValue){
     document.body.appendChild(wrap);
     const inp=wrap.querySelector("#__askInp");
     inp.value=defValue||"";
-    const done=v=>{wrap.remove();resolve(v);};
-    wrap.querySelector("#__askOk").onclick=()=>done(inp.value.trim()||null);
-    wrap.querySelector("#__askNo").onclick=()=>done(null);
+    let answered=false;
+    const okBtn=wrap.querySelector("#__askOk");
+    const noBtn=wrap.querySelector("#__askNo");
+    const done=v=>{
+      if(answered)return;
+      answered=true;
+      if(okBtn){okBtn.disabled=true;okBtn.classList.add("busy");}
+      if(noBtn)noBtn.disabled=true;
+      wrap.remove();resolve(v);
+    };
+    okBtn.onclick=()=>done(inp.value.trim()||null);
+    noBtn.onclick=()=>done(null);
     wrap.onclick=e=>{if(e.target===wrap)done(null);};
     inp.onkeydown=e=>{if(e.key==="Enter")done(inp.value.trim()||null);if(e.key==="Escape")done(null);};
     setTimeout(()=>inp.focus(),30);
@@ -1828,7 +1930,7 @@ function askConfirm(text,opts){
    wrap.innerHTML='<div class="modal-card" style="max-width:340px;width:100%">'
      +'<p style="margin:4px 0 18px;font-size:13.5px;color:var(--tx);white-space:pre-wrap">'+esc(text)+'</p>'
      +'<div style="display:flex;gap:8px;justify-content:flex-start">'
-     +'<button id="__askYes" class="btn" style="padding:8px 18px'+(opts.danger?';background:var(--err);border-color:var(--err);color:#fff':'')+'">'+esc(t("ok"))+'</button>'
+     +'<button id="__askYes" class="btn '+(opts.danger?'btn-danger':'btn-primary')+'" style="padding:8px 18px'+(opts.danger?';background:var(--err);border-color:var(--err);color:#fff':'')+'">'+esc(t("ok"))+'</button>'
      +'<button id="__askNo" class="btn-ghost btn" style="padding:8px 14px">'+esc(t("cancel"))+'</button>'
      +'</div></div>';
     document.body.appendChild(wrap);
@@ -2093,7 +2195,7 @@ function updateBreadcrumb() {
     }, 40);
   }
 }
-$("#newFolderBtn").onclick = guardBtn($("#newFolderBtn"), async () => {
+$("#newFolderBtn").onclick = guardModalSubmit($("#newFolderBtn"), async () => {
   const name = await askText(t("newFolderPrompt"));
   if (!name) return;
   const cleanName = name.replace(/[\/\\?%*:|"<>]/g, "").trim();
@@ -2105,7 +2207,7 @@ $("#newFolderBtn").onclick = guardBtn($("#newFolderBtn"), async () => {
       body: JSON.stringify({ path: fullPath })
     });
     toast(t("folderCreated"));
-    refresh();
+    await refresh();
   } catch(e) {
     toast(e.message, "err");
   }
@@ -2380,7 +2482,25 @@ function renderRows(){
     let nm=nm0;
     if(!nm){const d=document.createElement("div");d.id="noMatch";d.className="empty";
       wrap.appendChild(d);nm=d;}
-    nm.innerHTML='<p>'+esc(curFolderPrefix ? t("emptyFolder") : t("noMatch"))+'</p>';
+    if(fQuery){
+      nm.innerHTML=`<div class="empty-icon-wrap" style="width:54px;height:54px;border-radius:16px;background:var(--bg3);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--tx3)"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+        </div>
+        <h4 class="empty-title" style="margin:0 0 4px;font-size:15px;font-weight:700">${esc(t("noMatch"))}</h4>
+        <p class="empty-desc" style="margin:0 0 14px;font-size:12.5px;color:var(--tx3)">${esc(t("noMatchDesc")||(lang==="fa"?"فایلی مطابق با عبارت جستجو پیدا نشد.":"No files match your search query."))}</p>
+        <button type="button" class="btn btn-ghost btn-sm" id="emptyClearSearchBtn" onclick="$('#fClear').click()" style="width:auto">
+          ${esc(t("clearSearch")||(lang==="fa"?"پاک کردن جستجو":"Clear Search"))}
+        </button>`;
+    }else{
+      nm.innerHTML=`<div class="empty-icon-wrap" style="width:54px;height:54px;border-radius:16px;background:var(--brand-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--brand)"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h4 class="empty-title" style="margin:0 0 4px;font-size:15px;font-weight:700">${esc(t("emptyFolder")||(lang==="fa"?"این پوشه خالی است":"This folder is empty"))}</h4>
+        <p class="empty-desc" style="margin:0 0 14px;font-size:12.5px;color:var(--tx3)">${esc(t("emptyFolderDesc")||(lang==="fa"?"فایل‌های خود را به اینجا بکشید یا دکمه آپلود را بزنید.":"Drop files here or click Upload to add items."))}</p>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openDropZone()" style="width:auto">
+          ${esc(t("upload")||(lang==="fa"?"آپلود فایل":"Upload Files"))}
+        </button>`;
+    }
     nm.style.display="block";
     if(viewMode==="gallery"){
       wrap.querySelectorAll(".gallery:not(#noMatch)").forEach(g=>g.remove());
@@ -2634,6 +2754,15 @@ $("#uploadToggleBtn").onclick=()=>{
   syncUploadPanel();
 };
 syncUploadPanel();
+function openDropZone(){
+  if(!uploadOpen){
+    uploadOpen=true;
+    localStorage.setItem("anbar-up-open","1");
+    syncUploadPanel();
+  }
+  const fi=$("#fileInp");
+  if(fi)fi.click();
+}
 function setSelectMode(on){
   selectMode=!!on;
   document.body.classList.toggle("select-mode",selectMode);
@@ -3245,16 +3374,23 @@ $("#trashEmptyBtn").onclick=guardBtn($("#trashEmptyBtn"),async()=>{
  }catch(e){toast(e.message,"err");}
 });
 
+let _renamingInFlight = false;
 async function renameObj(o){
-  const currentBase=o.displayName||(o.filename?o.filename.split("/").pop():o.id);
-  const name=await askText(t("renameFile")||t("renameT"),currentBase);
-  if(name===null)return;
-  const clean=name.trim().replace(/[\\/?%*:|"<>]/g,"");
-  if(!clean||clean===currentBase)return;
+  if(_renamingInFlight)return;
+  _renamingInFlight = true;
   try{
-    await api("/f/"+encodeURIComponent(o.id),{method:"PATCH",body:JSON.stringify({filename:clean})});
-    evictFolderViewCache();toast(t("renameOk"));refresh();
-  }catch(e){toast(e.message,"err");}
+    const currentBase=o.displayName||(o.filename?o.filename.split("/").pop():o.id);
+    const name=await askText(t("renameFile")||t("renameT"),currentBase);
+    if(name===null)return;
+    const clean=name.trim().replace(/[\\/?%*:|"<>]/g,"");
+    if(!clean||clean===currentBase)return;
+    try{
+      await api("/f/"+encodeURIComponent(o.id),{method:"PATCH",body:JSON.stringify({filename:clean})});
+      evictFolderViewCache();toast(t("renameOk"));await refresh();
+    }catch(e){toast(e.message,"err");}
+  }finally{
+    _renamingInFlight = false;
+  }
 }
 function renderMarkdown(md) {
   if (!md) return "";
@@ -3673,7 +3809,16 @@ setInterval(()=>{
   if(!vid&&fmSubs.length){fmSubs=[];fmSubsObjId=null;} /* modal closed */
 },600);
 
-$("#fmClose").onclick=()=>{$("#fileModal").classList.remove("on");$("#fmPreview").innerHTML="";fmSubs=[];fmSubsObjId=null;};
+$("#fmClose").onclick=()=>{
+  const vid=$("#fmPreview video");
+  if(vid){try{vid.pause();vid.removeAttribute("src");vid.load();}catch(e){}}
+  const aud=$("#fmPreview audio");
+  if(aud){try{aud.pause();aud.removeAttribute("src");aud.load();}catch(e){}}
+  $("#fileModal").classList.remove("on");
+  $("#fmPreview").innerHTML="";
+  fmSubs=[];
+  fmSubsObjId=null;
+};
 $("#fmCloseTop").onclick=()=>$("#fmClose").onclick();
 $("#fmPrev").onclick=(e)=>{e.stopPropagation();navModalFile(-1);};
 $("#fmNext").onclick=(e)=>{e.stopPropagation();navModalFile(1);};
@@ -3733,7 +3878,7 @@ async function shareLink(o,opts){
   }catch(e){toast(e.message,"err");}
 }
 let shareTarget=null;
-$("#shareOpts").onsubmit=async ev=>{
+$("#shareOpts").onsubmit=guardModalSubmit($("#shareOptsOk"),async ev=>{
   ev.preventDefault();
   if(!shareTarget)return;
   const pw=$("#sharePw").value.trim();
@@ -3744,7 +3889,7 @@ $("#shareOpts").onsubmit=async ev=>{
   const slug=$("#shareSlug").value.trim().toLowerCase().replace(/\s+/g,"-");
   await shareLink(shareTarget,{pw,ttl,max:ttlSel,slug});
   $("#shareOptsModal").classList.remove("on");
-};
+});
 $("#copyBtn").onclick=async()=>{
   try{await navigator.clipboard.writeText($("#linkUrl").textContent);toast(t("copied"));}
   catch(e){$("#linkUrl").select?null:0;toast("copy failed","err");}
@@ -3834,62 +3979,239 @@ async function delObj(o){
     toast(t("delOk"));refresh();
   }catch(e){toast(t("delFail")+": "+e.message,"err");}
 }
-/* ================= move to folder (v0.12) ================= */
+/* ================= move to folder (v0.15.58) ================= */
 let moveIds=[];
-function openMoveModal(ids,subText){
-  moveIds=ids;
-  $("#moveSub").textContent=subText||"";
+let moveBrowsePrefix="";
+let moveFilterQuery="";
+let moveManualMode=false;
+
+function getAllFolderPaths(){
+  const fldSet=new Set();
+  (files||[]).forEach(o=>{
+    const fn=o.filename||"";
+    const id=String(o.id||"");
+    const extract=(str)=>{
+      let p=str.replace(/^\/+|\/+$/g,"");
+      if(!p)return;
+      const parts=p.split("/").filter(Boolean);
+      let acc="";
+      for(let i=0;i<parts.length;i++){
+        acc=acc?acc+"/"+parts[i]:parts[i];
+        fldSet.add(acc);
+      }
+    };
+    if(id.startsWith("folder:"))extract(id.slice("folder:".length));
+    if(fn.startsWith("folder:"))extract(fn.slice("folder:".length));
+    else if(fn.includes("/")){
+      const parts=fn.split("/").filter(Boolean);
+      let acc="";
+      const len=fn.endsWith("/")?parts.length:parts.length-1;
+      for(let i=0;i<len;i++){
+        acc=acc?acc+"/"+parts[i]:parts[i];
+        fldSet.add(acc);
+      }
+    }else if(fn.endsWith("/")){
+      extract(fn);
+    }
+  });
+  return fldSet;
+}
+
+function renderMoveBrowser(skipInputSync=false){
+  const allFolders=getAllFolderPaths();
+  const folderList=$("#moveFolderList");
+  const breadcrumbs=$("#moveBreadcrumbs");
+  const targetBadge=$("#moveTargetBadge");
+  const destInput=$("#moveDest");
   const errEl=$("#moveErr");
   if(errEl){errEl.style.display="none";errEl.textContent="";}
-  const d=$("#moveDest");
-  d.value="";
-  d.oninput=()=>{if(errEl){errEl.style.display="none";errEl.textContent="";}};
-  const chips=$("#moveChips");
-  if(chips){
-    chips.innerHTML="";
-    const rootBtn=document.createElement("button");
-    rootBtn.type="button";
-    rootBtn.className="btn btn-ghost";
-    rootBtn.style.cssText="padding:4px 10px;font-size:12px;border-radius:20px;background:var(--bg2)";
-    rootBtn.textContent=t("rootFolder");
-    rootBtn.onclick=()=>{d.value="";d.focus();if(errEl){errEl.style.display="none";errEl.textContent="";}};
-    chips.appendChild(rootBtn);
-    const fldSet=new Set();
-    files.forEach(o=>{
-      const fn=o.filename||"";
-      const slash=fn.indexOf("/");
-      if(slash!==-1){
-        const parts=fn.split("/").filter(Boolean);
-        let acc="";
-        for(let i=0;i<parts.length-(fn.endsWith("/")?0:1);i++){
-          acc+=parts[i]+"/";
-          fldSet.add(acc.replace(/\/+$/,""));
-        }
-      }else if(fn.endsWith("/")){
-        fldSet.add(fn.replace(/\/+$/,""));
-      }
-    });
-    Array.from(fldSet).sort().forEach(fld=>{
-      const btn=document.createElement("button");
-      btn.type="button";
-      btn.className="btn btn-ghost";
-      btn.style.cssText="padding:4px 10px;font-size:12px;border-radius:20px;background:var(--bg2)";
-      btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'+esc(fld);
-      btn.onclick=()=>{d.value=fld;d.focus();if(errEl){errEl.style.display="none";errEl.textContent="";}};
-      chips.appendChild(btn);
-    });
+
+  if(targetBadge){
+    targetBadge.textContent=moveBrowsePrefix?("/"+moveBrowsePrefix):(t("rootFolder")||"/");
   }
-  $("#moveModal").classList.add("on");
-  setTimeout(()=>d.focus(),30);
+  if(!skipInputSync&&destInput){
+    destInput.value=moveBrowsePrefix;
+  }
+
+  // 1. Breadcrumbs
+  if(breadcrumbs){
+    breadcrumbs.innerHTML="";
+    const rootCrumb=document.createElement("span");
+    rootCrumb.className="move-crumb"+(moveBrowsePrefix===""?" active":"");
+    rootCrumb.dataset.path="";
+    rootCrumb.textContent=t("rootFolder")||"ریشه (/)";
+    rootCrumb.onclick=()=>{
+      if(moveBrowsePrefix!==""){
+        moveBrowsePrefix="";
+        renderMoveBrowser();
+      }
+    };
+    breadcrumbs.appendChild(rootCrumb);
+
+    if(moveBrowsePrefix){
+      const parts=moveBrowsePrefix.split("/").filter(Boolean);
+      let acc="";
+      parts.forEach((part,idx)=>{
+        acc=acc?acc+"/"+part:part;
+        const currentPath=acc;
+        const isLast=idx===parts.length-1;
+
+        const sep=document.createElement("span");
+        sep.className="move-crumb-sep";
+        sep.textContent="/";
+        breadcrumbs.appendChild(sep);
+
+        const crumb=document.createElement("span");
+        crumb.className="move-crumb"+(isLast?" active":"");
+        crumb.dataset.path=currentPath;
+        crumb.textContent=part;
+        crumb.onclick=()=>{
+          if(!isLast){
+            moveBrowsePrefix=currentPath;
+            renderMoveBrowser();
+          }
+        };
+        breadcrumbs.appendChild(crumb);
+      });
+    }
+  }
+
+  // 2. Immediate child folders
+  const prefixWithSlash=moveBrowsePrefix?(moveBrowsePrefix.replace(/\/+$/,"")+"/"):"" ;
+  const directChildren=new Set();
+  allFolders.forEach(fp=>{
+    if(prefixWithSlash){
+      if(fp.startsWith(prefixWithSlash)){
+        const rem=fp.slice(prefixWithSlash.length);
+        const childName=rem.split("/")[0];
+        if(childName)directChildren.add(childName);
+      }
+    }else{
+      const childName=fp.split("/")[0];
+      if(childName)directChildren.add(childName);
+    }
+  });
+
+  // 3. Child folder tiles
+  if(folderList){
+    folderList.innerHTML="";
+    const sortedChildren=Array.from(directChildren).sort();
+    const query=(moveFilterQuery||"").trim().toLowerCase();
+    const filtered=query?sortedChildren.filter(c=>c.toLowerCase().includes(query)):sortedChildren;
+
+    const movingFolderPrefixes=moveIds
+      .filter(id=>String(id).startsWith("folder:"))
+      .map(id=>String(id).slice("folder:".length).replace(/\/+$/,""));
+
+    if(filtered.length===0){
+      const emptyDiv=document.createElement("div");
+      emptyDiv.style.cssText="padding:24px 12px;text-align:center;color:var(--tx3);font-size:12.5px";
+      emptyDiv.textContent=query
+        ?(lang==="fa"?"پوشه‌ای با این نام یافت نشد":"No folders match this filter")
+        :(lang==="fa"?"این پوشه زیرپوشه‌ای ندارد":"No subfolders in this location");
+      folderList.appendChild(emptyDiv);
+    }else{
+      filtered.forEach(childName=>{
+        const fullChildPath=prefixWithSlash?(prefixWithSlash+childName):childName;
+        const isCircular=movingFolderPrefixes.some(fp=>fullChildPath===fp||fullChildPath.startsWith(fp+"/"));
+
+        const tile=document.createElement("div");
+        tile.className="move-folder-tile"+(isCircular?" disabled":"");
+        tile.dataset.folder=childName;
+        tile.dataset.fullPath=fullChildPath;
+        if(isCircular){
+          tile.title=lang==="fa"?"امکان انتقال به داخل این پوشه وجود ندارد":"Cannot move into this folder";
+        }
+
+        tile.innerHTML=`
+          <div class="tile-name">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--brand);flex-shrink:0">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(childName)}</span>
+          </div>
+          <div class="tile-arrow">›</div>
+        `;
+
+        if(!isCircular){
+          tile.onclick=()=>{
+            moveBrowsePrefix=fullChildPath;
+            moveFilterQuery="";
+            const fi=$("#moveFilterInp");
+            if(fi)fi.value="";
+            renderMoveBrowser();
+          };
+        }
+        folderList.appendChild(tile);
+      });
+    }
+  }
+
+  // 4. Update Move Here button text
+  const okBtn=$("#moveOk");
+  if(okBtn){
+    const isRoot=moveBrowsePrefix==="";
+    okBtn.textContent=isRoot
+      ?(lang==="fa"?"انتقال به ریشه (/)":"Move to Root (/)")
+      :(lang==="fa"?"انتقال به این پوشه":"Move Here");
+  }
 }
+
+function openMoveModal(ids,subText){
+  moveIds=ids||[];
+  moveBrowsePrefix="";
+  moveFilterQuery="";
+  moveManualMode=false;
+
+  const subEl=$("#moveSub");
+  if(subEl)subEl.textContent=subText||"";
+
+  const errEl=$("#moveErr");
+  if(errEl){errEl.style.display="none";errEl.textContent="";}
+
+  const filterInp=$("#moveFilterInp");
+  if(filterInp){
+    filterInp.value="";
+    filterInp.oninput=(e)=>{
+      moveFilterQuery=e.target.value;
+      renderMoveBrowser();
+    };
+  }
+
+  const manualWrap=$("#moveManualWrap");
+  if(manualWrap)manualWrap.style.display="block";
+  const manualToggle=$("#moveManualToggle");
+  if(manualToggle){
+    manualToggle.onclick=()=>{
+      moveManualMode=!moveManualMode;
+      if(manualWrap)manualWrap.style.display=moveManualMode?"block":"none";
+      if(moveManualMode&&$("#moveDest"))$("#moveDest").focus();
+    };
+  }
+
+  const d=$("#moveDest");
+  if(d){
+    d.value="";
+    d.oninput=()=>{
+      moveBrowsePrefix=d.value.trim().replace(/^\/+|\/+$/g,"");
+      renderMoveBrowser(true);
+    };
+  }
+
+  renderMoveBrowser();
+  $("#moveModal").classList.add("on");
+}
+
 function closeMoveModal(){
   const okBtn=$("#moveOk");
   if(okBtn&&okBtn.disabled)return;
   $("#moveModal").classList.remove("on");
 }
+
 async function doMove(){
   if(!moveIds.length)return;
-  const dest=$("#moveDest").value.trim().replace(/\/+$/,"");
+  const d=$("#moveDest");
+  const dest=(d?d.value:moveBrowsePrefix).trim().replace(/^\/+|\/+$/g,"");
   const errEl=$("#moveErr");
   if(errEl){errEl.style.display="none";errEl.textContent="";}
 
@@ -3959,15 +4281,15 @@ async function doMove(){
         if(r.skipped&&r.skipped.length)errors.push(r.skipped.length+" skipped");
       }catch(e){errors.push(e.message);}
     }
-    $("#moveModal").classList.remove("on");
     selSet.clear();
     evictFolderViewCache();
+    await refresh();
+    $("#moveModal").classList.remove("on");
     if(errors.length){
       toast((ok?ok+" "+t("movedOk")+" — ":"")+errors.join(", "),"warn");
     }else{
       toast(ok+" "+t("movedOk"));
     }
-    refresh();
   }catch(err){
     if(errEl){
       errEl.textContent=err.message;
@@ -4519,6 +4841,43 @@ function guardBtn(btn,fn){
     if(btn.disabled)return;
     btn.disabled=true;
     try{await fn(...args);}finally{btn.disabled=false;}
+  };
+}
+
+/* universal modal submit guard wrapper (v0.15.58): eliminates double-submit races and stuck loading states */
+function guardModalSubmit(btn,fn,opts={}){
+  return async (...args)=>{
+    if(!btn||btn.disabled||btn.classList.contains("busy"))return;
+    const modalEl=btn.closest(".modal, .drawer");
+    const cancelBtn=opts.cancelBtn||(modalEl?modalEl.querySelector(".btn-ghost, .modal-cancel, [data-cancel], #moveCancel, #soCancel, #fmClose"):null);
+    const origHtml=btn.innerHTML;
+    const origDisabled=btn.disabled;
+    const cancelOrigDisabled=cancelBtn?cancelBtn.disabled:false;
+
+    btn.disabled=true;
+    btn.classList.add("busy");
+    if(cancelBtn)cancelBtn.disabled=true;
+
+    const loadingText=opts.loadingText||(typeof lang!=="undefined"&&lang==="fa"?"در حال پردازش…":"Processing…");
+    if(opts.showSpinner!==false){
+      btn.innerHTML=`<span class="spin" style="display:inline-block;animation:spin .65s linear infinite">⟳</span> ${loadingText}`;
+    }
+
+    try{
+      return await fn(...args);
+    }catch(err){
+      if(opts.onError){
+        opts.onError(err);
+      }else{
+        toast(err.message||String(err),"err");
+      }
+      throw err;
+    }finally{
+      btn.disabled=origDisabled;
+      btn.classList.remove("busy");
+      btn.innerHTML=origHtml;
+      if(cancelBtn)cancelBtn.disabled=cancelOrigDisabled;
+    }
   };
 }
 

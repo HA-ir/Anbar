@@ -10,12 +10,16 @@ INDEX_HTML = (ROOT / "src" / "anbar" / "ui" / "index.html").read_text()
 
 
 def test_version_bumped_to_0_15_57():
-    assert '__version__ = "0.15.57"' in INIT
-    assert 'version = "0.15.57"' in PYPROJECT
+    import re
+
+    assert re.search(r'__version__ = "0\.15\.(57|58)"', INIT)
+    assert re.search(r'version = "0\.15\.(57|58)"', PYPROJECT)
 
 
 def test_uv_lock_version_bumped_to_0_15_57():
-    assert 'name = "anbar"\nversion = "0.15.57"' in UVLOCK
+    import re
+
+    assert re.search(r'name = "anbar"\nversion = "0\.15\.(57|58)"', UVLOCK)
 
 
 def test_selection_avoids_render_rows_in_index_html():

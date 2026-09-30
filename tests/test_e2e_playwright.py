@@ -749,3 +749,190 @@ def test_mkv_video_playback_detection(authed_page: Page, tmp_path: Path):
     # Close modal
     page.click("#fmClose")
     page.wait_for_selector("#fileModal", state="hidden", timeout=3000)
+
+
+def test_hierarchical_move_browser_navigation(authed_page: Page, tmp_path: Path):
+    """Test 21: Hierarchical move browser with 5-level drill-down and breadcrumb ascension."""
+    page = authed_page
+    _upload_file(page, tmp_path, "deep_file.txt")
+    page.wait_for_selector(".gallery .gcell:has-text('deep_file.txt')", timeout=4000)
+
+    # Seed 5-level directory structure
+    page.evaluate("""async () => {
+        const levels = [
+            "lvl1",
+            "lvl1/lvl2",
+            "lvl1/lvl2/lvl3",
+            "lvl1/lvl2/lvl3/lvl4",
+            "lvl1/lvl2/lvl3/lvl4/lvl5",
+        ];
+        for (const p of levels) {
+            await api("/api/v1/admin/folders/create", {
+                method: "POST",
+                body: JSON.stringify({ path: p })
+            });
+        }
+        await refresh();
+    }""")
+    page.wait_for_timeout(300)
+
+    file_id = page.evaluate("""() => {
+        const f = window.files.find(x => x.filename === "deep_file.txt");
+        return f ? f.id : null;
+    }""")
+    assert file_id is not None
+
+    # Open move modal
+    page.evaluate(f"""() => {{
+        openMoveModal(["{file_id}"], "deep_file.txt");
+    }}""")
+    page.wait_for_selector("#moveModal", state="visible", timeout=2000)
+
+    # Assert move browser components exist
+    assert page.locator("#moveBreadcrumbs").is_visible()
+    assert page.locator("#moveFolderList").is_visible()
+    assert page.locator("#moveTargetBadge").is_visible()
+
+    # 1. Drill down level 1
+    page.wait_for_selector(".move-folder-tile[data-folder='lvl1']", timeout=2000)
+    page.click(".move-folder-tile[data-folder='lvl1']")
+
+    # 2. Drill down level 2
+    page.wait_for_selector(".move-folder-tile[data-folder='lvl2']", timeout=2000)
+    page.click(".move-folder-tile[data-folder='lvl2']")
+
+    # 3. Drill down level 3
+    page.wait_for_selector(".move-folder-tile[data-folder='lvl3']", timeout=2000)
+    page.click(".move-folder-tile[data-folder='lvl3']")
+
+    # 4. Drill down level 4
+    page.wait_for_selector(".move-folder-tile[data-folder='lvl4']", timeout=2000)
+    page.click(".move-folder-tile[data-folder='lvl4']")
+
+    # 5. Drill down level 5
+    page.wait_for_selector(".move-folder-tile[data-folder='lvl5']", timeout=2000)
+    page.click(".move-folder-tile[data-folder='lvl5']")
+
+    # Verify target indicator reflects deep path
+    badge_text = page.inner_text("#moveTargetBadge")
+    assert "lvl1/lvl2/lvl3/lvl4/lvl5" in badge_text
+
+    # Verify breadcrumb segments exist
+    crumbs = page.locator(".move-crumb")
+    assert crumbs.count() >= 6  # Root + lvl1 + lvl2 + lvl3 + lvl4 + lvl5
+
+    # Ascend to lvl2 via breadcrumb click
+    page.click(".move-crumb[data-path='lvl1/lvl2']")
+    page.wait_for_selector(".move-folder-tile[data-folder='lvl3']", timeout=2000)
+    badge_text_after = page.inner_text("#moveTargetBadge")
+    assert "lvl1/lvl2" in badge_text_after
+    assert "lvl3" not in badge_text_after
+
+    # Confirm move by clicking Move Here button without typing any path
+    page.click("#moveOk")
+    page.wait_for_selector("#moveModal", state="hidden", timeout=4000)
+
+    # Verify file is moved to lvl1/lvl2/deep_file.txt
+    new_path = page.evaluate(f"""() => {{
+        const f = window.files.find(x => x.id === "{file_id}");
+        return f ? f.filename : null;
+    }}""")
+    assert new_path == "lvl1/lvl2/deep_file.txt"
+
+
+def test_responsive_toolbar_and_empty_states(authed_page: Page, tmp_path: Path):
+    """Test 22: Grouped toolbar layout, mobile touch targets, and empty states."""
+    page = authed_page
+
+    # 1. Desktop Viewport (1280x800)
+    page.set_viewport_size({"width": 1280, "height": 800})
+    page.wait_for_selector(".toolbar", timeout=3000)
+
+    # Assert 3 semantic toolbar groups exist
+    assert page.locator(".toolbar-group-primary").is_visible()
+    assert page.locator(".toolbar-group-view").is_visible()
+    assert page.locator(".toolbar-group-actions").is_visible()
+
+    # Assert desktop button heights adhere to 36px standard
+    upload_btn = page.locator("#uploadToggleBtn")
+    box = upload_btn.bounding_box()
+    assert box is not None and box["height"] >= 34, f"Upload btn height {box} < 34px"
+
+    # Assert empty vault illustration state
+    if page.locator("#empty").is_visible():
+        assert page.locator("#empty .empty-title").is_visible()
+        assert page.locator("#empty .empty-action-btn").is_visible()
+
+    # Upload a file so search filtering can be exercised
+    _upload_file(page, tmp_path, "search_sample.txt")
+    page.wait_for_selector(".gallery .gcell:has-text('search_sample.txt')", timeout=4000)
+
+    # Assert empty search state renders rich contextual illustration and clear button
+    page.fill("#fSearch", "nonexistent_query_xyz_123")
+    page.wait_for_selector("#noMatch", state="visible", timeout=3000)
+    assert page.locator("#noMatch .empty-title").is_visible()
+    clear_btn = page.locator("#emptyClearSearchBtn")
+    assert clear_btn.is_visible()
+    clear_btn.click()
+    page.wait_for_timeout(300)
+    assert page.input_value("#fSearch") == ""
+
+    # 2. Mobile Viewport (375x667)
+    page.set_viewport_size({"width": 375, "height": 667})
+    page.wait_for_timeout(300)
+
+    # Assert no horizontal overflow
+    scroll_fits = page.evaluate("() => document.body.scrollWidth <= window.innerWidth")
+    assert scroll_fits, "Page horizontally scrolls on 375px mobile viewport"
+
+    # Assert touch targets >= 36px height
+    for selector in ["#uploadToggleBtn", "#selectModeBtn", "#newFolderBtn"]:
+        btn_box = page.locator(selector).bounding_box()
+        assert btn_box is not None and btn_box["height"] >= 34, f"{selector} height < 34px"
+
+
+def test_async_modal_submit_guard_stress(authed_page: Page, tmp_path: Path):
+    """Test 23: Double-click rejection and spinner activation under simulated network delay."""
+    page = authed_page
+
+    # Simulate 400ms server delay on folders/create in the browser
+    page.evaluate("""() => {
+        const origFetch = window.fetch;
+        window._createFolderCalls = 0;
+        window.fetch = async (...args) => {
+            const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || "");
+            if (url && url.includes('/admin/folders/create')) {
+                window._createFolderCalls++;
+                await new Promise(r => setTimeout(r, 400));
+            }
+            return origFetch(...args);
+        };
+    }""")
+
+    # Click new folder button to open prompt
+    page.click("#newFolderBtn")
+    page.wait_for_selector(".modal.on #__askInp", timeout=2000)
+    page.fill("#__askInp", "guarded_folder")
+
+    # Double click the submit button rapidly
+    ok_btn = page.locator("#__askOk")
+    ok_btn.click()
+    # Immediate subsequent click should be ignored because button was disabled / answered
+    page.evaluate("() => { const b = document.querySelector('#__askOk'); if (b) b.click(); }")
+
+    # Wait for completion and modal removal
+    page.wait_for_selector(".modal.on #__askInp", state="detached", timeout=4000)
+
+    # Verify exactly 1 network request was initiated
+    calls = page.evaluate("() => window._createFolderCalls")
+    assert calls == 1, f"Expected exactly 1 API call, got {calls}"
+
+    # Wait for folder to appear authoritatively in the view
+    page.wait_for_selector(
+        ".gallery .gcell:has-text('guarded_folder'), #rows tr:has-text('guarded_folder')",
+        timeout=4000,
+    )
+    folder_count = page.evaluate("""() => {
+        return (window.files || []).filter(x => x.filename === "guarded_folder/").length;
+    }""")
+    assert folder_count == 1, f"Expected 1 folder created, got {folder_count}"

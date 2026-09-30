@@ -44,15 +44,15 @@
 
 ### index.html (قطعات منطقی)
 - [ ] login screen
-- [x] file list + rendering (freeze-free in-place selection, gallery preservation, search sync)
+- [x] file list + rendering (freeze-free in-place selection, gallery preservation, semantic toolbar flex groups, standardized 36px/30px buttons, rich contextual empty states, mobile label collapsing)
 - [ ] upload flow (multiple/chunk/resume)
-- [x] folder nav + breadcrumbs
+- [x] folder nav + breadcrumbs (interactive hierarchical move browser with 5-level drill-down, zero manual path typing)
 - [ ] settings/theme (dark-light، دو زبانه)
 - [ ] MTProto login drawer
 - [ ] ZIP/export flow
-- [x] modals (rename/delete/link/info/move validation + spinner)
+- [x] modals (hierarchical visual move browser, universal submit guard guardModalSubmit, danger buttons, media resource teardown)
 - [ ] admin dashboard (stats، storage legend، settings)
-- [x] JS توابع کمکی (esc، fetch wrapper with 401 transparent retry، toast)
+- [x] JS توابع کمکی (esc، fetch wrapper with 401 transparent retry، toast، guardModalSubmit)
 
 ### miniapp.html
 - [ ] renderList + esc

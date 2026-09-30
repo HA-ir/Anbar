@@ -163,3 +163,22 @@ signatures per item.
 | Account/channel lost (ban) | that backend's files unreadable | backend is swappable via env; remaining backends serve; `/admin/status` flags it |
 | HMAC secret leaked | forged links possible | `anbarctl rotate-secret`; expired links die on their own |
 | Disk pressure | N/A — only metadata | VACUUM schedule; cache is capped and evictable |
+
+## UI Architecture & Interaction Contracts (v0.15.58)
+
+### 1. Hierarchical Move Browser State
+The Move dialog (`#moveModal`) maintains client-side navigation state (`moveBrowsePrefix`, `moveFilterQuery`, `moveManualMode`) decoupled from raw filesystem typing:
+- **Directory Hierarchy Extraction**: `getAllFolderPaths()` extracts multi-segment directory prefixes from object paths and virtual markers.
+- **Immediate Child Projection**: For the active `moveBrowsePrefix`, immediate child subdirectories are calculated and rendered as interactive tiles (`.move-folder-tile`).
+- **Interactive Breadcrumbs**: Navigable ancestor segment trail (`#moveBreadcrumbs`) allows single-click ascension across any depth without typing.
+- **Circular Validation**: Disables destination paths that match or descend from any folder being moved (`.disabled`), visually preventing circular moves before submission.
+- **Authoritative Refresh**: `doMove()` waits for `await refresh()` and cache eviction before modal teardown, ensuring zero stale state.
+
+### 2. Design System Tokens & Semantic Layout
+- **Custom Properties**: `--btn-h: 36px`, `--btn-h-sm: 30px`, `--btn-radius: 10px`, spacing tokens `--sp-xs` (4px) through `--sp-xl` (24px).
+- **Toolbar Flex Clusters**: Structured into 3 functional groups:
+  1. `toolbar-group-primary`: Ingestion (`#uploadToggleBtn`, `#newFolderBtn`).
+  2. `toolbar-group-view`: Presentation (`#viewBtn`, `#fType`).
+  3. `toolbar-group-actions`: Operations (`#selectModeBtn`, `#selAllBtn`, `#trashBtn`, `#linksBtn`, `#refBtn`).
+- **Mobile Responsive Collapse (<480px)**: Collapses secondary button labels to icon tooltips (`aria-label`) while maintaining touch target heights (≥36px).
+- **Universal Submit Guards**: `guardModalSubmit()` coordinates in-flight spinners, blocks duplicate clicks, and guarantees clean error reset across all modal actions.

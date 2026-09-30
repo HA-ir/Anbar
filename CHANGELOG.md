@@ -4,6 +4,19 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.58] — 2026-10-01
+
+### Added
+- **Interactive Hierarchical Move Browser**: Completely overhauled the Move dialog (`#moveModal`) from a manual path text input into an interactive visual virtual folder browser. Users can navigate 5+ directory levels deep via clickable folder tiles, ascend cleanly using the interactive breadcrumb trail (`#moveBreadcrumbs`), inspect active destination paths (`#moveTargetBadge`), and execute relocations with zero manual keyboard typing.
+- **Visual Circular Move Disabling**: Disables destination folder tiles and buttons (`.disabled`) that match the source item or any of its descendants, preventing illegal circular hierarchies before submission.
+- **Whole-Product Design System Tokens**: Added unified CSS design tokens to `:root` (`--btn-h: 36px`, `--btn-h-sm: 30px`, `--btn-radius: 10px`, spacing tokens `--sp-xs` through `--sp-xl`), standardizing button heights, paddings, and border radii across all controls.
+- **Semantic Toolbar Flex Clusters**: Reorganized the application toolbar into 3 balanced, purposeful flex groups (`.toolbar-group-primary`, `.toolbar-group-view`, `.toolbar-group-actions`), eliminating desktop clutter and height mismatches.
+- **Responsive Mobile Toolbar Collapsing (<480px)**: Secondary toolbar action buttons automatically collapse text labels on mobile screens (<480px) into clean icon-only tooltips, preserving a clean single/double row layout with zero horizontal page scrolling and full ≥36px touch targets.
+- **Contextual Empty States**: Replaced plain text placeholders with tailored SVG illustrations, descriptive bilingual copy, and primary action shortcuts for empty directories (`#empty` with "Upload Files") and zero search results (`#noMatch` with "Clear Search").
+- **Universal Modal Submit Guarding**: Implemented `guardModalSubmit()` across folder creation, renaming, moving, and link minting modals, rejecting duplicate clicks and displaying active in-flight spinners without leaving dialogs in stuck loading states.
+- **Media Resource Teardown**: Closing the media preview modal (`#fmClose`) explicitly pauses media decoders, detaches `src`, and unloads video/audio element buffers to prevent memory and background stream leaks.
+- **Playwright E2E Coverage Expansion**: Added automated browser tests for 5-level hierarchical folder navigation, responsive mobile toolbar layout, and async double-click submit guarding.
+
 ## [0.15.57] — 2026-09-30
 
 ### Fixed

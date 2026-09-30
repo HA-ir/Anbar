@@ -384,3 +384,219 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - deployed revision recorded: **92fccde**
   - Git state verified: **Clean, zero secrets tracked**
 - **Milestone Outcome**: **COMPLETED**
+
+---
+
+## 4. Product Quality & UX Overhaul Milestone (`specs/002-ux-product-overhaul`)
+
+### Session 10: Visual Audit & Product Quality Specification (2026-09-30)
+
+- **Current Objective**: Create formal feature specification for Anbar Product Quality & UX Overhaul based on real browser visual inspection, desktop/mobile screenshots, and deep journey audits.
+- **Completed Work**:
+  - Captured live desktop (`1280×800`) and mobile (`375×667`) browser screenshots of login, main dashboard, and move modal:
+    - *Discovered in Move Modal*: Requires manual typing of nested paths (`folder/subfolder`). Chips only show flat list; zero hierarchical navigation or child entry.
+    - *Discovered in Dashboard Toolbar*: Controls wrap into 3 disorganized rows with inconsistent heights, cluttered buttons, and misaligned select/search elements.
+    - *Discovered in Mobile*: Toolbar buttons cram together and wrap awkwardly across 4 lines; touch affordances need consolidation.
+  - Authored comprehensive specification in `specs/002-ux-product-overhaul/spec.md`:
+    - Completely redesigned Move experience with interactive hierarchical folder browser, breadcrumbs, child directory drill-down, visual destination display, and circular move prevention.
+    - Systematic design system overhaul with standardized control clusters, unified spacing, consistent button heights, and responsive mobile flex wrapping.
+    - Full user journey reliability safeguards and observable acceptance criteria.
+  - Passed specification quality checklist in `specs/002-ux-product-overhaul/checklists/requirements.md` (100% pass).
+  - Set active feature pointer in `.specify/feature.json`.
+- **Files/Components Changed**:
+  - `specs/002-ux-product-overhaul/spec.md` (created)
+  - `specs/002-ux-product-overhaul/checklists/requirements.md` (created)
+  - `.specify/feature.json` (updated to point to `specs/002-ux-product-overhaul`)
+  - `specs/desktop_login.png`, `specs/desktop_dashboard.png`, `specs/desktop_move_modal.png`, `specs/mobile_dashboard.png` (captured visual audit evidence)
+  - `docs/WORKING_RECORD.md` (updated)
+- **Tests Executed**:
+  - Live Playwright screenshot capture and visual layout analysis across desktop and mobile viewports.
+- **Tests Still Missing**:
+  - New Playwright E2E tests for the visual hierarchical folder browser and responsive mobile toolbars.
+- **Known Failures**:
+  - Current move modal lacks interactive child folder navigation; desktop/mobile toolbars have visual clutter.
+- **Deployment Status**:
+  - Production running stable v0.15.57 on Falkenstein (`92fccde`).
+- **Current Git Commit / Branch**:
+  - `a2817b2` on `main`.
+- **Exact Next Step for Next Session**:
+  - Perform deep UX and reliability investigation via `/speckit-clarify`.
+
+### Session 11: Deep UX Audit & Move Workflow Investigation (2026-09-30)
+
+- **Current Objective**: Perform comprehensive, evidence-driven UX and reliability audit across all major journeys using live headless browser automation, inspecting Move workflow, toolbar layouts, async error handling, and reliability lifecycles.
+- **Completed Work**:
+  1. **Move Workflow Deep Investigation**:
+     - *Tested*: Live manual interaction in Chromium with deep nested folders (`media/videos/movies/2026`).
+     - *Observation*: `#moveChips` extracts prefixes solely from existing objects. In `src/anbar/ui/index.html:3848-3884`, clicking a chip simply pastes the string into `#moveDest.value`. It does NOT navigate into child directories or reveal subfolders. Moving to a deeply nested subfolder requires manually typing `/movies/2026`.
+     - *Clarification*: The move modal must maintain an active navigation state (`moveBrowsePrefix`), render clickable child folder tiles, provide an interactive breadcrumb trail, and bind the "Move Here" button directly to the currently browsed path without manual typing.
+  2. **Whole-Product UX & Visual Hierarchy Audit**:
+     - *File Toolbar*: Desktop renders 11 disconnected elements with mixed heights and paddings. Mobile view (<480px) fragments awkwardly into 4 jagged rows.
+     - *Button Affordances & Design Tokens*: Action buttons lack standardized sizing (some 36px, some 32px, some unconstrained). Need standardized `.btn-group` containers and uniform heights.
+     - *Empty States*: Empty folders and zero search results display plain text; need engaging empty illustrations with actionable shortcut buttons.
+  3. **Reliability & Async Lifecycle Audit**:
+     - Tested repeated rapid clicks on folder creation, file rename, search clearing, and select-all.
+     - Identified that folder creation and renaming modals lacked loading spinners on submission, permitting duplicate network requests under high latency.
+  4. **Integrated Clarifications into Specification**:
+     - Updated `specs/002-ux-product-overhaul/spec.md` with verified code findings under `## Clarifications`.
+- **Files/Components Changed**:
+  - `specs/002-ux-product-overhaul/spec.md` (updated with Clarifications)
+  - `docs/WORKING_RECORD.md` (updated with Session 11 findings)
+- **Tests Executed**:
+  - Live Playwright interactive script testing move chips, nested folder paths, and toolbar wrapping.
+- **Tests Still Missing**:
+  - E2E tests for visual folder drill-down and breadcrumb ascension in the move modal.
+- **Known Failures**:
+  - Move dialog requires manual text typing for nested destinations; toolbar controls fragment on mobile.
+- **Deployment Status**:
+  - Production running v0.15.57 on Falkenstein (`92fccde`).
+- **Current Git Commit / Branch**:
+  - `a2817b2` on `main`.
+- **Exact Next Step for Next Session**:
+  - Design technical architecture and implementation plan via `/speckit-plan`.
+
+### Session 12: Implementation Planning & Move Browser Architecture (2026-10-01)
+
+- **Current Objective**: Create comprehensive implementation plan (`plan.md`, `research.md`, `data-model.md`, `contracts/ui-contracts.md`, `quickstart.md`) for the Anbar Product Quality & UX Overhaul milestone.
+- **Completed Work**:
+  - Authored `specs/002-ux-product-overhaul/plan.md` breaking work into 6 prioritized, verifiable phases:
+    1. Phase 1 — Move Workflow Redesign (Visual Hierarchical Navigation, child drill-down, breadcrumbs, circular move prevention).
+    2. Phase 2 — Universal Async Guarding & Reliability Fixes (modal submit loading spinners, duplicate click prevention).
+    3. Phase 3 — Information Architecture & Toolbar Reorganization (semantic flex clusters, standardized 36px/32px button heights).
+    4. Phase 4 — Contextual Empty States (rich SVG illustrations and actionable shortcuts for empty directories and zero search results).
+    5. Phase 5 — Responsive Mobile Usability & Accessibility (collapsing button labels on <480px, keyboard focus traps).
+    6. Phase 6 — E2E Browser Testing & Production Verification (Playwright automated journeys, Falkenstein deployment).
+  - Authored supporting Phase 0/1 artifacts:
+    - `research.md`: technical choices on virtual directory navigation, toolbar flex grouping, and async guarding.
+    - `data-model.md`: state entities (`MoveBrowserState`, `DesignTokens`, `ToolbarState`, `AsyncActionGuard`).
+    - `contracts/ui-contracts.md`: client component contracts, breadcrumb transitions, and CSS hierarchies.
+    - `quickstart.md`: runnable validation scenarios for deep folder relocation and responsive mobile checks.
+- **Files/Components Changed**:
+  - `specs/002-ux-product-overhaul/plan.md` (created)
+  - `specs/002-ux-product-overhaul/research.md` (created)
+  - `specs/002-ux-product-overhaul/data-model.md` (created)
+  - `specs/002-ux-product-overhaul/contracts/ui-contracts.md` (created)
+  - `specs/002-ux-product-overhaul/quickstart.md` (created)
+  - `docs/WORKING_RECORD.md` (updated)
+- **Tests Executed**:
+  - Structure validation against Spec Kit templates and Anbar Engineering Constitution v1.0.0.
+- **Tests Still Missing**:
+  - Implementation tasks pending generation via `/speckit-tasks`.
+- **Known Failures**:
+  - Move dialog requires manual text typing for nested destinations; toolbar controls fragment on mobile.
+- **Deployment Status**:
+  - Production running stable v0.15.57 on Falkenstein (`92fccde`).
+- **Current Git Commit / Branch**:
+  - `a2817b2` on `main`.
+- **Exact Next Step for Next Session**:
+  - Run `/speckit-tasks` to generate atomic implementation tasks (`tasks.md`) for the Product Quality & UX Overhaul milestone.
+
+### Session 13: Strict Product-Quality Acceptance Checklist (2026-10-01)
+
+- **Current Objective**: Author a concrete, testable product-quality verification checklist (`specs/002-ux-product-overhaul/checklists/acceptance.md`) with explicit observable evidence across Move, Reliability, Professional UX, and E2E Quality dimensions, rejecting technically functional but poor UX.
+- **Completed Work**:
+  - Authored `specs/002-ux-product-overhaul/checklists/acceptance.md` containing 26 numbered criteria (CHK001 through CHK026) across 4 core domains:
+    1. **Visual Hierarchical Move Workflow** (CHK001..CHK010): Zero manual path typing across 5 nested levels, interactive breadcrumbs, target path display, circular move visual disabling, same-destination block, empty directory support, bounded scrolling, real-time folder search, multi-item summary header, non-stuck loading state.
+    2. **Whole-Product Design System & Visual Hierarchy** (CHK011..CHK017): Semantic toolbar flex clusters (`Primary Ingest`, `View & Sort`, `Batch Actions`), standardized 36px/32px button heights, mobile label collapsing (<480px) to icon tooltips, contextual empty directory & zero-search SVG illustrations, red danger buttons for destructive operations, unified modal backdrops.
+    3. **Reliability & Asynchronous Lifecycle Resilience** (CHK018..CHK022): Universal double-click submission guarding across all modals, zero infinite spinners on network timeout/failure, deterministic browser history (`#folder=...`), media resource teardown upon modal close, authoritative view refresh post-mutation.
+    4. **End-to-End Quality & Visual Verification** (CHK023..CHK026): Automated Playwright deep move journey (5 levels), automated responsive viewport assertions (1280px & 375px), 5x rapid click stress tests, production deployment smoke test on `https://dl.amiri-dev.ir/`.
+- **Files/Components Changed**:
+  - `specs/002-ux-product-overhaul/checklists/acceptance.md` (created with 26 observable criteria)
+  - `docs/WORKING_RECORD.md` (updated)
+- **Tests Executed**:
+  - Checklist structure validation and criteria observability verification.
+- **Tests Still Missing**:
+  - Implementation tasks pending breakdown via `/speckit-tasks`.
+- **Known Failures**:
+  - Move dialog requires manual text typing for nested destinations; toolbar controls fragment on mobile.
+- **Deployment Status**:
+  - Production running stable v0.15.57 on Falkenstein (`92fccde`).
+- **Current Git Commit / Branch**:
+  - `a2817b2` on `main`.
+- **Exact Next Step for Next Session**:
+  - Run `/speckit-tasks` to generate atomic implementation tasks (`tasks.md`) for the Product Quality & UX Overhaul milestone.
+
+### Session 14: Atomic Task Generation & Execution Roadmap (2026-10-01)
+
+- **Current Objective**: Decompose the Product Quality & UX Overhaul specification, plan, research, and 26-item acceptance checklist into atomic, test-driven implementation tasks (`tasks.md`).
+- **Completed Work**:
+  - Generated `specs/002-ux-product-overhaul/tasks.md` with 30 atomic tasks (T001 through T030) across 7 execution phases:
+    - Phase 1: Setup & Pre-Flight Verification (T001..T002)
+    - Phase 2: Foundational Design Tokens & Modal Submit Guards (T003..T004)
+    - Phase 3: User Story 1 (P1) - Interactive Hierarchical Move Workflow MVP (T005..T011)
+    - Phase 4: User Story 2 (P1) - Whole-Product Design System & Visual Polish (T012..T016)
+    - Phase 5: User Story 3 (P2) - Comprehensive Journey Audit & Reliability Hardening (T017..T021)
+    - Phase 6: Documentation & Persistent Project Records (T022..T025)
+    - Phase 7: Full Product Quality Verification & Production Deployment Closure (T026..T030)
+- **Files/Components Changed**:
+  - `specs/002-ux-product-overhaul/tasks.md` (created with 30 actionable tasks)
+  - `docs/WORKING_RECORD.md` (updated)
+- **Tests Executed**:
+  - Task format validation, checklist dependency cross-referencing, and execution order verification.
+- **Tests Still Missing**:
+  - Implementation of T001 through T030.
+- **Known Failures**:
+  - Move dialog requires manual text typing for nested destinations; toolbar controls fragment on mobile.
+- **Deployment Status**:
+  - Production running stable v0.15.57 on Falkenstein (`92fccde`).
+- **Current Git Commit / Branch**:
+  - `a2817b2` on `main`.
+### Session 15: Product Quality & UX Overhaul Implementation (2026-10-01)
+
+- **Current Objective**: Implement the complete Product Quality & UX Overhaul (v0.15.58) covering the interactive hierarchical move browser, whole-product design system tokens, semantic toolbar flex clusters, mobile label collapsing, universal modal submit guards, contextual empty states, and comprehensive Playwright verification.
+- **Completed Work**:
+  1. **Interactive Hierarchical Move Browser (US1, MVP)**:
+     - Replaced raw destination text input with an interactive visual virtual folder browser in `src/anbar/ui/index.html`.
+     - Built `getAllFolderPaths()` and `renderMoveBrowser()` extracting multi-tier directory hierarchies.
+     - Enabled visual folder drill-down on child directory tiles (`.move-folder-tile`) and single-click ascension via interactive breadcrumbs (`#moveBreadcrumbs`).
+     - Displayed prominent active destination badge (`#moveTargetBadge`) with real-time directory search filtering (`#moveFilterInp`).
+     - Visually disabled circular destinations (`.disabled`) matching the source folder or any of its descendants.
+     - Kept destination input synced with the browser for direct power-user typing while eliminating manual typing requirements.
+     - Bound `#moveOk` ("Move Here" / "Move to Root") to active navigation cursor with atomic `guardModalSubmit` and authoritative `await refresh()`.
+  2. **Design Tokens & Toolbar Flex Clustering (US2)**:
+     - Added unified CSS custom properties to `:root`: `--btn-h: 36px`, `--btn-h-sm: 30px`, `--btn-radius: 10px`, spacing tokens `--sp-xs` through `--sp-xl`.
+     - Reorganized flat toolbar into 3 semantic flex clusters: `.toolbar-group-primary` (upload, new folder), `.toolbar-group-view` (gallery/table, file type), `.toolbar-group-actions` (select mode, trash, links, refresh).
+     - Standardized button dimensions, heights, and vertical text alignments.
+     - Implemented responsive mobile media query (`@media (max-width: 480px)`) collapsing secondary toolbar button text labels into clean icon tooltips, ensuring zero horizontal overflow and full ≥36px touch targets.
+  3. **Contextual Empty States & Visual Polish (US2)**:
+     - Upgraded `.empty` into rich contextual illustration card components.
+     - Redesigned `#empty` (empty vault) with tailored SVG graphics, descriptive Persian/English copy, and an immediate "Upload Files" shortcut button (`openDropZone()`).
+     - Redesigned `#noMatch` (zero search results) with search SVG graphics, descriptive copy, and a prominent "Clear Search" button.
+     - Applied distinct red styling (`btn-danger`) across all destructive operations: `#trashEmptyBtn`, `#revokeAllLinksBtn`, `#mgRevoke`, `#selDelBtn`, and danger confirmations.
+  4. **Universal Submit Guarding & Reliability Hardening (US3)**:
+     - Implemented universal `guardModalSubmit()` wrapper coordinating button disabling, in-flight spinner display, secondary click rejection, and guaranteed error recovery.
+     - Integrated `guardModalSubmit` into `#newFolderBtn`, `renameObj`, and `#shareOptsOk`.
+     - Updated `#fmClose` to explicitly pause media decoders, remove `src`, and unload stream buffers.
+  5. **Automated Verification & Version Bump**:
+     - Added 3 new Playwright E2E browser tests:
+       - `test_hierarchical_move_browser_navigation`: 5-level folder drill-down and breadcrumb ascension without keyboard typing.
+       - `test_responsive_toolbar_and_empty_states`: Desktop flex alignment, mobile 375px touch targets (≥36px), zero horizontal scroll, and contextual empty states.
+       - `test_async_modal_submit_guard_stress`: Double-click rejection under simulated network latency.
+     - Created `tests/test_v01558_overhaul.py` asserting version bump, design tokens, and move browser elements.
+     - Bumped version to `0.15.58` across `pyproject.toml`, `src/anbar/__init__.py`, and `uv.lock`.
+- **Files/Components Changed**:
+  - `src/anbar/ui/index.html` (move browser DOM/JS, design tokens, toolbar clusters, empty states, submit guards, danger buttons)
+  - `tests/test_e2e_playwright.py` (added tests 21, 22, 23)
+  - `tests/test_v01558_overhaul.py` (created regression suite)
+  - `tests/test_v01556_ui_fixes.py` & `tests/test_v01557_stabilization.py` (version assertions updated)
+  - `docs/ARCHITECTURE.md` (documented UI architecture, move browser contracts, and design tokens)
+  - `CHANGELOG.md` (added v0.15.58 release notes)
+  - `AUDIT_COVERAGE.md` (updated UI audit coverage)
+  - `BUGS_AND_FIXES.md` (recorded v0.15.58 resolutions and benchmarks)
+  - `pyproject.toml`, `src/anbar/__init__.py`, `uv.lock` (bumped to 0.15.58)
+  - `docs/WORKING_RECORD.md` (updated)
+- **Tests Executed**:
+  - `pytest -v`: 484/484 passed (100% pass rate).
+  - Playwright E2E suite (`tests/test_e2e_playwright.py`): 24/24 passed in headless Chromium.
+  - Linters: `ruff check` (0 errors), `ruff format --check` (100% formatted), `mypy` (0 errors).
+  - JavaScript syntax: `node -c` (0 syntax errors).
+- **Tests Still Missing**:
+  - None. Full test suite passing.
+- **Known Failures**:
+  - None in scope.
+- **Deployment Status**:
+  - Ready for Falkenstein production deployment (v0.15.58).
+- **Current Git Commit / Branch**:
+  - Working tree prepared for commit on `main`.
+- **Exact Next Step for Next Session**:
+  - Execute remote deployment via `/home/hossein/anbar_deploy_falkenstein.sh` and perform live smoke tests on `https://dl.amiri-dev.ir/`.

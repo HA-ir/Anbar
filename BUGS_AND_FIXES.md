@@ -223,6 +223,34 @@ docker stats anbar-anbar-1 --no-stream
 
 ---
 
+### v0.15.58 — Product Quality & UX Overhaul
+Date: 2026-10-01
+Scope: Specs/002-ux-product-overhaul (Move workflow redesign, design system, async reliability, empty states)
+
+#### Defects & UX Flaws Resolved
+1. **Manual Path Typing in Move Workflow**:
+   - *Issue*: Relocating an item into a nested folder required typing the complete path string manually.
+   - *Fix*: Implemented an interactive hierarchical folder browser with direct child folder drill-down, navigable breadcrumb trail (`#moveBreadcrumbs`), prominent destination path display (`#moveTargetBadge`), real-time folder search filter, and automated circular move visual disabling (`.disabled`).
+2. **Design Inconsistency & Toolbar Clutter**:
+   - *Issue*: 11 disconnected toolbar buttons on desktop; awkward wrapping and fragmented rows on mobile.
+   - *Fix*: Grouped into 3 semantic flex clusters (`.toolbar-group-primary`, `.toolbar-group-view`, `.toolbar-group-actions`), standardized button dimensions (`--btn-h: 36px`, `--btn-h-sm: 30px`, `--btn-radius: 10px`), and added responsive mobile label collapsing (<480px).
+3. **Async Race Conditions on Mutating Modals**:
+   - *Issue*: Rapid double-clicking on folder creation, file rename, or link minting could dispatch duplicate network requests.
+   - *Fix*: Implemented universal `guardModalSubmit()` across all modals with active in-flight spinners, disabled secondary clicks, and guaranteed error reset.
+4. **Media Resource Leaks**:
+   - *Issue*: Closing preview modal while playing video or audio kept decoders and streams active in memory.
+   - *Fix*: Added explicit `pause()`, `removeAttribute("src")`, and `load()` cleanup on modal dismiss.
+5. **Contextual Empty States**:
+   - *Issue*: Empty folders and zero search results presented raw text.
+   - *Fix*: Designed rich contextual SVG illustrations, descriptive copy, and operational shortcut buttons ("Upload Files", "Clear Search").
+
+#### Automated E2E Verification
+- Playwright tests: 24 passing end-to-end browser tests (`tests/test_e2e_playwright.py`).
+- 5-level directory drill-down and breadcrumb ascension verified in headless Chromium.
+- Mobile viewport touch targets verified (≥36px) with zero horizontal overflow.
+
+---
+
 ## Previous Versions
 
 ### v0.15.50
