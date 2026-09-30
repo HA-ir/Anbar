@@ -596,8 +596,14 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 - **Known Failures**:
   - None in scope.
 - **Deployment Status**:
-  - Ready for Falkenstein production deployment (v0.15.58).
+  - **DEPLOYED TO PRODUCTION (Falkenstein, v0.15.58)**:
+    - Remote host: `167.233.55.81:9898`
+    - Container status: `anbar-anbar-1 Up (healthy) 127.0.0.1:8318->8567/tcp`
+    - Local healthz: `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Public HTTPS healthz (`https://dl.amiri-dev.ir/healthz`): `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Database verification: All 90 objects intact and verified without data loss.
+    - Production UI verification: `moveBreadcrumbs` verified live in production HTML on `https://dl.amiri-dev.ir/`.
 - **Current Git Commit / Branch**:
-  - `7d4399d` on `main` (pushed to `origin main`).
+  - `ce366f4` on `main` (deployed to Falkenstein).
 - **Exact Next Step for Next Session**:
-  - Execute remote deployment to Falkenstein via `/home/hossein/anbar_deploy_falkenstein.sh` and perform live smoke tests on `https://dl.amiri-dev.ir/`.
+  - Milestone 2 complete. Stand by for future requirements.

@@ -74,5 +74,5 @@
 - [x] T026 Run full automated test suite (`pytest -v`), Playwright E2E suite (`pytest tests/test_e2e_playwright.py`), and linters (`ruff check`, `ruff format --check`, `mypy`)
 - [x] T027 Validate JavaScript syntax in `src/anbar/ui/index.html` via `node --check`
 - [x] T028 Bump version to `0.15.58` across `pyproject.toml`, `src/anbar/__init__.py`, and `uv.lock`
-- [ ] T029 Execute remote production deployment to Falkenstein via `/home/hossein/anbar_deploy_falkenstein.sh` and perform live smoke tests on `https://dl.amiri-dev.ir/`
-- [ ] T030 Update `docs/WORKING_RECORD.md` with final verification evidence, screenshots, deployed commit hash, and milestone completion closure
+- [x] T029 Execute remote production deployment to Falkenstein via `/home/hossein/anbar_deploy_falkenstein.sh` and perform live smoke tests on `https://dl.amiri-dev.ir/`
+- [x] T030 Update `docs/WORKING_RECORD.md` with final verification evidence, screenshots, deployed commit hash, and milestone completion closure
