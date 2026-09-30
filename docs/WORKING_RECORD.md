@@ -325,20 +325,19 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
      - Bumped version to `0.15.57` in `pyproject.toml`, `src/anbar/__init__.py`, and `uv.lock`. Added `tests/test_v01557_stabilization.py`.
      - Completed T028: Full test suite passes cleanly: **474 unit/integration/E2E tests passing (100%)**, `ruff check` passes, `ruff format --check` passes, `mypy` passes, `node --check` passes.
 - **Files/Components Changed**:
-  - `src/anbar/ui/index.html` (selection in-place, move modal state machine & validation, search debounce cancellation, MKV source hint & error inspection, 401 retry)
-  - `tests/test_e2e_playwright.py` (added 5 E2E tests: selection performance, cold start, move validation, search race safety, MKV playback)
-  - `tests/test_v01557_stabilization.py` (added unit/static tests for 0.15.57 fixes)
-  - `tests/test_v01556_ui_fixes.py` (updated version assertion regex)
-  - `pyproject.toml` (bumped to 0.15.57)
-  - `src/anbar/__init__.py` (bumped to 0.15.57)
-  - `uv.lock` (updated to 0.15.57)
-  - `docs/DEPLOY.md` (documented `/opt/anbar` volume invariants)
-  - `/home/hossein/anbar_deploy_falkenstein.sh` (local untracked helper created outside Git)
-  - `CHANGELOG.md` (updated)
-  - `AUDIT_COVERAGE.md` (updated)
-  - `BUGS_AND_FIXES.md` (updated)
-  - `specs/001-ux-reliability-stabilization/tasks.md` (tasks T001..T028 marked complete)
-  - `docs/WORKING_RECORD.md` (updated)
+  - `src/anbar/ui/index.html`
+  - `tests/test_e2e_playwright.py`
+  - `tests/test_v01557_stabilization.py`
+  - `tests/test_v01556_ui_fixes.py`
+  - `pyproject.toml`
+  - `src/anbar/__init__.py`
+  - `uv.lock`
+  - `docs/DEPLOY.md`
+  - `CHANGELOG.md`
+  - `AUDIT_COVERAGE.md`
+  - `BUGS_AND_FIXES.md`
+  - `specs/001-ux-reliability-stabilization/tasks.md`
+  - `docs/WORKING_RECORD.md`
 - **Tests Executed**:
   - `pytest -v`: **474 passed** (0 failures, 2 warnings).
   - `pytest tests/test_e2e_playwright.py`: **21 passed** (0 failures).
@@ -346,15 +345,42 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff format --check src/ tests/`: 125 files already formatted.
   - `mypy src/anbar/api/`: Success (no issues found in 8 source files).
   - `node --check`: Syntax valid for `src/anbar/ui/index.html`.
-- **Tests Still Missing**:
-  - None for local implementation. Remote production deployment verification (T029) and final project closure (T030) remain.
-- **Known Failures**:
-  - Zero reproducible failures in local environment.
-- **Deployment Status**:
-  - Ready for remote deployment to Falkenstein (T029) using `/home/hossein/anbar_deploy_falkenstein.sh`.
 - **Current Git Commit / Branch**:
-  - Working tree modified on `main` (ready to commit).
-- **Current Task**:
-  - T029 (Execute remote deployment to Falkenstein and run live smoke tests against `https://dl.amiri-dev.ir/`).
-- **Next Actionable Step**:
-  - Commit the completed implementation (T001..T028), push to origin, and execute remote deployment on Falkenstein via `/home/hossein/anbar_deploy_falkenstein.sh`.
+  - `92fccde` on `main`.
+
+### Session 9: Production Deployment & Live Verification Closure (2026-09-30)
+
+- **Current Objective**: Execute remote deployment to Falkenstein (T029), perform live production smoke testing across all 5 stabilized areas, and complete final milestone documentation closure (T030).
+- **Completed Work**:
+  1. **T029: Production Deployment Execution**:
+     - Committed and pushed v0.15.57 (`92fccde`) to `origin/main`.
+     - Verified deployment helper `/home/hossein/anbar_deploy_falkenstein.sh` target: SSH port 9898 to `167.233.55.81`, pulling `/root/anbar`, building `anbar:prod`, restarting `/opt/anbar/compose.yaml` (mounting absolute paths `/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env`), and verifying health checks.
+     - Executed deployment: `anbar-anbar-1` container rebuilt and started (Up healthy).
+     - Confirmed local healthcheck: `http://127.0.0.1:8318/healthz` -> `{"status":"ok","service":"anbar","version":"0.15.57"}`.
+     - Confirmed public HTTPS healthcheck: `https://dl.amiri-dev.ir/healthz` -> `{"status":"ok","service":"anbar","version":"0.15.57"}`.
+     - Verified production database at `/opt/anbar/data/anbar.db`: 48 objects preserved intact. Zero data loss.
+  2. **T029: Production Live Smoke Tests**:
+     - *Startup/Cold Start*: Verified `/api/v1/admin/status` and `/api/v1/admin/objects` return HTTP 200 with 48 objects.
+     - *Search/Filter*: Verified prefix query (`?prefix=private/`) returns 18 matching objects.
+     - *Media & MKV Range*: Verified HTTP 206 Partial Content, `Content-Type: video/x-matroska`, and `Accept-Ranges: bytes` across live MKV objects (`UcYmcrfZ7XVC`, `PHYEGdwcUB3F`, `U97aeVxJxeMm`).
+     - *Move Workflow*: Created test folder `prod_smoke_test_dir`, renamed/moved to `prod_smoke_renamed`, cleaned up.
+     - *Container Logs*: Clean startup logs; zero tracebacks or unhandled exceptions.
+  3. **T030: Final Documentation Closure**:
+     - All 30 tasks (T001 through T030) marked complete in `specs/001-ux-reliability-stabilization/tasks.md`.
+     - Synchronized `docs/WORKING_RECORD.md`, `CHANGELOG.md`, `BUGS_AND_FIXES.md`, and `AUDIT_COVERAGE.md`.
+     - Confirmed deployment helper `/home/hossein/anbar_deploy_falkenstein.sh` remains outside Git.
+- **Final Release Gate Status**:
+  - T001–T028 implemented: **YES**
+  - 474/474 pytest passing: **YES**
+  - 21/21 Playwright E2E passing: **YES**
+  - ruff clean: **YES**
+  - mypy clean: **YES**
+  - syntax checks clean: **YES**
+  - T029 production deployment successful: **YES** (v0.15.57 on Falkenstein @ 92fccde)
+  - production health checks successful: **YES** (local 8318 + public HTTPS 200)
+  - real production smoke tests successful: **YES** (status, search, move, Range MKV streaming, data preservation)
+  - 5 reported defects resolved: **YES** (BUG-38, BUG-39, BUG-40, BUG-41, BUG-42)
+  - T030 documentation updated: **YES**
+  - deployed revision recorded: **92fccde**
+  - Git state verified: **Clean, zero secrets tracked**
+- **Milestone Outcome**: **COMPLETED**

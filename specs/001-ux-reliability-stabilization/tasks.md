@@ -93,5 +93,5 @@
 - [x] T026 [P] Update `CHANGELOG.md` with Keep a Changelog entries for all stabilization fixes
 - [x] T027 [P] Update `AUDIT_COVERAGE.md` with audit status flags for `ui/index.html`
 - [x] T028 Run full test suite (`pytest -v`), linters (`ruff check`, `ruff format --check`, `mypy`), and `node --check` on `src/anbar/ui/index.html`
-- [ ] T029 Execute remote deployment to Falkenstein and run live smoke tests against `https://dl.amiri-dev.ir/`
-- [ ] T030 Update `docs/WORKING_RECORD.md` with final verification results, commit hash, and project closure documentation
+- [x] T029 Execute remote deployment to Falkenstein and run live smoke tests against `https://dl.amiri-dev.ir/`
+- [x] T030 Update `docs/WORKING_RECORD.md` with final verification results, commit hash, and project closure documentation
