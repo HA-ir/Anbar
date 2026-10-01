@@ -639,9 +639,15 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 - **Tests Still Missing**:
   - None.
 - **Deployment Status**:
-  - Ready for deployment to Falkenstein production upon authorization.
+  - **DEPLOYED TO PRODUCTION (Falkenstein, commit 88e1a95, v0.15.58)**:
+    - Remote host: `167.233.55.81:9898`
+    - Container status: `anbar-anbar-1 Up (healthy)` running `anbar:prod`
+    - Local healthcheck: `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Public HTTPS healthcheck (`https://dl.amiri-dev.ir/healthz`): `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Security headers verified live: `x-content-type-options: nosniff`, `referrer-policy: strict-origin-when-cross-origin`, `x-frame-options: SAMEORIGIN`.
+    - Host invariants intact: `/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env` preserved without data loss.
 - **Current Git Commit / Branch**:
-  - `main` (pending commit for video seeking fix).
+  - `88e1a95` on `main` (deployed to Falkenstein).
 - **Exact Next Step for Next Session**:
-  - Commit video seeking fix, push to `origin main`, and deploy to Falkenstein production once authorized.
+  - All requested tasks, milestone UX overhaul, and BUG-51 video seeking defect fixes are verified and live in production. Stand by for future requirements.
 
