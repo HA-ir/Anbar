@@ -983,3 +983,87 @@ def test_video_playback_and_seeking(authed_page: Page, tmp_path: Path):
 
     page.click("#fmClose")
     page.wait_for_selector("#fileModal", state="hidden", timeout=3000)
+
+
+def test_settings_mobile_responsiveness_and_telegram_test(authed_page: Page):
+    """Test 25: Settings drawer responsiveness on mobile (<640px) and live Telegram test button."""
+    page = authed_page
+
+    # 1. Resize to mobile phone viewport (375x667, iPhone SE)
+    page.set_viewport_size({"width": 375, "height": 667})
+
+    # Open Settings
+    page.click("#setBtn")
+    page.wait_for_selector("#drawer.on", timeout=4000)
+
+    # 2. Check mobile layout behavior
+    # Form row labels and inputs should be stacked on small screens
+    row_flex_dir = page.evaluate("""() => {
+        const row = document.querySelector("#secTgConfig .set-row:not(:has(> .sw))");
+        return row ? window.getComputedStyle(row).flexDirection : "";
+    }""")
+    assert row_flex_dir == "column", f"Expected column flex direction on mobile, got {row_flex_dir}"
+
+    # Verify input widths expand to 100% on mobile
+    inp_width = page.evaluate("""() => {
+        const inp = document.querySelector("#s_tg_channel_id");
+        return inp ? inp.getBoundingClientRect().width : 0;
+    }""")
+    assert inp_width > 280, f"Expected input width > 280px on 375px viewport, got {inp_width}"
+
+    # Verify switch rows remain horizontal (space-between)
+    sw_row_flex_dir = page.evaluate("""() => {
+        const swRow = document.querySelector(".drawer .set-row:has(> .sw)");
+        return swRow ? window.getComputedStyle(swRow).flexDirection : "";
+    }""")
+    assert sw_row_flex_dir == "row", f"Switches should be row, got {sw_row_flex_dir}"
+
+    # 3. Test Telegram Test Connection button
+    test_btn = page.locator("#btnTgTestConn")
+    assert test_btn.is_visible()
+
+    # Intercept /telegram/test API call
+    page.evaluate("""() => {
+        const origFetch = window.fetch;
+        window.fetch = async (...args) => {
+            const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || "");
+            if (url.includes('/admin/telegram/test')) {
+                return new Response(JSON.stringify({
+                    ok: true,
+                    bots: [
+                        {
+                            index: 0,
+                            masked_token: "123456:••••••",
+                            working: true,
+                            username: "verified_bot"
+                        }
+                    ],
+                    session: {
+                        available: true,
+                        working: true,
+                        details: {
+                            id: 8888,
+                            username: "verified_user",
+                            first_name: "Verified User"
+                        }
+                    }
+                }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            }
+            return origFetch(...args);
+        };
+    }""")
+
+    test_btn.click()
+    page.wait_for_timeout(500)
+
+    # Check that connected box is visible with verified details
+    conn_box = page.locator("#tgAuthConnectedBox")
+    assert conn_box.is_visible()
+    box_text = conn_box.inner_text()
+    assert "verified_user" in box_text or "Verified User" in box_text
+
+    # Close settings
+    page.click("#setClose")
+    page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
+    has_on = page.evaluate("() => document.querySelector('#drawer').classList.contains('on')")
+    assert not has_on

@@ -12,6 +12,7 @@ import os
 import time
 import uuid
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -969,8 +970,197 @@ def _write_env_dict(path: Path, updates: dict[str, str]) -> bool:
             return False
 
 
+async def _test_telegram_credentials(request: Request) -> dict[str, Any]:
+    """Actively test configured Telegram Bot tokens and MTProto session."""
+    s = request.app.state.settings
+    db = request.app.state.db
+    env_path = _get_env_file_path()
+    env_vars = _read_env_dict(env_path)
+
+    bot_tokens_raw = (
+        env_vars.get("ANBAR_BOT_TOKENS")
+        or s.bot_tokens_raw
+        or (s.bot_token.get_secret_value() if s.bot_token else "")
+    )
+    tokens_list = [t.strip() for t in (bot_tokens_raw or "").split(",") if t.strip()]
+
+    # 1. Test bot tokens asynchronously
+    bots_res: list[dict[str, Any]] = []
+    if tokens_list:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            tasks = [
+                client.get(f"https://api.telegram.org/bot{token}/getMe") for token in tokens_list
+            ]
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            for idx, (token, resp) in enumerate(zip(tokens_list, responses, strict=True)):
+                masked = _mask_secret(token, 6)
+                if isinstance(resp, BaseException):
+                    bots_res.append(
+                        {
+                            "index": idx,
+                            "masked_token": masked,
+                            "working": False,
+                            "error": str(resp),
+                        }
+                    )
+                elif resp.status_code == 200:
+                    try:
+                        data = resp.json()
+                        if data.get("ok"):
+                            r_info = data.get("result", {})
+                            bots_res.append(
+                                {
+                                    "index": idx,
+                                    "masked_token": masked,
+                                    "working": True,
+                                    "username": r_info.get("username"),
+                                    "first_name": r_info.get("first_name"),
+                                    "id": r_info.get("id"),
+                                }
+                            )
+                        else:
+                            bots_res.append(
+                                {
+                                    "index": idx,
+                                    "masked_token": masked,
+                                    "working": False,
+                                    "error": data.get("description", "Error from Bot API"),
+                                }
+                            )
+                    except Exception as e:
+                        bots_res.append(
+                            {
+                                "index": idx,
+                                "masked_token": masked,
+                                "working": False,
+                                "error": f"JSON decode error: {e}",
+                            }
+                        )
+                else:
+                    err_msg = f"HTTP {resp.status_code}"
+                    try:
+                        err_data = resp.json()
+                        if isinstance(err_data, dict) and err_data.get("description"):
+                            err_msg = err_data["description"]
+                    except Exception:
+                        pass
+                    bots_res.append(
+                        {
+                            "index": idx,
+                            "masked_token": masked,
+                            "working": False,
+                            "error": err_msg,
+                        }
+                    )
+
+    # 2. Test MTProto Session
+    session_res: dict[str, Any] = {
+        "available": False,
+        "working": False,
+        "details": None,
+        "error": None,
+    }
+
+    backend = getattr(request.app.state, "backend", None)
+    client_attr = getattr(backend, "_client", None) if backend else None
+    if client_attr is not None and getattr(backend, "_connected", False):
+        cl = client_attr
+        session_res["available"] = True
+        try:
+            is_auth = await cl.is_user_authorized()
+            if is_auth:
+                me = await cl.get_me()
+                session_res["working"] = True
+                session_res["details"] = {
+                    "id": getattr(me, "id", None),
+                    "first_name": getattr(me, "first_name", ""),
+                    "username": getattr(me, "username", None),
+                    "phone": getattr(me, "phone", None),
+                }
+            else:
+                session_res["working"] = False
+                session_res["error"] = "Session is not authorized"
+        except Exception as e:
+            session_res["working"] = False
+            session_res["error"] = str(e)
+    else:
+        raw_session = db.kv_get("cfg_tg_session")
+        api_id_val = env_vars.get("ANBAR_API_ID") or s.api_id
+        api_hash_val = env_vars.get("ANBAR_API_HASH") or s.api_hash
+        if raw_session and api_id_val and api_hash_val:
+            session_res["available"] = True
+            from telethon import TelegramClient
+            from telethon.sessions import StringSession
+
+            cl = TelegramClient(StringSession(raw_session), int(api_id_val), str(api_hash_val))
+            try:
+                await asyncio.wait_for(cl.connect(), timeout=5.0)
+                if await cl.is_user_authorized():
+                    me = await cl.get_me()
+                    session_res["working"] = True
+                    session_res["details"] = {
+                        "id": getattr(me, "id", None),
+                        "first_name": getattr(me, "first_name", ""),
+                        "username": getattr(me, "username", None),
+                        "phone": getattr(me, "phone", None),
+                    }
+                else:
+                    session_res["working"] = False
+                    session_res["error"] = "Session is not authorized"
+            except Exception as e:
+                session_res["working"] = False
+                session_res["error"] = str(e)
+            finally:
+                try:
+                    await cl.disconnect()
+                except Exception:
+                    pass
+        elif s.session_file and Path(s.session_file).exists() and api_id_val and api_hash_val:
+            session_res["available"] = True
+            from telethon import TelegramClient
+
+            cl = TelegramClient(str(s.session_file), int(api_id_val), str(api_hash_val))
+            try:
+                await asyncio.wait_for(cl.connect(), timeout=5.0)
+                if await cl.is_user_authorized():
+                    me = await cl.get_me()
+                    session_res["working"] = True
+                    session_res["details"] = {
+                        "id": getattr(me, "id", None),
+                        "first_name": getattr(me, "first_name", ""),
+                        "username": getattr(me, "username", None),
+                        "phone": getattr(me, "phone", None),
+                    }
+                else:
+                    session_res["working"] = False
+                    session_res["error"] = "Session file is not authorized"
+            except Exception as e:
+                session_res["working"] = False
+                session_res["error"] = str(e)
+            finally:
+                try:
+                    await cl.disconnect()
+                except Exception:
+                    pass
+
+    return {
+        "ok": True,
+        "bots": bots_res,
+        "session": session_res,
+    }
+
+
+@router.post("/admin/telegram/test")
+async def telegram_test_connection(request: Request):
+    """Actively test configured Telegram bots and MTProto session."""
+    require_admin(request)
+    return await _test_telegram_credentials(request)
+
+
 @router.get("/admin/telegram-config")
-async def telegram_config_get(request: Request):
+async def telegram_config_get(request: Request, test: bool = False):
     """Retrieve current Telegram & MTProto configuration for admin UI."""
     require_admin(request)
     s = request.app.state.settings
@@ -1004,7 +1194,12 @@ async def telegram_config_get(request: Request):
     hybrid_env = env_vars.get("ANBAR_HYBRID_ENABLED", "").lower() in ("true", "1", "yes")
     hybrid_enabled = hybrid_runtime or hybrid_env
 
-    return {
+    # Active test if requested
+    test_result = None
+    if test:
+        test_result = await _test_telegram_credentials(request)
+
+    res: dict[str, Any] = {
         "backend": backend,
         "hybrid_enabled": hybrid_enabled,
         # B-054: full bot tokens must never leave the server — only the
@@ -1028,6 +1223,13 @@ async def telegram_config_get(request: Request):
             )
         ),
     }
+
+    if test_result is not None:
+        res["test_result"] = test_result
+        if test_result.get("session", {}).get("available"):
+            res["session_authorized"] = bool(test_result["session"].get("working"))
+
+    return res
 
 
 @router.post("/admin/telegram-config")

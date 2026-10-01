@@ -686,6 +686,23 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
   .lnk-main{flex:1;min-width:0}
   .lk-acts{display:flex;gap:6px;flex:none;margin-inline-start:auto}
   .keyrow{gap:10px}
+
+  /* Responsive Settings Drawer & Form Rows (<720px) */
+  .drawer .set-row:not(:has(> .sw)){
+    flex-direction:column;align-items:stretch;gap:6px;padding:9px 0}
+  .drawer .set-row:not(:has(> .sw)) .lab{flex:none;width:100%}
+  .drawer .set-row:not(:has(> .sw)) input[type=text],
+  .drawer .set-row:not(:has(> .sw)) input[type=tel],
+  .drawer .set-row:not(:has(> .sw)) input[type=password],
+  .drawer .set-row:not(:has(> .sw)) input[type=number],
+  .drawer .set-row:not(:has(> .sw)) select{
+    width:100% !important;max-width:100% !important;box-sizing:border-box}
+  .drawer .set-row:has(> .sw){
+    display:flex;flex-direction:row;align-items:center;justify-content:space-between;padding:10px 0}
+  .drawer-nav{padding:8px 10px;gap:5px}
+  .dtab{padding:7px 12px;font-size:12px;border-radius:18px}
+  #tgAuthConnectedBox{flex-direction:column;align-items:stretch;gap:10px}
+  #tgAuthConnectedBox .btn{width:100%}
 }
 </style>
 </head>
@@ -1061,8 +1078,13 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
 
     <!-- Telegram & MTProto Configuration (v0.14.1) -->
     <div class="sec" id="secTgConfig">
-      <h3 data-i18n="secTgConfig">پیکربندی تلگرام و متغیرها (.env)</h3>
-      
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">
+        <h3 data-i18n="secTgConfig" style="margin-bottom:0;border-bottom:none;padding-bottom:0">پیکربندی تلگرام و متغیرها (.env)</h3>
+        <button type="button" class="btn btn-ghost" id="btnTgTestConn" style="font-size:12px;padding:6px 12px;white-space:nowrap;flex:none">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span data-i18n="tgTestConn">تست اتصال تلگرام</span>
+        </button>
+      </div>
+
       <!-- Telegram MTProto Authentication Box -->
       <div id="tgAuthConnectedBox" style="display:none;background:var(--ok-soft);border:1.5px solid var(--ok);border-radius:12px;padding:14px;margin-top:8px;align-items:center;justify-content:space-between;gap:12px">
         <div style="display:flex;align-items:center;gap:10px">
@@ -1513,6 +1535,9 @@ const I18N={
   tgCodeSent:"کد تأیید به تلگرام شما ارسال شد", tgNeedCode:"کد دریافتی از تلگرام را وارد کنید",
   tgVerifying:"در حال اعتبارسنجی...", tgLogoutQ:"آیا مایلید از سشن تلگرام خارج شوید؟",
   tgLoggedOut:"از تلگرام خارج شدید",
+  tgTestConn:"تست اتصال تلگرام", tgTestingConn:"در حال آزمایش اتصال...",
+  tgTestSuccess:"اتصال تلگرام بررسی و تأیید شد", tgTestFailed:"خطا در اتصال تلگرام",
+  tgBotWorking:"فعال", tgBotInvalid:"نامعتبر",
   upload:"آپلود / دریافت",
   empty:"هنوز فایلی آپلود نکرده‌ای",
   setT:"تنظیمات ادمین", secAuth:"احراز هویت", secRate:"محدودیت سرعت (در دقیقه)",
@@ -1688,6 +1713,9 @@ const I18N={
   tgCodeSent:"Verification code sent to your Telegram", tgNeedCode:"Enter the code you received",
   tgVerifying:"Verifying...", tgLogoutQ:"Sign out of the Telegram session?",
   tgLoggedOut:"Signed out of Telegram",
+  tgTestConn:"Test Telegram Connection", tgTestingConn:"Testing connection...",
+  tgTestSuccess:"Telegram connection verified", tgTestFailed:"Telegram connection error",
+  tgBotWorking:"Active", tgBotInvalid:"Invalid",
   upload:"Upload / Ingest",
   empty:"No files yet",
   setT:"Admin settings", secAuth:"Authentication", secRate:"Rate limits (per minute)",
@@ -5332,8 +5360,16 @@ $("#s_tg_hash_toggle").onclick=async()=>{
    (bot_add_token), remove posts the masked row's index
    (bot_remove_index). The UI list is display-only. */
 let _tgTokenMasked=[];
-function renderTgTokens(masked){
+let _tgTokenTestMap={};
+
+function renderTgTokens(masked, testResults){
   _tgTokenMasked=masked||[];
+  if(testResults && Array.isArray(testResults)){
+    _tgTokenTestMap={};
+    testResults.forEach(item=>{
+      if(item && item.masked_token){ _tgTokenTestMap[item.masked_token]=item; }
+    });
+  }
   const box=$("#tgTokensList");
   if(!box)return;
   if(!_tgTokenMasked.length){
@@ -5343,8 +5379,22 @@ function renderTgTokens(masked){
   box.innerHTML="";
   _tgTokenMasked.forEach((m,i)=>{
     const row=document.createElement("div");
-    row.style.cssText="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:6px 10px";
-    row.innerHTML='<span style="flex:1;direction:ltr;text-align:left;font-family:ui-monospace,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(m)+'</span>'
+    row.style.cssText="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:6px 10px;flex-wrap:wrap";
+
+    let statusBadge="";
+    const testInfo=_tgTokenTestMap[m];
+    if(testInfo){
+      if(testInfo.working){
+        const botHandle=testInfo.username?` (@${testInfo.username})`:"";
+        statusBadge=`<span style="font-size:11px;font-weight:600;color:var(--ok);background:var(--ok-soft);padding:2px 7px;border-radius:12px;white-space:nowrap">✓ ${esc(t("tgBotWorking"))}${esc(botHandle)}</span>`;
+      }else{
+        const errDesc=testInfo.error?` title="${esc(testInfo.error)}"`:"";
+        statusBadge=`<span${errDesc} style="font-size:11px;font-weight:600;color:var(--err);background:var(--err-soft);padding:2px 7px;border-radius:12px;white-space:nowrap">✗ ${esc(t("tgBotInvalid"))}</span>`;
+      }
+    }
+
+    row.innerHTML='<span style="flex:1;min-width:140px;direction:ltr;text-align:left;font-family:ui-monospace,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(m)+'</span>'
+      +statusBadge
       +'<button type="button" class="btn btn-ghost" data-i="'+i+'" title="'+esc(t("tgTokenRemove"))+'" style="width:auto;padding:3px 9px;font-size:11.5px;border-color:var(--err);color:var(--err)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
     row.querySelector("button").onclick=async()=>{
       try{
@@ -5417,11 +5467,58 @@ async function loadTelegramConfig(){
     if (boxConnected && boxLogin) {
       boxConnected.style.display = isAuthed ? "flex" : "none";
       boxLogin.style.display = isAuthed ? "none" : "flex";
+      if(isAuthed && r.test_result && r.test_result.session && r.test_result.session.details){
+        const u = r.test_result.session.details;
+        const sub = boxConnected.querySelector("small");
+        if(sub){
+          const uName = u.username ? ` (@${u.username})` : "";
+          const fName = u.first_name ? `${u.first_name} ` : "";
+          sub.textContent = `${fName}${uName} · ID: ${u.id || "—"}`;
+        }
+      }
     }
     if($("#s_tg_chunk_size"))$("#s_tg_chunk_size").value=r.chunk_size_mb||16;
     syncHashToggleBtn();
   }catch(e){}
 }
+
+async function testTelegramConnection(){
+  const btn = $("#btnTgTestConn");
+  if(btn){ btn.disabled = true; btn.style.opacity = ".6"; }
+  try {
+    toast(t("tgTestingConn"));
+    const res = await api("/api/v1/admin/telegram/test", {method: "POST"});
+    if(res && res.ok){
+      if(res.bots && Array.isArray(res.bots)){
+        renderTgTokens(_tgTokenMasked, res.bots);
+      }
+      const isAuthed = !!(res.session && res.session.working);
+      const boxConnected = document.getElementById("tgAuthConnectedBox");
+      const boxLogin = document.getElementById("tgAuthLoginForm");
+      if(boxConnected && boxLogin){
+        boxConnected.style.display = isAuthed ? "flex" : "none";
+        boxLogin.style.display = isAuthed ? "none" : "flex";
+        if(isAuthed && res.session.details){
+          const u = res.session.details;
+          const sub = boxConnected.querySelector("small");
+          if(sub){
+            const uName = u.username ? ` (@${u.username})` : "";
+            const fName = u.first_name ? `${u.first_name} ` : "";
+            sub.textContent = `${fName}${uName} · ID: ${u.id || "—"}`;
+          }
+        }
+      }
+      toast(t("tgTestSuccess"));
+    } else {
+      toast(t("tgTestFailed"), "warn");
+    }
+  } catch(e) {
+    toast(e.message || t("tgTestFailed"), "err");
+  } finally {
+    if(btn){ btn.disabled = false; btn.style.opacity = ""; }
+  }
+}
+if($("#btnTgTestConn")) $("#btnTgTestConn").onclick = testTelegramConnection;
 $("#swPreview").onclick=()=>{
   previewsEnabled=!previewsEnabled;
   localStorage.setItem("anbar-previews",previewsEnabled?"1":"0");

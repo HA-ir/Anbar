@@ -649,5 +649,44 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 - **Current Git Commit / Branch**:
   - `88e1a95` on `main` (deployed to Falkenstein).
 - **Exact Next Step for Next Session**:
-  - All requested tasks, milestone UX overhaul, and BUG-51 video seeking defect fixes are verified and live in production. Stand by for future requirements.
+  - Complete verification and deploy Settings UI/UX responsive overhaul and Telegram active testing.
+
+### Session 17: Telegram Active Verification & Settings UI/UX Responsive Overhaul (2026-10-01)
+
+- **Current Objective**:
+  1. Add active Telegram credential verification (`POST /api/v1/admin/telegram/test` and `GET /api/v1/admin/telegram-config?test=true`):
+     - Concurrently test bot tokens via Telegram Bot API `/getMe` using `httpx.AsyncClient`.
+     - Test MTProto session via Telethon (`is_user_authorized()` and `get_me()`) across active backend, DB string, or session file.
+     - Display verified bot username and MTProto user profile badges instead of merely reporting static presence.
+  2. Overhaul Settings UI/UX and mobile responsiveness:
+     - On mobile and small screens (<720px), stack `.set-row` vertically with full-width 100% inputs and labels on top, while keeping switches horizontally aligned (`justify-content: space-between`).
+     - Optimize mobile drawer navigation and touch padding (≥36px touch targets).
+     - Add dedicated "تست اتصال تلگرام" action button in the Settings UI with live badges.
+- **Completed Work**:
+  - Implemented `_test_telegram_credentials()` and `POST /api/v1/admin/telegram/test` in `src/anbar/api/admin.py`.
+  - Updated `telegram_config_get` to accept `?test=true` and return active test results.
+  - Updated `src/anbar/ui/index.html` with responsive form row rules for screens <720px, `#btnTgTestConn` action, verified MTProto status display, and per-token bot health badges.
+  - Added bilingual translations in `I18N.fa` and `I18N.en`.
+  - Created unit/integration tests in `tests/test_telegram_test_api.py`.
+  - Added Playwright E2E browser test `test_settings_mobile_responsiveness_and_telegram_test` in `tests/test_e2e_playwright.py`.
+- **Files/Components Changed**:
+  - `src/anbar/api/admin.py`
+  - `src/anbar/ui/index.html`
+  - `tests/test_telegram_test_api.py`
+  - `tests/test_e2e_playwright.py`
+  - `docs/WORKING_RECORD.md`
+- **Tests Executed**:
+  - `pytest -v`: 489/489 passed (100%).
+  - `tests/test_telegram_test_api.py`: 3/3 passed.
+  - `tests/test_e2e_playwright.py`: 26/26 passed in headless Chromium (including Test 25 for mobile responsive settings and Telegram test).
+  - `tests/test_dashboard_i18n.py`: 3/3 passed (full bilingual parity).
+  - `ruff check`: 0 errors.
+  - `ruff format --check`: 100% compliant.
+  - `mypy src/anbar`: 0 errors.
+- **Deployment Status**:
+  - Ready for Falkenstein production deployment upon user confirmation.
+- **Current Git Commit / Branch**:
+  - `e6d24fc` on `main` (pending commit for Session 17).
+- **Exact Next Step for Next Session**:
+  - Commit and deploy Session 17 changes to Falkenstein production.
 
