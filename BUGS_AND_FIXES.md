@@ -243,9 +243,19 @@ Scope: Specs/002-ux-product-overhaul (Move workflow redesign, design system, asy
 5. **Contextual Empty States**:
    - *Issue*: Empty folders and zero search results presented raw text.
    - *Fix*: Designed rich contextual SVG illustrations, descriptive copy, and operational shortcut buttons ("Upload Files", "Clear Search").
+6. **Video Seeking Stalled / Infinite Loading State (BUG-51)**:
+   - *Issue*: Playing a video worked initially, but seeking forward to a later point caused the video to freeze indefinitely in a waiting/loading state and never resume.
+   - *Root Cause 1 (Rate Limiting)*: `limit_download` in `src/anbar/api/download.py` was applied unconditionally across all HTTP requests to `/f/{id}` (default 10 req/min). Video initial load takes 2-4 Range requests for container headers; seeking forward issues 2-3 more Range requests. Within seconds, normal scrubbing crossed 10 requests, returning HTTP 429 Too Many Requests. HTML5 `<video>` cannot recover from 429 on Range probes, entering an unrecoverable stall.
+   - *Root Cause 2 (BaseHTTPMiddleware Disconnect Crash)*: `_SecurityHeadersMiddleware` was implemented via Starlette's `BaseHTTPMiddleware`. When a browser seeks, it aborts earlier in-flight range streams. `BaseHTTPMiddleware` caught the cancellation and synthesized `send({"type": "http.response.body", "body": b"", "more_body": False})`. Because `Content-Length` was declared on the 206 response, Uvicorn raised `RuntimeError: Response content shorter than Content-Length`, terminating ASGI connection handling and breaking subsequent pipelined requests.
+   - *Root Cause 3 (Prefetch Congestion)*: Lookahead prefetching eagerly spawned 2 full chunk background downloads (up to 32MB-98MB) before the active seek chunk yielded its first byte, saturating backend bandwidth.
+   - *Fix*:
+     1. Exempted HTTP Range requests from the per-minute full-download rate limiter in `src/anbar/api/download.py` (`if not request.headers.get("range"): limit_download(...)`), matching the existing architectural rule that Range probes are not full downloads.
+     2. Re-implemented `_SecurityHeadersMiddleware` in `src/anbar/main.py` as a pure ASGI middleware intercepting `http.response.start`, completely eliminating `BaseHTTPMiddleware` and its disconnect crashes.
+     3. Refactored multi-segment streaming into single-chunk lookahead pipelining, ensuring the active seek chunk receives 100% bandwidth immediately.
+   - *Verification*: Automated Playwright E2E test `test_video_playback_and_seeking` exercising multiple forward and backward seeks on 10-minute MP4 and MKV videos with zero 429s or playback stalls.
 
 #### Automated E2E Verification
-- Playwright tests: 24 passing end-to-end browser tests (`tests/test_e2e_playwright.py`).
+- Playwright tests: 25 passing end-to-end browser tests (`tests/test_e2e_playwright.py`).
 - 5-level directory drill-down and breadcrumb ascension verified in headless Chromium.
 - Mobile viewport touch targets verified (≥36px) with zero horizontal overflow.
 

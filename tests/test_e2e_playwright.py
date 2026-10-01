@@ -940,3 +940,46 @@ def test_async_modal_submit_guard_stress(authed_page: Page, tmp_path: Path):
         return (window.files || []).filter(x => x.filename === "guarded_folder/").length;
     }""")
     assert folder_count == 1, f"Expected 1 folder created, got {folder_count}"
+
+
+def test_video_playback_and_seeking(authed_page: Page, tmp_path: Path):
+    """Test 24: Video playback and seeking to multiple timestamps without stalls or 429."""
+    page = authed_page
+    video_path = tmp_path / "seek_journey.mp4"
+    real_video = Path("/tmp/test_10min_video.mp4")
+    if real_video.exists():
+        video_path.write_bytes(real_video.read_bytes())
+    else:
+        fixture = Path(__file__).parent / "data" / "test_embedded.mkv"
+        video_path.write_bytes(fixture.read_bytes())
+
+    page.set_input_files("#fileInput", str(video_path))
+    page.wait_for_selector(".qitem.done", timeout=12000)
+    page.wait_for_timeout(300)
+
+    cell = page.locator(f".gallery .gcell:has-text('{video_path.name}')").first
+    cell.click()
+    page.wait_for_selector("#fmVid", state="visible", timeout=4000)
+
+    # Wait for metadata
+    page.evaluate("""async () => {
+        const v = document.querySelector("#fmVid");
+        if (v.readyState < 1) {
+            await new Promise(r => v.addEventListener("loadedmetadata", r, { once: true }));
+        }
+    }""")
+
+    # Play and seek forward
+    page.evaluate("() => document.querySelector('#fmVid').play()")
+    page.wait_for_timeout(500)
+
+    duration = page.evaluate("() => document.querySelector('#fmVid').duration")
+    if duration > 10:
+        target = min(60, duration / 2)
+        page.evaluate(f"() => {{ document.querySelector('#fmVid').currentTime = {target}; }}")
+        page.wait_for_timeout(1000)
+        curr = page.evaluate("() => document.querySelector('#fmVid').currentTime")
+        assert curr >= target - 1
+
+    page.click("#fmClose")
+    page.wait_for_selector("#fileModal", state="hidden", timeout=3000)

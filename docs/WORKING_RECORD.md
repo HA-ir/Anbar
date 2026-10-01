@@ -607,3 +607,41 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ce366f4` on `main` (deployed to Falkenstein).
 - **Exact Next Step for Next Session**:
   - Milestone 2 complete. Stand by for future requirements.
+
+### Session 16: Video Seeking Defect Investigation & Resolution (2026-10-01)
+
+- **Current Objective**: Investigate and resolve the defect where seeking forward in a video (e.g., several minutes ahead in MP4/MKV) causes playback to freeze indefinitely in a waiting/loading state and never resume.
+- **Root Cause Analysis**:
+  1. *Rate Limiter Denial (HTTP 429)*: `limit_download` in `src/anbar/api/download.py` was applied unconditionally on every request to `/f/{id}`, with a default ceiling of 10 requests per minute (`ANBAR_RATE_DOWNLOAD_PER_MIN=10`). Video playback starts with 2-4 Range requests for container headers (moov/index), and forward/backward seeks issue multiple Range requests. Normal user scrubbing exceeded 10 requests in under 30 seconds, causing Uvicorn to return HTTP 429 Too Many Requests. The HTML5 `<video>` engine cannot recover from 429 on Range probes, entering an unrecoverable stall.
+  2. *ASGI Middleware Stream Cancellation Crash*: `_SecurityHeadersMiddleware` in `src/anbar/main.py` was built using Starlette's `BaseHTTPMiddleware`. When a browser seeks to a new timestamp, it cancels earlier in-flight media Range streams. `BaseHTTPMiddleware` caught the task cancellation and synthesized an empty response body (`more_body: False`). Because the 206 Partial Content response had already declared `Content-Length`, Uvicorn raised `RuntimeError: Response content shorter than Content-Length`, terminating ASGI connection handling and corrupting subsequent pipelined requests.
+  3. *Lookahead Prefetch Bandwidth Contention*: Multi-chunk lookahead prefetching eagerly spawned 2 full chunk background downloads (up to 32MB-98MB) before the active seek chunk yielded its first byte, saturating backend bandwidth.
+- **Architectural Solution**:
+  1. *Exempt Range Requests from Download Ceiling*: In `src/anbar/api/download.py`, wrapped `limit_download` with `if not request.headers.get("range"): ...`. Media playback probes and byte-range chunks are streaming reads, not full file downloads, and must not count toward the per-minute full-download rate limit.
+  2. *Pure ASGI Security Headers Middleware*: Re-implemented `_SecurityHeadersMiddleware` in `src/anbar/main.py` as a pure ASGI middleware intercepting `http.response.start` via `MutableHeaders` without intercepting or wrapping `StreamingResponse` body streams. Client disconnects during seeks now cleanly terminate the generator without protocol violations or Uvicorn crashes.
+  3. *Single-Chunk Lookahead Pipelining*: Replaced multi-chunk lookahead with single-chunk pipelining: streaming the active seek chunk with 100% bandwidth first, then prefetching the next chunk concurrently while the active chunk is streamed to the socket.
+- **Completed Work & Verification**:
+  - Implemented the fixes in `src/anbar/api/download.py` and `src/anbar/main.py`.
+  - Added automated Playwright E2E test `test_video_playback_and_seeking` (Test 24) in `tests/test_e2e_playwright.py` exercising 10-minute MP4 and MKV videos across multiple seeks (60s, 120s, 300s, 500s) without stalls or HTTP 429 errors.
+  - Ran full test suite: 485/485 pytest passed (100%), ruff check clean, mypy clean.
+- **Files/Components Changed**:
+  - `src/anbar/api/download.py` (range rate-limit bypass, single-chunk pipelined prefetch)
+  - `src/anbar/main.py` (pure ASGI `_SecurityHeadersMiddleware`)
+  - `tests/test_e2e_playwright.py` (added `test_video_playback_and_seeking`)
+  - `BUGS_AND_FIXES.md` (documented BUG-51 root causes, fixes, and verification)
+  - `CHANGELOG.md` (added BUG-51 entry to v0.15.58)
+  - `docs/WORKING_RECORD.md` (recorded Session 16 findings and verification)
+- **Tests Executed**:
+  - `pytest -v`: 485/485 passed.
+  - `tests/test_e2e_playwright.py`: 25/25 passed.
+  - `ruff check`: 0 errors.
+  - `ruff format --check`: 100% compliant.
+  - `mypy`: 0 errors.
+- **Tests Still Missing**:
+  - None.
+- **Deployment Status**:
+  - Ready for deployment to Falkenstein production upon authorization.
+- **Current Git Commit / Branch**:
+  - `main` (pending commit for video seeking fix).
+- **Exact Next Step for Next Session**:
+  - Commit video seeking fix, push to `origin main`, and deploy to Falkenstein production once authorized.
+

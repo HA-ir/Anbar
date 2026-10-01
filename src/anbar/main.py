@@ -234,32 +234,49 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
 
     app.add_middleware(_SelectiveGZip, minimum_size=1000)
 
-    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.datastructures import MutableHeaders
 
-    class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
-        """SEC-B8: Attach standard security headers to HTTP responses."""
+    class _SecurityHeadersMiddleware:
+        """SEC-B8: Attach standard security headers to HTTP responses.
 
-        async def dispatch(self, request, call_next):
-            response = await call_next(request)
-            response.headers.setdefault("X-Content-Type-Options", "nosniff")
-            response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-            path = request.url.path
-            if not path.startswith("/ui/miniapp"):
-                response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-            ctype = response.headers.get("content-type", "")
-            if "text/html" in ctype:
-                csp = (
-                    "default-src 'self'; "
-                    "script-src 'self' 'unsafe-inline' https://telegram.org; "
-                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-                    "font-src 'self' https://fonts.gstatic.com data:; "
-                    "img-src 'self' data: blob:; "
-                    "media-src 'self' blob:; "
-                    "connect-src 'self'; "
-                    "frame-ancestors 'self' https://web.telegram.org;"
-                )
-                response.headers.setdefault("Content-Security-Policy", csp)
-            return response
+        Implemented as a pure ASGI middleware to prevent BaseHTTPMiddleware
+        from intercepting StreamingResponse bodies and breaking on client aborts/seeks.
+        """
+
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http":
+                await self.app(scope, receive, send)
+                return
+
+            path = scope.get("path", "")
+            is_miniapp = path.startswith("/ui/miniapp")
+
+            async def send_wrapper(message):
+                if message["type"] == "http.response.start":
+                    headers = MutableHeaders(scope=message)
+                    headers.setdefault("x-content-type-options", "nosniff")
+                    headers.setdefault("referrer-policy", "strict-origin-when-cross-origin")
+                    if not is_miniapp:
+                        headers.setdefault("x-frame-options", "SAMEORIGIN")
+                    ctype = headers.get("content-type", "")
+                    if "text/html" in ctype:
+                        csp = (
+                            "default-src 'self'; "
+                            "script-src 'self' 'unsafe-inline' https://telegram.org; "
+                            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                            "font-src 'self' https://fonts.gstatic.com data:; "
+                            "img-src 'self' data: blob:; "
+                            "media-src 'self' blob:; "
+                            "connect-src 'self'; "
+                            "frame-ancestors 'self' https://web.telegram.org;"
+                        )
+                        headers.setdefault("content-security-policy", csp)
+                await send(message)
+
+            await self.app(scope, receive, send_wrapper)
 
     app.add_middleware(_SecurityHeadersMiddleware)
 

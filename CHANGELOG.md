@@ -6,6 +6,12 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [0.15.58] — 2026-10-01
 
+### Fixed
+- **Video Seeking Infinite Loading & Playback Stalls (BUG-51)**: Resolved issue where seeking forward in media (MP4/MKV) caused indefinite loading.
+  - Exempted HTTP Range requests from the per-minute download rate limiter in `src/anbar/api/download.py` (`if not request.headers.get("range"): limit_download(...)`), preventing scrubbing probes from tripping HTTP 429 Too Many Requests.
+  - Converted `_SecurityHeadersMiddleware` in `src/anbar/main.py` from `BaseHTTPMiddleware` to a pure ASGI middleware intercepting `http.response.start`. This prevents Starlette from synthesizing premature empty response bodies when the browser aborts active streams on seek, eliminating Uvicorn `RuntimeError: Response content shorter than Content-Length` protocol crashes.
+  - Replaced multi-chunk lookahead prefetching with single-chunk pipelined streaming, allocating 100% bandwidth immediately to the seek destination chunk before prefetching the next contiguous segment.
+
 ### Added
 - **Interactive Hierarchical Move Browser**: Completely overhauled the Move dialog (`#moveModal`) from a manual path text input into an interactive visual virtual folder browser. Users can navigate 5+ directory levels deep via clickable folder tiles, ascend cleanly using the interactive breadcrumb trail (`#moveBreadcrumbs`), inspect active destination paths (`#moveTargetBadge`), and execute relocations with zero manual keyboard typing.
 - **Visual Circular Move Disabling**: Disables destination folder tiles and buttons (`.disabled`) that match the source item or any of its descendants, preventing illegal circular hierarchies before submission.

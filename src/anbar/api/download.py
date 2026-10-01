@@ -168,10 +168,12 @@ async def download(request: Request, obj_id: str):
         resolved = db.kv_get(f"slug:{obj_id}")
         if resolved:
             obj_id = resolved
-    # rate limit before auth: an anonymous hammerer gets 429, not endless 401s
-    limit_download(
-        db, request, obj_id, runtime.get_int(db, "rate_download", settings.rate_download_per_min)
-    )
+    # rate limit before auth: an anonymous hammerer gets 429, not endless 401s.
+    # Full downloads only: Range requests (media seeking / video streaming probes)
+    # must not be throttled by the per-minute download ceiling.
+    if not request.headers.get("range"):
+        rate_limit = runtime.get_int(db, "rate_download", settings.rate_download_per_min)
+        limit_download(db, request, obj_id, rate_limit)
     row = db.get_object(obj_id)
     if row is None:
         raise HTTPException(404, "object not found")
@@ -453,36 +455,30 @@ async def download(request: Request, obj_id: str):
                 for i in range(0, len(mv), SLICE):
                     yield bytes(mv[i : i + SLICE])
         else:
-            # Adaptive Deep Lookahead Prefetching (Depth 2 Buffer)
-            # Concurrently prefetches upcoming chunks to saturate network pipes and eliminate gaps
-            tasks: dict[int, asyncio.Task[bytes]] = {}
-
-            def _ensure_prefetch(current_i: int) -> None:
-                for lookahead in (1, 2):
-                    target_i = current_i + lookahead
-                    if target_i < len(segments) and target_i not in tasks:
-                        t_idx = segments[target_i][0]
-                        tasks[target_i] = asyncio.create_task(
-                            _fetch_chunk_bytes(manifest.chunks[t_idx], (obj_id, t_idx))
-                        )
-
+            # Single-chunk lookahead pipelining: fetch current chunk with full bandwidth,
+            # then prefetch next chunk concurrently while streaming current chunk to socket.
+            next_task: asyncio.Task[bytes] | None = None
             try:
-                _ensure_prefetch(0)
                 for seg_i, (idx, off, n) in enumerate(segments):
-                    if seg_i in tasks:
-                        chunk = await tasks.pop(seg_i)
+                    if next_task is not None:
+                        chunk = await next_task
+                        next_task = None
                     else:
                         chunk = await _fetch_chunk_bytes(manifest.chunks[idx], (obj_id, idx))
 
-                    _ensure_prefetch(seg_i)
+                    # Start prefetching next chunk while streaming current chunk to socket
+                    if seg_i + 1 < len(segments):
+                        next_idx = segments[seg_i + 1][0]
+                        next_task = asyncio.create_task(
+                            _fetch_chunk_bytes(manifest.chunks[next_idx], (obj_id, next_idx))
+                        )
 
                     mv = memoryview(chunk)[off : off + n]
                     for i in range(0, len(mv), SLICE):
                         yield bytes(mv[i : i + SLICE])
             finally:
-                for t in tasks.values():
-                    if not t.done():
-                        t.cancel()
+                if next_task is not None and not next_task.done():
+                    next_task.cancel()
 
     return StreamingResponse(stream(), status_code=status, headers=headers)
 
