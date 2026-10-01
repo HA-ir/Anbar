@@ -684,9 +684,15 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff format --check`: 100% compliant.
   - `mypy src/anbar`: 0 errors.
 - **Deployment Status**:
-  - Ready for Falkenstein production deployment upon user confirmation.
+  - **DEPLOYED TO PRODUCTION (Falkenstein, commit 5b3c2bf, v0.15.58)**:
+    - Remote host: `167.233.55.81:9898`
+    - Container status: `anbar-anbar-1 Up (healthy)` running `anbar:prod`
+    - Local healthcheck: `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Public HTTPS healthcheck (`https://dl.amiri-dev.ir/healthz`): `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Deployed features verified: `btnTgTestConn` active in live HTML on `https://dl.amiri-dev.ir/`.
+    - Host invariants intact: `/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env` preserved without data loss.
 - **Current Git Commit / Branch**:
-  - `e6d24fc` on `main` (pending commit for Session 17).
+  - `5b3c2bf` on `main` (deployed to Falkenstein).
 - **Exact Next Step for Next Session**:
-  - Commit and deploy Session 17 changes to Falkenstein production.
+  - Both active Telegram testing and mobile settings responsive overhaul are verified live in production. Stand by for future requirements.
 
