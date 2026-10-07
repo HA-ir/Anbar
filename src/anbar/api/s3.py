@@ -123,8 +123,7 @@ async def list_objects_v2(
     full_search_prefix = f"{bucket}/{req_prefix}" if req_prefix else bucket_prefix
     rows = db.list_objects_by_prefix(full_search_prefix)
     matching = [
-        r for r in rows
-        if r["filename"].startswith(full_search_prefix) and not r.get("deleted_at")
+        r for r in rows if r["filename"].startswith(full_search_prefix) and not r.get("deleted_at")
     ]
 
     max_keys_int = max(1, min(int(request.query_params.get("max-keys", max_keys)), 1000))
@@ -143,9 +142,9 @@ async def list_objects_v2(
     if delimiter:
         for r in matching:
             fn = r["filename"]
-            rel_key = fn[len(bucket_prefix):] if fn.startswith(bucket_prefix) else fn
+            rel_key = fn[len(bucket_prefix) :] if fn.startswith(bucket_prefix) else fn
             if req_prefix and rel_key.startswith(req_prefix):
-                rest = rel_key[len(req_prefix):]
+                rest = rel_key[len(req_prefix) :]
             else:
                 rest = rel_key
 
@@ -178,7 +177,7 @@ async def list_objects_v2(
     for r in paged:
         contents = ET.SubElement(root, "Contents")
         is_pfx = r["filename"].startswith(bucket_prefix)
-        key_name = r["filename"][len(bucket_prefix):] if is_pfx else r["filename"]
+        key_name = r["filename"][len(bucket_prefix) :] if is_pfx else r["filename"]
         ET.SubElement(contents, "Key").text = key_name
         ET.SubElement(contents, "Size").text = str(r["size"])
         ET.SubElement(contents, "ETag").text = f'"{r.get("sha256") or ""}"'
