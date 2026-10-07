@@ -801,9 +801,25 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff format --check`: 100% compliant.
   - `mypy src/anbar`: 0 errors across 41 source files.
 - **Deployment Status**:
-  - Ready for production deployment to Falkenstein.
+  - **DEPLOYED TO PRODUCTION (Falkenstein, commit 2411bfc, v0.16.0)**:
+    - Remote host: `167.233.55.81:9898`
+    - Container status: `anbar-anbar-1 Up (healthy)` running `anbar:prod`
+    - Local healthcheck: `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Public HTTPS healthcheck (`https://dl.amiri-dev.ir/healthz`): `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Webhook verified active on Telegram Bot API:
+      `{"url":"https://dl.amiri-dev.ir/api/v1/tg/webhook","pending_update_count":0,"allowed_updates":["message"]}`
+    - Deployed features verified:
+      - Asymmetric anti-ban routing active: Telegram downloads stream via MTProto, uploads stream via Bot CDN.
+      - Mode C external web URL ingestion supported.
+      - Live progress bar, speed (MB/s), and ETA feedback enabled.
+      - Settings drawer webhook management and owner ID configuration active.
+      - Remote upload/download roundtrip verified directly on Falkenstein with SHA256 integrity and immediate object purge.
+    - Host invariants intact: `/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env` preserved without data loss.
 - **Current Git Commit / Branch**:
-  - In progress on `main`.
+  - `2411bfc` on `main` (deployed to Falkenstein).
+- **Exact Next Step for Next Session**:
+  - All features deployed, verified, and operational in production.
+
 
 
 
