@@ -798,9 +798,21 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff format --check`: 100% compliant.
   - `mypy src/anbar`: 0 errors across 41 source files.
 - **Deployment Status**:
-  - Ready for production deployment to Falkenstein.
+  - **DEPLOYED TO PRODUCTION (Falkenstein, commit 5f2c384, v0.16.0)**:
+    - Remote host: `167.233.55.81:9898`
+    - Container status: `anbar-anbar-1 Up (healthy)` running `anbar:prod`
+    - Local healthcheck: `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Public HTTPS healthcheck (`https://dl.amiri-dev.ir/healthz`): `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Deployed features verified:
+      - `s_tg_owner_ids`, `s_tg_webhook_secret`, and webhook management buttons live in production HTML on `https://dl.amiri-dev.ir/`.
+      - Webhook endpoint `POST /api/v1/tg/webhook` active and enforcing 403 on invalid secret tokens.
+      - Remote upload/download roundtrip verified on Falkenstein with SHA256 integrity check and immediate object purge (zero disk residues).
+    - Host invariants intact: `/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env` preserved without data loss.
 - **Current Git Commit / Branch**:
-  - In progress on `main`.
+  - `5f2c384` on `main` (deployed to Falkenstein).
+- **Exact Next Step for Next Session**:
+  - All features deployed, verified, and operational.
+
 
 
 
