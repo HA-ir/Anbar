@@ -1215,6 +1215,17 @@ async def telegram_config_get(request: Request, test: bool = False):
         "api_hash_set": bool(api_hash_raw),
         "mtproto_peer": mtproto_peer,
         "chunk_size_mb": chunk_size_mb,
+        "owner_tg_ids": (
+            env_vars.get("ANBAR_OWNER_TG_IDS")
+            or env_vars.get("ANBAR_OWNER_TG_ID")
+            or (", ".join(str(i) for i in sorted(s.owner_tg_ids)) if s.owner_tg_ids else "")
+        ),
+        "tg_webhook_secret": _mask_secret(
+            env_vars.get("ANBAR_TG_WEBHOOK_SECRET")
+            or (s.tg_webhook_secret.get_secret_value() if s.tg_webhook_secret else ""),
+            4,
+        ),
+        "webhook_url": f"{s.base_url.rstrip('/')}/api/v1/tg/webhook",
         "session_authorized": (
             bool(db.kv_get("cfg_tg_session"))
             or (
@@ -1236,6 +1247,7 @@ async def telegram_config_get(request: Request, test: bool = False):
 async def telegram_config_update(request: Request):
     """Update Telegram and MTProto credentials and write safely to persistent .env."""
     require_admin(request)
+    s = request.app.state.settings
     try:
         body = await request.json()
     except Exception:
@@ -1337,12 +1349,97 @@ async def telegram_config_update(request: Request):
         except ValueError:
             raise HTTPException(422, "chunk_size_mb must be integer") from None
 
+    if "owner_tg_ids" in body:
+        oids = str(body["owner_tg_ids"]).strip()
+        updates["ANBAR_OWNER_TG_IDS"] = oids
+        s.owner_tg_ids_raw = oids
+
+    if "tg_webhook_secret" in body:
+        wsec = str(body["tg_webhook_secret"]).strip()
+        if wsec and "•" not in wsec and "*" not in wsec:
+            from pydantic import SecretStr
+
+            updates["ANBAR_TG_WEBHOOK_SECRET"] = wsec
+            s.tg_webhook_secret = SecretStr(wsec)
+
     if updates and not _write_env_dict(env_path, updates):
         # BUG-v0.15.27: a silent persist failure used to return ok with the
         # requested keys listed as updated — the UI showed a success toast
         # while the change was lost on restart. Surface the real failure.
         raise HTTPException(500, f"could not persist settings to {env_path}")
     return {"status": "ok", "updated_keys": list(updates.keys()), "persisted": bool(updates)}
+
+
+@router.post("/admin/telegram/webhook/set")
+async def telegram_webhook_set(request: Request):
+    """Register Telegram Bot Webhook with Bot API."""
+    require_admin(request)
+    s = request.app.state.settings
+    db = request.app.state.db
+    token = s.bot_tokens[0] if s.bot_tokens else None
+    if not token:
+        raise HTTPException(400, "No Telegram Bot Token configured")
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    url = body.get("url") or f"{s.base_url.rstrip('/')}/api/v1/tg/webhook"
+    secret = body.get("secret") or s.effective_webhook_secret(db)
+
+    payload = {
+        "url": url,
+        "allowed_updates": ["message"],
+        "secret_token": secret,
+    }
+    import httpx
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(f"https://api.telegram.org/bot{token}/setWebhook", json=payload)
+        data = resp.json()
+        if not data.get("ok"):
+            raise HTTPException(400, f"Telegram API error: {data.get('description', 'failed')}")
+        return {"status": "ok", "url": url, "description": data.get("description", "Webhook set")}
+
+
+@router.get("/admin/telegram/webhook/info")
+async def telegram_webhook_info(request: Request):
+    """Retrieve webhook health and status from Telegram Bot API."""
+    require_admin(request)
+    s = request.app.state.settings
+    token = s.bot_tokens[0] if s.bot_tokens else None
+    if not token:
+        raise HTTPException(400, "No Telegram Bot Token configured")
+
+    import httpx
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(f"https://api.telegram.org/bot{token}/getWebhookInfo")
+        data = resp.json()
+        if not data.get("ok"):
+            raise HTTPException(400, f"Telegram API error: {data.get('description', 'failed')}")
+        return data.get("result", {})
+
+
+@router.post("/admin/telegram/webhook/delete")
+async def telegram_webhook_delete(request: Request):
+    """Delete Telegram Bot Webhook."""
+    require_admin(request)
+    s = request.app.state.settings
+    token = s.bot_tokens[0] if s.bot_tokens else None
+    if not token:
+        raise HTTPException(400, "No Telegram Bot Token configured")
+
+    import httpx
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(f"https://api.telegram.org/bot{token}/deleteWebhook")
+        data = resp.json()
+        if not data.get("ok"):
+            raise HTTPException(400, f"Telegram API error: {data.get('description', 'failed')}")
+        return {"status": "ok", "description": data.get("description", "Webhook deleted")}
 
 
 @router.get("/admin/telegram-config/reveal-api-hash")

@@ -1125,3 +1125,42 @@ def test_upload_queue_pause_resume_and_audio_controls(authed_page: Page, tmp_pat
     assert res["hasPause"] is True
     assert res["hasResume"] is True
     assert res["isPausedState"] is True
+
+
+def test_settings_telegram_webhook_and_owner_id_panel(authed_page: Page):
+    """Test 27: Settings drawer Telegram webhook management & authorized owner IDs."""
+    page = authed_page
+
+    # Open settings
+    page.click("#setBtn")
+    page.wait_for_selector("#drawer.on", timeout=4000)
+
+    # Check fields are present
+    assert page.locator("#s_tg_owner_ids").is_visible()
+    assert page.locator("#s_tg_webhook_secret").is_visible()
+    assert page.locator("#btnTgSetWebhook").is_visible()
+    assert page.locator("#btnTgWebhookInfo").is_visible()
+    assert page.locator("#btnTgDelWebhook").is_visible()
+
+    # Fill owner IDs
+    page.fill("#s_tg_owner_ids", "11223344, 55667788")
+
+    # Save settings
+    page.click("#saveBtn")
+    page.wait_for_selector(".toast", timeout=4000)
+
+    # Close settings
+    page.click("#setClose")
+    page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
+
+    # Re-open settings to verify persistence in UI
+    page.click("#setBtn")
+    page.wait_for_selector("#drawer.on", timeout=4000)
+    page.wait_for_function(
+        "() => document.querySelector('#s_tg_owner_ids').value !== ''", timeout=4000
+    )
+    val = page.input_value("#s_tg_owner_ids")
+    assert val == "11223344, 55667788"
+
+    page.click("#setClose")
+    page.wait_for_selector("#drawer.on", state="detached", timeout=3000)

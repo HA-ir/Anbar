@@ -768,29 +768,37 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - Implemented streaming ingestion engine `src/anbar/telegram_ingest.py` with `AsyncIteratorReader`, post link parser, Bot API helpers, and direct/protected-post streamers.
   - Implemented webhook receiver `src/anbar/api/tg_webhook.py` mounted at `/api/v1/tg/webhook`.
   - Added CLI `webhook set/info/delete` subcommands in `src/anbar/cli.py`.
-  - Added unit and integration tests in `tests/test_tg_webhook.py` and `tests/test_cli_webhook.py`.
+  - Added Web Panel Telegram settings integration in `src/anbar/ui/index.html` allowing the admin to set authorized user IDs, webhook secret, and trigger register/check/delete webhook directly from the browser.
+  - Added admin endpoints in `src/anbar/api/admin.py`: `POST /admin/telegram/webhook/set`, `GET /admin/telegram/webhook/info`, and `POST /admin/telegram/webhook/delete`.
+  - Added unit, integration, and Playwright E2E browser tests in `tests/test_tg_webhook.py`, `tests/test_cli_webhook.py`, `tests/test_telegram_config.py`, and `tests/test_e2e_playwright.py`.
   - Updated `docs/API.md`, `CHANGELOG.md`, and `docs/WORKING_RECORD.md`.
 - **Files/Components Changed**:
   - `src/anbar/config.py`
   - `src/anbar/mtproto_provider.py`
   - `src/anbar/telegram_ingest.py`
   - `src/anbar/api/tg_webhook.py`
+  - `src/anbar/api/admin.py`
+  - `src/anbar/ui/index.html`
   - `src/anbar/main.py`
   - `src/anbar/cli.py`
   - `tests/test_tg_webhook.py`
   - `tests/test_cli_webhook.py`
+  - `tests/test_telegram_config.py`
+  - `tests/test_e2e_playwright.py`
   - `docs/API.md`
   - `CHANGELOG.md`
   - `docs/WORKING_RECORD.md`
 - **Tests Executed**:
-  - `pytest -v`: 506/506 passed (100%).
+  - `pytest -v`: 508/508 passed (100%).
   - `tests/test_tg_webhook.py`: 7/7 passed.
   - `tests/test_cli_webhook.py`: 3/3 passed.
+  - `tests/test_telegram_config.py`: 5/5 passed.
+  - `tests/test_e2e_playwright.py`: 28/28 passed in headless Chromium.
   - `ruff check`: 0 errors.
   - `ruff format --check`: 100% compliant.
   - `mypy src/anbar`: 0 errors across 41 source files.
 - **Deployment Status**:
-  - Ready for production deployment to Falkenstein upon confirmation.
+  - Ready for production deployment to Falkenstein.
 - **Current Git Commit / Branch**:
   - In progress on `main`.
 

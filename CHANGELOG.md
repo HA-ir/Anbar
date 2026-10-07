@@ -16,6 +16,11 @@ versioning follows [SemVer](https://semver.org/).
     - `anbarctl webhook set <public_url>`: Configures webhook with secret token and allowed updates.
     - `anbarctl webhook info`: Inspects webhook status, pending updates, and errors.
     - `anbarctl webhook delete`: Removes active webhook.
+  - Added Web Panel Telegram settings integration in `src/anbar/ui/index.html`:
+    - Configure authorized Telegram user IDs (`ANBAR_OWNER_TG_IDS`) and webhook secret (`ANBAR_TG_WEBHOOK_SECRET`) directly in Settings drawer.
+    - Register, inspect, and delete Telegram Webhooks directly from the web panel via `#btnTgSetWebhook`, `#btnTgWebhookInfo`, and `#btnTgDelWebhook`.
+    - Added backend admin endpoints `POST /api/v1/admin/telegram/webhook/set`, `GET /api/v1/admin/telegram/webhook/info`, and `POST /api/v1/admin/telegram/webhook/delete`.
+    - Added Playwright browser test coverage for web panel webhook management.
 
 ## [0.15.59] — 2026-10-07
 

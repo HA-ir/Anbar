@@ -1175,6 +1175,37 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <div class="lab"><span data-i18n="tgChunkLab">حجم هر چانک (MB)</span><small data-i18n="tgChunkSub">حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto</small></div>
         <input type="number" min="1" max="49" id="s_tg_chunk_size" data-dirty-key="chunk_size_mb" style="direction:ltr;width:80px">
       </div>
+
+      <!-- Telegram Webhook & Ingest Settings -->
+      <div class="set-row">
+        <div class="lab">
+          <span data-i18n="tgOwnerLab">شناسه مجاز تلگرام (ANBAR_OWNER_TG_IDS)</span>
+          <small data-i18n="tgOwnerSub">شناسه‌های عددی مجاز تلگرام برای ارسال مستقیم فایل یا لینک پست</small>
+        </div>
+        <input type="text" id="s_tg_owner_ids" data-dirty-key="owner_tg_ids" placeholder="12345678, 87654321" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+      </div>
+
+      <div class="set-row">
+        <div class="lab">
+          <span data-i18n="tgWebhookSecretLab">رمز هدر وب‌هوک (اختیاری)</span>
+          <small data-i18n="tgWebhookSecretSub">توکن X-Telegram-Bot-Api-Secret-Token (در صورت خالی بودن خودکار تولید می‌شود)</small>
+        </div>
+        <input type="text" id="s_tg_webhook_secret" data-dirty-key="tg_webhook_secret" placeholder="••••••••" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+      </div>
+
+      <!-- Webhook Management Actions -->
+      <div class="set-row" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
+          <span data-i18n="tgWebhookStatusLab">مدیریت وب‌هوک بات تلگرام</span>
+          <span id="tgWebhookBadge" class="badge" style="font-size:11px;padding:2px 8px;border-radius:12px;background:var(--bg3);color:var(--tx2)">—</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <button type="button" class="btn btn-primary" id="btnTgSetWebhook" data-i18n="tgSetWebhook" style="font-size:12px;padding:6px 12px;border-radius:8px">ثبت وب‌هوک تلگرام</button>
+          <button type="button" class="btn btn-ghost" id="btnTgWebhookInfo" data-i18n="tgWebhookInfo" style="font-size:12px;padding:6px 12px;border-radius:8px">بررسی وضعیت</button>
+          <button type="button" class="btn btn-ghost" id="btnTgDelWebhook" data-i18n="tgDelWebhook" style="font-size:12px;padding:6px 12px;border-radius:8px;color:var(--err);border-color:var(--err)">حذف وب‌هوک</button>
+        </div>
+        <div id="tgWebhookInfoBox" style="display:none;background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;font-size:12px;font-family:ui-monospace,monospace;direction:ltr;white-space:pre-wrap;color:var(--tx2)"></div>
+      </div>
     </div>
 
     <!-- Backup & System Health (v0.15.0) -->
@@ -1530,6 +1561,16 @@ const I18N={
   tgPeerLab:"MTProto Peer (ANBAR_MTPROTO_PEER)",
   tgChunkLab:"حجم هر چانک (MB)",
   tgChunkSub:"حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto",
+  tgOwnerLab:"شناسه مجاز تلگرام (ANBAR_OWNER_TG_IDS)",
+  tgOwnerSub:"شناسه‌های عددی مجاز تلگرام برای ارسال مستقیم فایل یا لینک پست",
+  tgWebhookSecretLab:"رمز هدر وب‌هوک (اختیاری)",
+  tgWebhookSecretSub:"توکن X-Telegram-Bot-Api-Secret-Token (در صورت خالی بودن خودکار تولید می‌شود)",
+  tgWebhookStatusLab:"مدیریت وب‌هوک بات تلگرام",
+  tgSetWebhook:"ثبت وب‌هوک تلگرام",
+  tgWebhookInfo:"بررسی وضعیت وب‌هوک",
+  tgDelWebhook:"حذف وب‌هوک",
+  tgWebhookRegistered:"وب‌هوک با موفقیت ثبت شد",
+  tgWebhookDeleted:"وب‌هوک با موفقیت حذف شد",
   tgAddToken:"+ افزودن", tgAddTokenPh:"توکن بات جدید (123456:ABC-DEF...)",
   tgTokensEmpty:"هیچ توکنی ثبت نشده", tgTokenRemove:"حذف این توکن",
   tgTokenAdded:"توکن اضافه شد", tgTokenRemoved:"توکن حذف شد",
@@ -1709,6 +1750,16 @@ const I18N={
   tgPeerLab:"MTProto Peer (ANBAR_MTPROTO_PEER)",
   tgChunkLab:"Chunk Size (MB)",
   tgChunkSub:"Max 19 for Bot, max 49 for MTProto",
+  tgOwnerLab:"Authorized Telegram User IDs (ANBAR_OWNER_TG_IDS)",
+  tgOwnerSub:"Numeric IDs allowed to send files or restricted post links",
+  tgWebhookSecretLab:"Webhook Secret Token (optional)",
+  tgWebhookSecretSub:"Header token X-Telegram-Bot-Api-Secret-Token (auto-derived if blank)",
+  tgWebhookStatusLab:"Telegram Bot Webhook",
+  tgSetWebhook:"Register Webhook",
+  tgWebhookInfo:"Check Webhook Status",
+  tgDelWebhook:"Delete Webhook",
+  tgWebhookRegistered:"Webhook registered successfully",
+  tgWebhookDeleted:"Webhook deleted successfully",
   tgAddToken:"+ Add", tgAddTokenPh:"New bot token (123456:ABC-DEF...)",
   tgTokensEmpty:"No tokens configured", tgTokenRemove:"Remove this token",
   tgTokenAdded:"Token added", tgTokenRemoved:"Token removed",
@@ -5551,7 +5602,13 @@ async function loadTelegramConfig(){
       }
     }
     if($("#s_tg_chunk_size"))$("#s_tg_chunk_size").value=r.chunk_size_mb||16;
+    if($("#s_tg_owner_ids"))$("#s_tg_owner_ids").value=r.owner_tg_ids||"";
+    if($("#s_tg_webhook_secret")){
+      $("#s_tg_webhook_secret").value="";
+      $("#s_tg_webhook_secret").placeholder=r.tg_webhook_secret||"••••••••";
+    }
     syncHashToggleBtn();
+    checkWebhookInfo(false);
   }catch(e){}
 }
 
@@ -5592,6 +5649,58 @@ async function testTelegramConnection(){
   }
 }
 if($("#btnTgTestConn")) $("#btnTgTestConn").onclick = testTelegramConnection;
+
+const btnSetWh=$("#btnTgSetWebhook");
+if(btnSetWh)btnSetWh.onclick=async()=>{
+  btnSetWh.disabled=true;btnSetWh.style.opacity=".6";
+  try{
+    const r=await api("/api/v1/admin/telegram/webhook/set",{method:"POST"});
+    toast(t("tgWebhookRegistered")||r.description,"ok");
+    checkWebhookInfo(true);
+  }catch(e){toast(e.message,"err");}
+  finally{btnSetWh.disabled=false;btnSetWh.style.opacity="";}
+};
+const btnInfoWh=$("#btnTgWebhookInfo");
+if(btnInfoWh)btnInfoWh.onclick=()=>checkWebhookInfo(true);
+const btnDelWh=$("#btnTgDelWebhook");
+if(btnDelWh)btnDelWh.onclick=async()=>{
+  btnDelWh.disabled=true;btnDelWh.style.opacity=".6";
+  try{
+    const r=await api("/api/v1/admin/telegram/webhook/delete",{method:"POST"});
+    toast(t("tgWebhookDeleted")||r.description,"ok");
+    checkWebhookInfo(true);
+  }catch(e){toast(e.message,"err");}
+  finally{btnDelWh.disabled=false;btnDelWh.style.opacity="";}
+};
+async function checkWebhookInfo(showBox=false){
+  try{
+    const r=await api("/api/v1/admin/telegram/webhook/info");
+    const badge=$("#tgWebhookBadge");
+    const box=$("#tgWebhookInfoBox");
+    if(badge){
+      if(r.url){
+        badge.textContent="Active";
+        badge.style.background="var(--ok-soft)";
+        badge.style.color="var(--ok)";
+      }else{
+        badge.textContent="Inactive";
+        badge.style.background="var(--bg3)";
+        badge.style.color="var(--tx3)";
+      }
+    }
+    if(box){
+      if(showBox){
+        box.style.display="block";
+        box.textContent="URL: "+(r.url||"(none)")+"\nPending Updates: "+(r.pending_update_count||0)+(r.last_error_message?("\nLast Error: "+r.last_error_message):"");
+      }else{
+        box.style.display="none";
+      }
+    }
+  }catch(e){
+    if(showBox)toast(e.message,"err");
+  }
+}
+
 $("#swPreview").onclick=()=>{
   previewsEnabled=!previewsEnabled;
   localStorage.setItem("anbar-previews",previewsEnabled?"1":"0");
@@ -5764,6 +5873,9 @@ $("#saveBtn").onclick=guardBtn($("#saveBtn"),async()=>{
   const enteredHash=$("#s_tg_api_hash")?.value?.trim();
   // never save the revealed masked value back
   if(enteredHash&&!enteredHash.includes("•")&&!enteredHash.includes("*"))tgBody.api_hash=enteredHash;
+  if($("#s_tg_owner_ids"))tgBody.owner_tg_ids=$("#s_tg_owner_ids").value.trim();
+  const enteredWhSec=$("#s_tg_webhook_secret")?.value?.trim();
+  if(enteredWhSec&&!enteredWhSec.includes("•")&&!enteredWhSec.includes("*"))tgBody.tg_webhook_secret=enteredWhSec;
   try{
     const r1 = await api("/api/v1/admin/settings",{method:"POST",body:JSON.stringify(body)});
     curSettings=r1.settings;
