@@ -737,8 +737,22 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff check`: 0 errors.
   - `mypy src/anbar`: 0 errors.
 - **Deployment Status**:
-  - Ready for production deployment to Falkenstein.
+  - **DEPLOYED TO PRODUCTION (Falkenstein, commit 00b1921, v0.15.59)**:
+    - Remote host: `167.233.55.81:9898`
+    - Container status: `anbar-anbar-1 Up (healthy)` running `anbar:prod`
+    - Local healthcheck: `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Public HTTPS healthcheck (`https://dl.amiri-dev.ir/healthz`): `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Deployed features verified:
+      - `qpause` and `.qresume` live in production HTML on `https://dl.amiri-dev.ir/`.
+      - Modernized MiniApp with `humanSize` live on `https://dl.amiri-dev.ir/tg-app`.
+      - S3 gateway `ListBuckets` and `HeadBucket` verified live over localhost.
+      - Resumable upload discovery `GET /api/v1/upload/resume/{upload_id}` verified live.
+      - Temporary test upload verified and immediately purged (`NJFQRcKrw4Uv` permanently wiped from DB and backend blobs; zero `/tmp` residuals).
+    - Host invariants intact: `/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env` preserved without data loss.
 - **Current Git Commit / Branch**:
-  - In progress on `main`.
+  - `00b1921` on `main` (deployed to Falkenstein).
+- **Exact Next Step for Next Session**:
+  - 4-pillar enhancements deployed and verified live in production. Stand by for future tasks.
+
 
 
