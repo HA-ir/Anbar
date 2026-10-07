@@ -1067,3 +1067,61 @@ def test_settings_mobile_responsiveness_and_telegram_test(authed_page: Page):
     page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
     has_on = page.evaluate("() => document.querySelector('#drawer').classList.contains('on')")
     assert not has_on
+
+
+def test_upload_queue_pause_resume_and_audio_controls(authed_page: Page, tmp_path: Path):
+    """Test 26: Upload queue pause/resume controls and enhanced audio preview playback speeds."""
+    page = authed_page
+
+    # 1. Test audio preview controls
+    audio_path = tmp_path / "song.mp3"
+    audio_path.write_bytes(b"\xff\xfb\x90\x44" + b"\x00" * 2048)  # minimal mp3 frame
+    _upload_file(page, tmp_path, "song.mp3")
+    page.wait_for_selector(".gallery .gcell:has-text('song.mp3')", timeout=4000)
+
+    # Click audio cell name to open preview modal
+    cell = page.locator(".gallery .gcell:has-text('song.mp3')").first
+    cell.locator(".gname").click()
+    page.wait_for_selector("#fileModal", state="visible", timeout=4000)
+
+    # Check audio player controls
+    assert page.locator("#fmAud").is_visible()
+    assert page.locator(".aud-skip[data-skip='-10']").is_visible()
+    assert page.locator(".aud-skip[data-skip='10']").is_visible()
+    speed_btns = page.locator(".aud-speed-btn")
+    assert speed_btns.count() >= 5
+
+    # Click speed button 1.5x
+    btn_15 = page.locator(".aud-speed-btn[data-speed='1.5']")
+    btn_15.click()
+    speed_val = page.evaluate("() => document.querySelector('#fmAud').playbackRate")
+    assert speed_val == 1.5
+
+    # Close modal
+    page.click("#fmClose")
+    page.wait_for_selector("#fileModal", state="hidden", timeout=3000)
+
+    # 2. Test queue pause and resume client actions
+    res = page.evaluate("""() => {
+        queue.push({
+            id: "test-paused-upload",
+            file: { name: "test_large.bin", size: 32 * 1024 * 1024 },
+            state: "up",
+            prog: 50,
+            _xhr: { abort: () => {} }
+        });
+        renderQueue();
+        const pauseBtn = document.querySelector('.qpause[data-id="test-paused-upload"]');
+        if (!pauseBtn) return { hasPause: false };
+        pauseItem("test-paused-upload");
+        const resumeBtn = document.querySelector('.qresume[data-id="test-paused-upload"]');
+        const isPausedState = queue.find(q => q.id === "test-paused-upload")?.state === "paused";
+        return {
+            hasPause: true,
+            hasResume: !!resumeBtn,
+            isPausedState: isPausedState
+        };
+    }""")
+    assert res["hasPause"] is True
+    assert res["hasResume"] is True
+    assert res["isPausedState"] is True

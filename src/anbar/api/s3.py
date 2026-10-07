@@ -55,6 +55,53 @@ def _check_s3_auth(request: Request, write: bool = False):
         raise HTTPException(401, "S3 writes require authentication")
 
 
+@router.get("", include_in_schema=False)
+@router.get("/", include_in_schema=False)
+async def list_buckets(request: Request):
+    """S3 ListBuckets endpoint returning XML listing of available buckets."""
+    _check_s3_auth(request)
+    db: Database = request.app.state.db
+    # Find all distinct top-level prefixes that act as buckets
+    rows = db.list_objects(limit=1000)
+    buckets_found = {"default"}
+    for r in rows:
+        fn = r.get("filename", "")
+        if "/" in fn:
+            p = fn.split("/")[0].strip()
+            if p:
+                buckets_found.add(p)
+
+    root = ET.Element(
+        "ListAllMyBucketsResult", attrib={"xmlns": "http://s3.amazonaws.com/doc/2006-03-01/"}
+    )
+    owner = ET.SubElement(root, "Owner")
+    ET.SubElement(owner, "ID").text = "anbar"
+    ET.SubElement(owner, "DisplayName").text = "anbar"
+    b_el = ET.SubElement(root, "Buckets")
+    for b in sorted(buckets_found):
+        bucket_el = ET.SubElement(b_el, "Bucket")
+        ET.SubElement(bucket_el, "Name").text = b
+        ET.SubElement(bucket_el, "CreationDate").text = "2026-01-01T00:00:00.000Z"
+
+    xml_bytes = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    return Response(content=xml_bytes, media_type="application/xml")
+
+
+@router.head("/{bucket}")
+async def head_bucket(bucket: str, request: Request):
+    """S3 HeadBucket endpoint checking bucket accessibility."""
+    _check_s3_auth(request)
+    _ = bucket
+    return Response(status_code=200, headers={"x-amz-bucket-region": "us-east-1"})
+
+
+@router.put("/{bucket}")
+async def create_bucket(bucket: str, request: Request):
+    """S3 CreateBucket endpoint."""
+    _check_s3_auth(request, write=True)
+    return Response(status_code=200, headers={"Location": f"/s3/{bucket}"})
+
+
 @router.get("/{bucket}")
 async def list_objects_v2(
     bucket: str,
@@ -68,10 +115,17 @@ async def list_objects_v2(
     settings = request.app.state.settings
     rate = runtime.get_int(db, "rate_download", settings.rate_download_per_min)
     limit_download(db, request, f"s3:{bucket}", rate)
-    prefix = f"{bucket}/"
-    # SEC-B3: never fall back to global default-bucket enumeration. S3 lists
-    rows = db.list_objects_by_prefix(prefix)
-    matching = [r for r in rows if r["filename"].startswith(prefix) and not r.get("deleted_at")]
+
+    req_prefix = request.query_params.get("prefix", "")
+    delimiter = request.query_params.get("delimiter")
+
+    bucket_prefix = f"{bucket}/"
+    full_search_prefix = f"{bucket}/{req_prefix}" if req_prefix else bucket_prefix
+    rows = db.list_objects_by_prefix(full_search_prefix)
+    matching = [
+        r for r in rows
+        if r["filename"].startswith(full_search_prefix) and not r.get("deleted_at")
+    ]
 
     max_keys_int = max(1, min(int(request.query_params.get("max-keys", max_keys)), 1000))
     offset = 0
@@ -82,29 +136,57 @@ async def list_objects_v2(
         except ValueError:
             offset = 0
 
-    paged = matching[offset : offset + max_keys_int]
-    is_truncated = (offset + max_keys_int) < len(matching)
+    # Handle delimiter (common prefixes for folders)
+    contents_list = []
+    common_prefixes = set()
+
+    if delimiter:
+        for r in matching:
+            fn = r["filename"]
+            rel_key = fn[len(bucket_prefix):] if fn.startswith(bucket_prefix) else fn
+            if req_prefix and rel_key.startswith(req_prefix):
+                rest = rel_key[len(req_prefix):]
+            else:
+                rest = rel_key
+
+            if delimiter in rest:
+                cp = (req_prefix or "") + rest.split(delimiter)[0] + delimiter
+                common_prefixes.add(cp)
+            else:
+                contents_list.append(r)
+    else:
+        contents_list = matching
+
+    paged = contents_list[offset : offset + max_keys_int]
+    is_truncated = (offset + max_keys_int) < len(contents_list)
     next_token = str(offset + max_keys_int) if is_truncated else None
 
     root = ET.Element(
         "ListBucketResult", attrib={"xmlns": "http://s3.amazonaws.com/doc/2006-03-01/"}
     )
     ET.SubElement(root, "Name").text = bucket
-    ET.SubElement(root, "KeyCount").text = str(len(paged))
+    if req_prefix:
+        ET.SubElement(root, "Prefix").text = req_prefix
+    if delimiter:
+        ET.SubElement(root, "Delimiter").text = delimiter
+    ET.SubElement(root, "KeyCount").text = str(len(paged) + len(common_prefixes))
     ET.SubElement(root, "MaxKeys").text = str(max_keys_int)
     ET.SubElement(root, "IsTruncated").text = "true" if is_truncated else "false"
     if next_token:
         ET.SubElement(root, "NextContinuationToken").text = next_token
 
     for r in paged:
-        # REL-C4: sha256 is already selected in db.list_objects() — zero N+1 queries
         contents = ET.SubElement(root, "Contents")
-        is_pfx = r["filename"].startswith(prefix)
-        key_name = r["filename"][len(prefix) :] if is_pfx else r["filename"]
+        is_pfx = r["filename"].startswith(bucket_prefix)
+        key_name = r["filename"][len(bucket_prefix):] if is_pfx else r["filename"]
         ET.SubElement(contents, "Key").text = key_name
         ET.SubElement(contents, "Size").text = str(r["size"])
         ET.SubElement(contents, "ETag").text = f'"{r.get("sha256") or ""}"'
         ET.SubElement(contents, "LastModified").text = formatdate(r["created_at"], usegmt=True)
+
+    for cp in sorted(common_prefixes):
+        cp_el = ET.SubElement(root, "CommonPrefixes")
+        ET.SubElement(cp_el, "Prefix").text = cp
 
     xml_bytes = ET.tostring(root, encoding="utf-8", xml_declaration=True)
     return Response(content=xml_bytes, media_type="application/xml")

@@ -243,7 +243,9 @@ html[dir="ltr"] .field input{padding:13px 15px 13px 44px}
 .qcancel.btn{width:auto;padding:3px 10px;font-size:11.5px;border:1px solid var(--err);border-radius:8px;
   color:var(--err);background:transparent;flex:none}
 .qcancel.btn:hover{color:#fff;background:var(--err);border-color:var(--err)}
+.qpause.btn,.qresume.btn{width:auto;padding:3px 10px;font-size:11.5px;border-radius:8px;flex:none}
 .qitem.canceled .qbar i{background:var(--tx3)}
+.qitem.paused .qbar i{background:var(--warn)}
 /* filter bar */
 .filterbar{display:flex;gap:10px;margin-bottom:14px}
 .searchbox{flex:1;position:relative;display:flex;align-items:center}
@@ -582,6 +584,12 @@ html[dir="rtl"] .toast{direction:rtl;text-align:right}
   border:1px dashed var(--line2);color:var(--tx3);font-size:11.5px;cursor:pointer}
 .fm-subs .subadd:hover{border-color:var(--brand);color:var(--brand)}
 .fm-subs .subadd.busy{opacity:.55;pointer-events:none}
+.aud-speed-btn.active{background:var(--brand) !important;color:#fff !important;font-weight:600}
+@media(max-width:480px){
+  .fm-subs{gap:8px;padding:10px}
+  .fm-subs .subchip,.fm-subs .subadd{padding:6px 12px;font-size:12px;min-height:32px}
+  .aud-ctrls{gap:6px}
+}
 .fm-preview iframe,.fm-preview object{width:100%;height:380px;border:none;border-radius:10px}
 .fm-preview pre{width:100%;max-height:360px;overflow:auto;padding:14px;margin:0;font-size:12px;
   font-family:ui-monospace,Menlo,Consolas,monospace;direction:ltr;text-align:left;white-space:pre-wrap;
@@ -1575,6 +1583,7 @@ const I18N={
   linkT:"لینک اشتراک‌گذاری", linkS:"این لینک بدون نیاز به ورود کار می‌کند و بعد از ۲۴ ساعت منقضی می‌شود.",
   copy:"کپی", copied:"کپی شد", close:"بستن",
   tUp:"آپلود…", tDone:"آپلود شد", tFail:"خطا", tCancel:"لغو", tCanceled:"لغو شد",
+  tPause:"توقف", tResume:"ادامه", tPaused:"متوقف‌شده",
   saved:"تنظیمات ذخیره شد", purgeOk:"کش پاک شد", purgeFail:"پاک‌شدن کش خطا داشت",
   delQ:"این فایل برای همیشه حذف شود؟", delOk:"حذف شد", delFail:"حذف خطا داشت", ok:"تأیید", cancel:"انصراف",
   dlStart:"دانلود شروع شد", sizeOver:"بزرگ‌تر از سقف مجاز است", uploading:"در صف…",
@@ -1753,6 +1762,7 @@ const I18N={
   linkT:"Share link", linkS:"Works without login; expires in 24 hours.",
   copy:"Copy", copied:"Copied", close:"Close",
   tUp:"Uploading…", tDone:"Uploaded", tFail:"Error", tCancel:"Cancel", tCanceled:"Canceled",
+  tPause:"Pause", tResume:"Resume", tPaused:"Paused",
   saved:"Settings saved", purgeOk:"Cache purged", purgeFail:"Purge failed",
   delQ:"Delete this file permanently?", delOk:"Deleted", delFail:"Delete failed", ok:"OK", cancel:"Cancel",
   dlStart:"Download started", sizeOver:"exceeds the size limit", uploading:"Queued…",
@@ -3604,8 +3614,28 @@ async function openFileModal(o){
     loadSubsStrip(o,pv);
   }else if(kind==="audio"){
     pv.classList.add("has","audio");
-    pv.innerHTML='<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
-      +'<audio src="'+url+'" controls preload="metadata"></audio>';
+    pv.innerHTML='<div style="width:48px;height:48px;border-radius:50%;background:var(--brand-soft);display:flex;align-items:center;justify-content:center;margin-bottom:6px">'
+      +'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>'
+      +'<audio id="fmAud" src="'+url+'" controls preload="metadata" style="width:100%"></audio>'
+      +'<div class="aud-ctrls" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;flex-wrap:wrap">'
+      +'<button type="button" class="btn btn-ghost aud-skip" data-skip="-10" style="padding:4px 9px;font-size:11.5px" title="-10s">⟲ 10s</button>'
+      +'<button type="button" class="btn btn-ghost aud-skip" data-skip="10" style="padding:4px 9px;font-size:11.5px" title="+10s">10s ⟳</button>'
+      +'<div class="aud-speeds" style="display:inline-flex;gap:4px;background:var(--bg3);border-radius:14px;padding:2px 4px">'
+      +['0.75','1','1.25','1.5','2'].map(s=>'<button type="button" class="aud-speed-btn'+(s==='1'?' active':'')+'" data-speed="'+s+'" style="border:none;background:transparent;color:var(--tx2);padding:2px 7px;font-size:11px;border-radius:10px;cursor:pointer">'+s+'x</button>').join('')
+      +'</div></div>';
+    const aEl=pv.querySelector("#fmAud");
+    if(aEl){
+      pv.querySelectorAll(".aud-skip").forEach(b=>{
+        b.onclick=()=>{ const dt=parseFloat(b.dataset.skip||"0"); aEl.currentTime=Math.max(0,Math.min(aEl.duration||0,aEl.currentTime+dt)); };
+      });
+      pv.querySelectorAll(".aud-speed-btn").forEach(b=>{
+        b.onclick=()=>{
+          const sp=parseFloat(b.dataset.speed||"1");
+          aEl.playbackRate=sp;
+          pv.querySelectorAll(".aud-speed-btn").forEach(x=>x.classList.toggle("active",x===b));
+        };
+      });
+    }
   }else if(kind==="pdf"){
     pv.classList.add("has");
     pv.innerHTML='<iframe src="'+url+'#toolbar=0" title="PDF Preview"></iframe>';
@@ -4529,21 +4559,21 @@ function renderQueue(){
   q.innerHTML="";
   for(const it of queue){
     const d=document.createElement("div");
-    d.className="qitem "+(it.state==="done"?"done":it.state==="fail"?"fail":"");
+    d.className="qitem "+(it.state==="done"?"done":it.state==="fail"?"fail":it.state==="paused"?"paused":"");
     d.dataset.id=it.id;
+    const chunkInfo=it.resumeChunks?` · (${it.resumeChunks} chunks done)`:"";
     d.innerHTML='<div class="row"><span class="nm">'+esc(it.file.name)+'</span>'
-      +'<span class="sz">'+humanSize(it.file.size)+'</span></div>'
+      +'<span class="sz">'+humanSize(it.file.size)+chunkInfo+'</span></div>'
       +'<div class="qbar"><i style="width:'+it.prog+'%"></i></div>'
       +'<div class="qstat"><span>'+(it.state==="fail"?'<span class="err">'+esc(it.err||"")+'</span>'
-        :it.state==="canceled"?t("tCanceled"):it.state==="done"?t("tDone"):it.state==="up"?t("tUp"):t("uploading"))
+        :it.state==="canceled"?t("tCanceled"):it.state==="paused"?t("tPaused"):it.state==="done"?t("tDone"):it.state==="up"?t("tUp"):t("uploading"))
       +'</span>'
-      /* BUG-v0.15.28: stable row layout — percent span is fixed-width (CSS
-         .qpct); BUG-v0.15.34: .qstat is flex space-between, so status text sits
-         at the START and the cancel/retry button lands CENTERED between the
-         status and the percent label (user request: cancel in the middle). */
-      +((it.state==="up"||it.state==="wait")?'<button class="btn-ghost btn qcancel" data-id="'+it.id+'">'+esc(t("tCancel"))+'</button>':'')
-      +(it.state==="fail"?'<button class="btn-ghost btn qretry" data-id="'+it.id+'" style="padding:3px 10px;font-size:11.5px">'+esc(t("retry"))+'</button>'
-        :'<span class="qpct">'+(it.state==="up"?Math.floor(it.prog)+"%":"")+'</span>')+'</div>';
+      +'<div style="display:flex;align-items:center;gap:6px">'
+      +(it.state==="up"?'<button class="btn-ghost btn qpause" data-id="'+it.id+'" style="padding:3px 8px;font-size:11.5px">'+esc(t("tPause"))+'</button>':'')
+      +(it.state==="paused"?'<button class="btn-ghost btn qresume" data-id="'+it.id+'" style="padding:3px 8px;font-size:11.5px">'+esc(t("tResume"))+'</button>':'')
+      +((it.state==="up"||it.state==="wait"||it.state==="paused")?'<button class="btn-ghost btn qcancel" data-id="'+it.id+'">'+esc(t("tCancel"))+'</button>':'')
+      +(it.state==="fail"?'<button class="btn-ghost btn qretry" data-id="'+it.id+'" style="padding:3px 10px;font-size:11.5px">'+esc(t("retry"))+'</button>':'')
+      +'<span class="qpct">'+(it.state==="up"||it.state==="paused"?Math.floor(it.prog)+"%":"")+'</span></div></div>';
     q.appendChild(d);
   }
   q.querySelectorAll(".qretry").forEach(b=>{
@@ -4551,6 +4581,12 @@ function renderQueue(){
   });
   q.querySelectorAll(".qcancel").forEach(b=>{
     b.onclick=()=>cancelItem(b.dataset.id);
+  });
+  q.querySelectorAll(".qpause").forEach(b=>{
+    b.onclick=()=>pauseItem(b.dataset.id);
+  });
+  q.querySelectorAll(".qresume").forEach(b=>{
+    b.onclick=()=>resumeItem(b.dataset.id);
   });
 }
 async function pump(){
@@ -4562,7 +4598,8 @@ async function pump(){
     await uploadOne(it);
     it.state="done";it.prog=100;
   }catch(e){
-    if(e&&e.message==="__canceled__"){it.state="canceled";it.err="";}   // BUG-v0.15.26
+    if(it._paused){it.state="paused";it.err="";}
+    else if(e&&e.message==="__canceled__"){it.state="canceled";it.err="";}
     else{it.state="fail";it.err=e.message;}
   }
   renderQueue();
@@ -4801,12 +4838,48 @@ function cancelItem(id){
   it._canceled=true;
   it.state="canceled";it.err="";
   renderQueue();
-  // if nothing is uploading anymore the pump loop is stuck on this item —
-  // uploadOne's promise rejects and pump() continues with the next item.
+}
+function pauseItem(id){
+  const it=queue.find(q=>q.id===id);
+  if(!it)return;
+  if(it.state==="up"&&it._xhr){
+    it._paused=true;
+    try{it._xhr.abort();}catch(e){}
+    it.state="paused";
+  }else if(it.state==="wait"){
+    it.state="paused";
+  }
+  renderQueue();
+}
+async function resumeItem(id){
+  const it=queue.find(q=>q.id===id);
+  if(!it||it.state!=="paused")return;
+  it._paused=false;
+  try{
+    const r=await api("/api/v1/upload/resume/"+encodeURIComponent(it.id));
+    if(r&&r.exists&&r.chunks_done>0){
+      it.resumeFrom=r.chunks_done;
+      it.resumeChunks=r.chunks_done;
+      const doneBytes=r.bytes_done||(r.chunks_done*16*1024*1024);
+      it.prog=Math.min(99,Math.round(doneBytes/(it.file.size||doneBytes)*100));
+    }
+  }catch(e){}
+  it.state="wait";it.err="";
+  renderQueue();pump();
 }
 async function retryItem(id){
   const it=queue.find(q=>q.id===id);
   if(!it||uploading)return;
+  it._paused=false;
+  try{
+    const r=await api("/api/v1/upload/resume/"+encodeURIComponent(it.id));
+    if(r&&r.exists&&r.chunks_done>0){
+      it.resumeFrom=r.chunks_done;
+      it.resumeChunks=r.chunks_done;
+      const doneBytes=r.bytes_done||(r.chunks_done*16*1024*1024);
+      it.prog=Math.min(99,Math.round(doneBytes/(it.file.size||doneBytes)*100));
+    }
+  }catch(e){}
   it.state="wait";it.err="";
   renderQueue();pump();
 }

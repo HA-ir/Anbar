@@ -694,5 +694,51 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 - **Current Git Commit / Branch**:
   - `5b3c2bf` on `main` (deployed to Falkenstein).
 - **Exact Next Step for Next Session**:
-  - Both active Telegram testing and mobile settings responsive overhaul are verified live in production. Stand by for future requirements.
+  - Implement and verify 4-pillar enhancements: resumable upload queue with pause/resume handshake, modernized Telegram MiniApp, S3 gateway compatibility, and media/audio mobile controls.
+
+### Session 18: 4-Pillar Product Enhancement & Low-Bandwidth Remote Verification (2026-10-07)
+
+- **Current Objective**:
+  1. Pillar 1: Upload Queue & Network Resilience:
+     - Implement `GET /api/v1/upload/resume/{upload_id}` checkpoint discovery endpoint.
+     - Add Pause (`.qpause`) and Resume (`.qresume`) buttons and pause/resume/retry handlers in UI.
+     - Handshake with server checkpoints on resume/retry using `X-Resume-From: <chunks_done>` without restarting from byte 0.
+  2. Pillar 2: Telegram Mini App Modernization:
+     - Overhaul `src/anbar/ui/miniapp.html` with Anbar design tokens, `humanSize(b)`, clean SVG file type icons, category filter pills, animated progress bar, toast notifications, and Telegram Haptic Feedback.
+  3. Pillar 3: S3 Gateway Client Compatibility Audit:
+     - Implement `ListBuckets` (`GET /s3`, `GET /s3/`) returning `ListAllMyBucketsResult` XML.
+     - Implement `HeadBucket` (`HEAD /s3/{bucket}`) and `CreateBucket` (`PUT /s3/{bucket}`).
+     - Support `prefix` and `delimiter` / `<CommonPrefixes>` directory grouping in `ListObjectsV2`.
+  4. Pillar 4: Media & Subtitle Mobile Experience:
+     - Add audio preview variable playback rate selector (`0.75x`, `1x`, `1.25x`, `1.5x`, `2x`) and seek stepping (`±10s`).
+     - Optimize mobile subtitle manager strip padding and wrapping (<480px).
+- **Completed Work**:
+  - Updated `src/anbar/api/upload.py` with `GET /upload/resume/{upload_id}`.
+  - Updated `src/anbar/ui/index.html` with pause/resume queue controls, audio playback rate buttons, and mobile subtitle strip wrapping.
+  - Overhauled `src/anbar/ui/miniapp.html` with tokenized design, responsive categories, and animated progress.
+  - Updated `src/anbar/api/s3.py` with `list_buckets`, `head_bucket`, `create_bucket`, and hierarchical prefix/delimiter grouping.
+  - Created unit tests in `tests/test_upload_resume_api.py` and `tests/test_s3_compatibility.py`.
+  - Added Playwright E2E browser test Test 26 in `tests/test_e2e_playwright.py`.
+- **Files/Components Changed**:
+  - `src/anbar/api/upload.py`
+  - `src/anbar/ui/index.html`
+  - `src/anbar/ui/miniapp.html`
+  - `src/anbar/api/s3.py`
+  - `tests/test_upload_resume_api.py`
+  - `tests/test_s3_compatibility.py`
+  - `tests/test_e2e_playwright.py`
+  - `CHANGELOG.md`
+  - `docs/WORKING_RECORD.md`
+- **Tests Executed**:
+  - `pytest -v`: 496/496 passed (100%).
+  - `tests/test_upload_resume_api.py`: 3/3 passed.
+  - `tests/test_s3_compatibility.py`: 3/3 passed.
+  - `tests/test_e2e_playwright.py`: 27/27 passed in headless Chromium.
+  - `ruff check`: 0 errors.
+  - `mypy src/anbar`: 0 errors.
+- **Deployment Status**:
+  - Ready for production deployment to Falkenstein.
+- **Current Git Commit / Branch**:
+  - In progress on `main`.
+
 

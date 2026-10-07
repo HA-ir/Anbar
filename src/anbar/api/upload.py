@@ -7,6 +7,7 @@ ownership (used by DELETE in F4).
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Annotated, cast
 
@@ -310,6 +311,52 @@ async def upload_raw(request: Request):
         resume_from=resume_from,
     )
     return await _commit(request, manifest, sha_hex, filename, content_type)
+
+
+@router.get("/upload/resume/{upload_id}")
+async def get_upload_resume_status(request: Request, upload_id: str):
+    """Retrieve checkpoint metadata for a resumable upload id."""
+    require_uploader(request)
+    db = request.app.state.db
+    clean_id = upload_id.strip()
+    if not clean_id:
+        raise HTTPException(400, "upload_id cannot be empty")
+    raw = db.kv_get(f"upres:{clean_id}")
+    if not raw:
+        return {
+            "upload_id": clean_id,
+            "exists": False,
+            "chunks_done": 0,
+            "bytes_done": 0,
+            "timestamp": None,
+        }
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            chunks = data.get("chunks", [])
+            ts = data.get("_ts")
+        elif isinstance(data, list):
+            chunks = data
+            ts = None
+        else:
+            chunks = []
+            ts = None
+        bytes_done = sum(c.get("s", 0) for c in chunks if isinstance(c, dict))
+        return {
+            "upload_id": clean_id,
+            "exists": True,
+            "chunks_done": len(chunks),
+            "bytes_done": bytes_done,
+            "timestamp": ts,
+        }
+    except Exception:
+        return {
+            "upload_id": clean_id,
+            "exists": False,
+            "chunks_done": 0,
+            "bytes_done": 0,
+            "timestamp": None,
+        }
 
 
 async def _peek_size(file: UploadFile) -> int:

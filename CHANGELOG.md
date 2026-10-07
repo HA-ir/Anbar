@@ -4,6 +4,27 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.15.59] — 2026-10-07
+
+### Added
+- **Resumable Upload Queue & Network Resilience**:
+  - Implemented `GET /api/v1/upload/resume/{upload_id}` discovery endpoint in `src/anbar/api/upload.py` exposing server-side chunk checkpoints and byte counts.
+  - Added Pause (`.qpause`) and Resume (`.qresume`) queue controls in `src/anbar/ui/index.html`.
+  - Added automatic resumption handshake querying server checkpoints on reconnect/retry to resume from chunk `N` (`X-Resume-From: N`) without restarting from byte 0.
+  - Added chunk-level progress indicators and warning states for paused uploads.
+- **Telegram Mini App Modernization**:
+  - Completely modernized `src/anbar/ui/miniapp.html` using Anbar design tokens (`--radius-lg`, `--btn-h`, brand accents) and Telegram WebApp color scheme integration.
+  - Implemented human-readable file size formatting (`humanSize(b)`) handling `B`, `KB`, `MB`, `GB`, `TB`.
+  - Added clean SVG file type icons, category filter pills (All, Images, Videos, Audio, Docs), real animated upload progress bar, toast alerts, and Telegram Haptic Feedback.
+- **S3 Gateway Client Compatibility**:
+  - Implemented `ListBuckets` (`GET /s3`, `GET /s3/`) returning standard `ListAllMyBucketsResult` XML in `src/anbar/api/s3.py`.
+  - Implemented `HeadBucket` (`HEAD /s3/{bucket}`) and `CreateBucket` (`PUT /s3/{bucket}`) returning standard HTTP 200 responses.
+  - Added `prefix` parameter filtering and hierarchical `delimiter` support in `ListObjectsV2`, populating `<CommonPrefixes><Prefix>dir/</Prefix></CommonPrefixes>` for standard AWS CLI, rclone, and Cyberduck compatibility.
+- **Media & Subtitle Mobile Experience**:
+  - Enhanced audio file preview with variable playback rate controls (`0.75x`, `1x`, `1.25x`, `1.5x`, `2x`) and `±10s` seek stepping.
+  - Made the subtitle manager strip responsive on mobile screens with wrapped touch-friendly pills (≥36px touch targets).
+  - Added Playwright E2E browser test coverage for audio playback rates and upload pause/resume state handling.
+
 ## [0.15.58] — 2026-10-01
 
 ### Fixed

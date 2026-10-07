@@ -15,3 +15,9 @@ build/
 
 # os
 .DS_Store
+
+# tools & specs
+.claude/
+.codebase-memory/
+.specify/
+specs/
