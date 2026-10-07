@@ -1145,9 +1145,13 @@ def test_settings_telegram_webhook_and_owner_id_panel(authed_page: Page):
     # Fill owner IDs
     page.fill("#s_tg_owner_ids", "11223344, 55667788")
 
-    # Save settings
-    page.click("#saveBtn")
-    page.wait_for_selector(".toast", timeout=4000)
+    # Save settings and wait for server response
+    with page.expect_response(
+        lambda r: "/api/v1/admin/telegram-config" in r.url and r.status == 200
+    ):
+        page.click("#saveBtn")
+
+    page.wait_for_timeout(300)
 
     # Close settings
     page.click("#setClose")

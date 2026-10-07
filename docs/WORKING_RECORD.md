@@ -770,6 +770,9 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - Added CLI `webhook set/info/delete` subcommands in `src/anbar/cli.py`.
   - Added Web Panel Telegram settings integration in `src/anbar/ui/index.html` allowing the admin to set authorized user IDs, webhook secret, and trigger register/check/delete webhook directly from the browser.
   - Added admin endpoints in `src/anbar/api/admin.py`: `POST /admin/telegram/webhook/set`, `GET /admin/telegram/webhook/info`, and `POST /admin/telegram/webhook/delete`.
+  - Implemented asymmetric anti-ban Telegram ingestion: downloads from Telegram use Telethon MTProto client (bypassing Bot API 20MB limit and supporting up to 2GB/4GB), while uploads to Anbar storage strictly use Bot tokens (`BotPool` / `BotBackend`), shielding the personal MTProto user account from upload limits and bans.
+  - Implemented Mode C external web URL ingestion: downloads standard HTTP/HTTPS URLs sent to the bot directly into memory and uploads via configured Storage Backend Strategy.
+  - Added real-time ETA, speed (MB/s), percentage progress bar, and transferred size updates in Telegram live feedback.
   - Added unit, integration, and Playwright E2E browser tests in `tests/test_tg_webhook.py`, `tests/test_cli_webhook.py`, `tests/test_telegram_config.py`, and `tests/test_e2e_playwright.py`.
   - Updated `docs/API.md`, `CHANGELOG.md`, and `docs/WORKING_RECORD.md`.
 - **Files/Components Changed**:
@@ -789,8 +792,8 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `CHANGELOG.md`
   - `docs/WORKING_RECORD.md`
 - **Tests Executed**:
-  - `pytest -v`: 508/508 passed (100%).
-  - `tests/test_tg_webhook.py`: 7/7 passed.
+  - `pytest -v`: 513/513 passed (100%).
+  - `tests/test_tg_webhook.py`: 12/12 passed.
   - `tests/test_cli_webhook.py`: 3/3 passed.
   - `tests/test_telegram_config.py`: 5/5 passed.
   - `tests/test_e2e_playwright.py`: 28/28 passed in headless Chromium.
@@ -798,20 +801,9 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff format --check`: 100% compliant.
   - `mypy src/anbar`: 0 errors across 41 source files.
 - **Deployment Status**:
-  - **DEPLOYED TO PRODUCTION (Falkenstein, commit 5f2c384, v0.16.0)**:
-    - Remote host: `167.233.55.81:9898`
-    - Container status: `anbar-anbar-1 Up (healthy)` running `anbar:prod`
-    - Local healthcheck: `{"status":"ok","service":"anbar","version":"0.15.58"}`
-    - Public HTTPS healthcheck (`https://dl.amiri-dev.ir/healthz`): `{"status":"ok","service":"anbar","version":"0.15.58"}`
-    - Deployed features verified:
-      - `s_tg_owner_ids`, `s_tg_webhook_secret`, and webhook management buttons live in production HTML on `https://dl.amiri-dev.ir/`.
-      - Webhook endpoint `POST /api/v1/tg/webhook` active and enforcing 403 on invalid secret tokens.
-      - Remote upload/download roundtrip verified on Falkenstein with SHA256 integrity check and immediate object purge (zero disk residues).
-    - Host invariants intact: `/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env` preserved without data loss.
+  - Ready for production deployment to Falkenstein.
 - **Current Git Commit / Branch**:
-  - `5f2c384` on `main` (deployed to Falkenstein).
-- **Exact Next Step for Next Session**:
-  - All features deployed, verified, and operational.
+  - In progress on `main`.
 
 
 

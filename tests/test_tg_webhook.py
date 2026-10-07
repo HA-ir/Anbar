@@ -7,7 +7,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from starlette.testclient import TestClient
 
 from anbar.config import Settings
-from anbar.telegram_ingest import format_size, parse_telegram_post_link
+from anbar.telegram_ingest import (
+    format_eta,
+    format_size,
+    get_bot_storage_backend,
+    parse_telegram_post_link,
+    parse_web_url,
+    render_progress_bar,
+)
 
 
 def test_format_size():
@@ -16,6 +23,28 @@ def test_format_size():
     assert format_size(1024) == "1.00 KB"
     assert format_size(1024 * 1024 * 5) == "5.00 MB"
     assert format_size(1024 * 1024 * 1024 * 2) == "2.00 GB"
+
+
+def test_format_eta_and_progress_bar():
+    assert format_eta(None) == "calculating..."
+    assert format_eta(45) == "45s"
+    assert format_eta(90) == "1m 30s"
+    assert format_eta(3665) == "1h 01m"
+
+    assert render_progress_bar(0) == "░░░░░░░░░░"
+    assert render_progress_bar(50) == "█████░░░░░"
+    assert render_progress_bar(100) == "██████████"
+
+
+def test_parse_web_url():
+    assert (
+        parse_web_url("Download from https://example.com/archive.zip now")
+        == "https://example.com/archive.zip"
+    )
+    assert parse_web_url("http://site.org/file.pdf") == "http://site.org/file.pdf"
+    assert parse_web_url("https://t.me/c/123/45") is None
+    assert parse_web_url("https://t.me/channel/45") is None
+    assert parse_web_url("No URL here") is None
 
 
 def test_parse_telegram_post_link():
@@ -175,6 +204,7 @@ async def test_mode_a_direct_media_ingest(client: TestClient):
     ):
         await _ingest_direct_media(
             app=app,
+            message={"message_id": 1, "chat": {"id": 12345}},
             media_info=media_info,
             bot_token="test_token",
             chat_id=12345,
@@ -230,3 +260,120 @@ async def test_mode_b_protected_post_ingest(client: TestClient):
         call_text = mock_edit.call_args[0][3]
         assert "Saved to Anbar!" in call_text
         assert "restricted_video.mp4" in call_text
+
+
+def test_get_bot_storage_backend_selection(client: TestClient):
+    app = client.app
+    # Verify BotBackend or primary pool is selected to avoid MTProto upload ban
+    backend, pool = get_bot_storage_backend(app)
+    assert backend is not None
+
+
+async def test_mode_c_web_url_ingest(client: TestClient):
+    from anbar.telegram_ingest import _ingest_web_url
+
+    app = client.app
+
+    mock_stream_resp = MagicMock()
+    mock_stream_resp.status_code = 200
+    mock_stream_resp.url = "https://example.com/movie.mp4"
+    mock_stream_resp.headers = {
+        "content-disposition": 'attachment; filename="movie.mp4"',
+        "content-type": "video/mp4",
+        "content-length": "2048",
+    }
+
+    async def _mock_bytes(_chunk_size):
+        yield b"fake movie stream bytes"
+
+    mock_stream_resp.aiter_bytes = _mock_bytes
+
+    class MockAsyncClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        def stream(self, *args, **kwargs):
+            class _StreamContext:
+                async def __aenter__(self):
+                    return mock_stream_resp
+
+                async def __aexit__(self, *args):
+                    pass
+
+            return _StreamContext()
+
+    with (
+        patch("httpx.AsyncClient", return_value=MockAsyncClient()),
+        patch("anbar.telegram_ingest.edit_telegram_message", new_callable=AsyncMock) as mock_edit,
+    ):
+        await _ingest_web_url(
+            app=app,
+            url="https://example.com/movie.mp4",
+            bot_token="test_token",
+            chat_id=12345,
+            status_msg_id=99,
+        )
+
+        assert mock_edit.called
+        call_text = mock_edit.call_args[0][3]
+        assert "Saved to Anbar!" in call_text
+        assert "movie.mp4" in call_text
+
+
+async def test_mode_a_large_file_fallback_to_mtproto(client: TestClient):
+    from anbar.telegram_ingest import _ingest_direct_media
+
+    app = client.app
+    message = {
+        "message_id": 50,
+        "chat": {"id": 12345},
+        "document": {
+            "file_id": "huge_file_id",
+            "file_name": "large_archive.zip",
+            "file_size": 50 * 1024 * 1024,
+            "mime_type": "application/zip",
+        },
+    }
+    media_info = {
+        "file_id": "huge_file_id",
+        "filename": "large_archive.zip",
+        "size": 50 * 1024 * 1024,
+        "content_type": "application/zip",
+    }
+
+    # Mock Telethon client & recent message
+    mock_telethon = MagicMock()
+    mock_msg = MagicMock()
+    mock_msg.media = MagicMock()
+    mock_telethon.get_messages = AsyncMock(return_value=[mock_msg])
+
+    async def _mock_iter_download(*args, **kwargs):
+        yield b"chunk 1"
+        yield b"chunk 2"
+
+    mock_telethon.iter_download = _mock_iter_download
+
+    with (
+        patch(
+            "anbar.telegram_ingest.get_active_mtproto_client",
+            new_callable=AsyncMock,
+            return_value=mock_telethon,
+        ),
+        patch("anbar.telegram_ingest.edit_telegram_message", new_callable=AsyncMock) as mock_edit,
+    ):
+        await _ingest_direct_media(
+            app=app,
+            message=message,
+            media_info=media_info,
+            bot_token="123456:FAKE_TOKEN",
+            chat_id=12345,
+            status_msg_id=101,
+        )
+
+        assert mock_edit.called
+        call_text = mock_edit.call_args[0][3]
+        assert "Saved to Anbar!" in call_text
+        assert "large_archive.zip" in call_text

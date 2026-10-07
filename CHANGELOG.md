@@ -12,6 +12,13 @@ versioning follows [SemVer](https://semver.org/).
   - Added Mode A direct media ingest streaming forwarded or uploaded documents, videos, audio, and photos directly via Telegram Bot API `getFile` into `ObjectService`.
   - Added Mode B protected post ingest resolving restricted channel/group post links (`t.me/c/<channel_id>/<msg_id>` and `t.me/<username>/<msg_id>`) via MTProto Telethon client and streaming chunks directly in memory without touching disk.
   - Added real-time user progress feedback via Telegram Bot API messages (initial status, real-time updates, and final download link `https://<BASE_URL>/f/<id>`).
+  - Added Asymmetric Anti-Ban Telegram Transfer Routing:
+    - Automatically downloads media via Telethon MTProto client (bypassing Bot API 20MB limit and supporting up to 2GB/4GB).
+    - Exclusively uploads chunks to Anbar storage via Telegram Bot tokens (`BotPool` / `BotBackend`), shielding the personal MTProto user account from upload quotas, flood waits, and spam bans.
+  - Added Mode C External Web URL Ingest:
+    - Automatically detects standard HTTP/HTTPS URLs sent to the bot, streaming them directly into memory and uploading via the configured Storage Backend Strategy.
+  - Added Live ETA & Speed Feedback:
+    - Live progress bar (`[████████░░]`), percentage, transferred/total bytes, transfer speed (`MB/s`), and remaining time estimation (`ETA: 1m 20s`) displayed in real-time Telegram message updates.
   - Added operational CLI commands to `anbarctl`:
     - `anbarctl webhook set <public_url>`: Configures webhook with secret token and allowed updates.
     - `anbarctl webhook info`: Inspects webhook status, pending updates, and errors.
