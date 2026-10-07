@@ -750,9 +750,50 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
       - Temporary test upload verified and immediately purged (`NJFQRcKrw4Uv` permanently wiped from DB and backend blobs; zero `/tmp` residuals).
     - Host invariants intact: `/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env` preserved without data loss.
 - **Current Git Commit / Branch**:
-  - `00b1921` on `main` (deployed to Falkenstein).
+  - `192ed68` on `main` (deployed to Falkenstein: `00b1921`).
 - **Exact Next Step for Next Session**:
-  - 4-pillar enhancements deployed and verified live in production. Stand by for future tasks.
+  - Implement Telegram Bot Webhook & Protected-Post MTProto Ingestion pipeline.
+
+### Session 19: Telegram Bot Webhook & Protected-Post MTProto Ingest (2026-10-08)
+
+- **Current Objective**:
+  1. Implement Telegram Bot Webhook endpoint (`POST /api/v1/tg/webhook`) with secret token header authentication (`X-Telegram-Bot-Api-Secret-Token`) and owner authorization (`ANBAR_OWNER_TG_IDS` / `ANBAR_OWNER_TG_ID`).
+  2. Implement Mode A direct media ingest (documents, videos, audio, photos) streaming via Bot API `getFile` directly into `ObjectService`.
+  3. Implement Mode B protected post ingest (`t.me/c/<channel_id>/<msg_id>` and `t.me/<username>/<msg_id>`) using active Telethon MTProto client streaming chunks via `iter_download()` without saving to disk.
+  4. Real-time Telegram messaging feedback (initial status, real-time edit, final download link `https://<BASE_URL>/f/<id>`, error reporting).
+  5. Operational CLI commands in `anbarctl`: `webhook set`, `webhook info`, `webhook delete`.
+- **Completed Work**:
+  - Extended `src/anbar/config.py` with `tg_webhook_secret`, `owner_tg_ids`, and `effective_webhook_secret(db)`.
+  - Implemented `src/anbar/mtproto_provider.py` providing shared active Telethon client access across storage backends with graceful shutdown cleanup.
+  - Implemented streaming ingestion engine `src/anbar/telegram_ingest.py` with `AsyncIteratorReader`, post link parser, Bot API helpers, and direct/protected-post streamers.
+  - Implemented webhook receiver `src/anbar/api/tg_webhook.py` mounted at `/api/v1/tg/webhook`.
+  - Added CLI `webhook set/info/delete` subcommands in `src/anbar/cli.py`.
+  - Added unit and integration tests in `tests/test_tg_webhook.py` and `tests/test_cli_webhook.py`.
+  - Updated `docs/API.md`, `CHANGELOG.md`, and `docs/WORKING_RECORD.md`.
+- **Files/Components Changed**:
+  - `src/anbar/config.py`
+  - `src/anbar/mtproto_provider.py`
+  - `src/anbar/telegram_ingest.py`
+  - `src/anbar/api/tg_webhook.py`
+  - `src/anbar/main.py`
+  - `src/anbar/cli.py`
+  - `tests/test_tg_webhook.py`
+  - `tests/test_cli_webhook.py`
+  - `docs/API.md`
+  - `CHANGELOG.md`
+  - `docs/WORKING_RECORD.md`
+- **Tests Executed**:
+  - `pytest -v`: 506/506 passed (100%).
+  - `tests/test_tg_webhook.py`: 7/7 passed.
+  - `tests/test_cli_webhook.py`: 3/3 passed.
+  - `ruff check`: 0 errors.
+  - `ruff format --check`: 100% compliant.
+  - `mypy src/anbar`: 0 errors across 41 source files.
+- **Deployment Status**:
+  - Ready for production deployment to Falkenstein upon confirmation.
+- **Current Git Commit / Branch**:
+  - In progress on `main`.
+
 
 
 

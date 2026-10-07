@@ -13,6 +13,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from typing import Any
 
 
 def _http(
@@ -512,6 +513,26 @@ def _build_parser() -> argparse.ArgumentParser:
     p_cenc.add_argument("-o", "--out", help="output encrypted file path (.enc)")
     p_cenc.set_defaults(func=_cmd_client_encrypt)
 
+    # ── telegram webhook management tools ───────────────────────────
+    p_wh = sub.add_parser("webhook", help="manage telegram bot webhook")
+    wh_sub = p_wh.add_subparsers(dest="webhook_action", required=True)
+
+    wh_set = wh_sub.add_parser("set", help="set telegram bot webhook url")
+    wh_set.add_argument("url", help="public HTTPS URL for webhook")
+    wh_set.add_argument("--token", default=os.environ.get("ANBAR_BOT_TOKEN"), help="bot token")
+    wh_set.add_argument(
+        "--secret", default=os.environ.get("ANBAR_TG_WEBHOOK_SECRET"), help="secret token"
+    )
+    wh_set.set_defaults(func=_cmd_webhook)
+
+    wh_info = wh_sub.add_parser("info", help="inspect webhook status and health")
+    wh_info.add_argument("--token", default=os.environ.get("ANBAR_BOT_TOKEN"), help="bot token")
+    wh_info.set_defaults(func=_cmd_webhook)
+
+    wh_del = wh_sub.add_parser("delete", help="remove telegram bot webhook")
+    wh_del.add_argument("--token", default=os.environ.get("ANBAR_BOT_TOKEN"), help="bot token")
+    wh_del.set_defaults(func=_cmd_webhook)
+
     return parser
 
 
@@ -573,6 +594,100 @@ def _cmd_client_encrypt(args: argparse.Namespace) -> int:
 
     print(f"Encrypted successfully -> {out_path} ({len(enc)} bytes)")
     return 0
+
+
+def _cmd_webhook(args: argparse.Namespace) -> int:
+    """Manage Telegram Bot webhook via Bot API."""
+    token = args.token
+    if not token:
+        try:
+            from .config import get_settings
+
+            s = get_settings()
+            token = s.bot_tokens[0] if s.bot_tokens else None
+        except Exception:
+            token = None
+    if not token:
+        print("error: bot token required (pass --token or set ANBAR_BOT_TOKEN)", file=sys.stderr)
+        return 1
+
+    action = getattr(args, "webhook_action", "")
+    base_api = f"https://api.telegram.org/bot{token}"
+
+    if action == "set":
+        url = args.url.strip()
+        secret = getattr(args, "secret", None)
+        if not secret:
+            try:
+                from .config import get_settings
+
+                s = get_settings()
+                secret = s.effective_webhook_secret()
+            except Exception:
+                secret = None
+
+        payload: dict[str, Any] = {
+            "url": url,
+            "allowed_updates": ["message"],
+        }
+        if secret:
+            payload["secret_token"] = secret
+
+        req = urllib.request.Request(
+            f"{base_api}/setWebhook",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode())
+                if data.get("ok"):
+                    print(f"Webhook set successfully: {data.get('description', 'OK')}")
+                    return 0
+                print(f"error: {data.get('description', 'failed')}", file=sys.stderr)
+                return 1
+        except Exception as e:
+            print(f"error setting webhook: {e}", file=sys.stderr)
+            return 1
+
+    elif action == "info":
+        req = urllib.request.Request(f"{base_api}/getWebhookInfo", method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode())
+                if data.get("ok"):
+                    res = data.get("result", {})
+                    print("Webhook Info:")
+                    print(f"  URL: {res.get('url') or '(none)'}")
+                    print(f"  Has custom certificate: {res.get('has_custom_certificate', False)}")
+                    print(f"  Pending update count: {res.get('pending_update_count', 0)}")
+                    if res.get("last_error_date"):
+                        err_msg = res.get("last_error_message")
+                        err_date = res.get("last_error_date")
+                        print(f"  Last error: {err_msg} (at {err_date})")
+                    return 0
+                print(f"error: {data.get('description', 'failed')}", file=sys.stderr)
+                return 1
+        except Exception as e:
+            print(f"error getting webhook info: {e}", file=sys.stderr)
+            return 1
+
+    elif action == "delete":
+        req = urllib.request.Request(f"{base_api}/deleteWebhook", method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode())
+                if data.get("ok"):
+                    print(f"Webhook deleted: {data.get('description', 'OK')}")
+                    return 0
+                print(f"error: {data.get('description', 'failed')}", file=sys.stderr)
+                return 1
+        except Exception as e:
+            print(f"error deleting webhook: {e}", file=sys.stderr)
+            return 1
+
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:

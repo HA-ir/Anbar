@@ -210,6 +210,9 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         cc = getattr(app.state, "chunk_cache", None)
         if cc is not None:
             cc.close()
+        from .mtproto_provider import close_mtproto_helper
+
+        await close_mtproto_helper(app)
         db.close()
         if not injected:
             await app.state.backend.close()
@@ -356,12 +359,13 @@ def create_app(backend: StorageBackend | None = None) -> FastAPI:
         body = "\n".join(lines) + "\n"
         return Response(content=body, media_type="text/plain; version=0.0.4; charset=utf-8")
 
-    from .api import admin, download, s3, upload, web  # noqa: PLC0415
+    from .api import admin, download, s3, tg_webhook, upload, web  # noqa: PLC0415
 
     app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
     from .api import ingest  # local import: optional URL-ingest feature
 
     app.include_router(ingest.router, prefix="/api/v1", tags=["ingest"])
+    app.include_router(tg_webhook.router, prefix="/api/v1", tags=["telegram"])
     app.include_router(download.router, prefix="/f", tags=["download"])
     app.include_router(s3.router, tags=["s3"])
     app.include_router(admin.router, prefix="/api/v1", tags=["admin"])

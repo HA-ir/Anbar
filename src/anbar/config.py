@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -76,6 +77,11 @@ class Settings(BaseSettings):
     web_session_ttl: int = Field(default=43200, ge=300)  # 12 h
     miniapp_allowed_users_raw: str | None = Field(default=None, alias="ANBAR_MINIAPP_ALLOWED_USERS")
 
+    # telegram webhook & bot ingest (v0.16.0)
+    tg_webhook_secret: SecretStr | None = None
+    owner_tg_ids_raw: str | None = Field(default=None, alias="ANBAR_OWNER_TG_IDS")
+    owner_tg_id: int | None = None
+
     # cache
     cache_enabled: bool = False
     cache_dir: Path = Path("data/cache")
@@ -99,6 +105,40 @@ class Settings(BaseSettings):
         if not self.miniapp_allowed_users_raw:
             return set()
         return {int(p) for p in self.miniapp_allowed_users_raw.split(",") if p.strip().isdigit()}
+
+    @property
+    def owner_tg_ids(self) -> set[int]:
+        ids: set[int] = set()
+        if self.owner_tg_id:
+            ids.add(self.owner_tg_id)
+        if self.owner_tg_ids_raw:
+            for p in self.owner_tg_ids_raw.split(","):
+                p_str = p.strip()
+                if p_str.isdigit():
+                    ids.add(int(p_str))
+        if self.miniapp_allowed_users:
+            ids.update(self.miniapp_allowed_users)
+        return ids
+
+    def effective_webhook_secret(self, db: Any = None) -> str:
+        """Secret token for Telegram Bot Webhook header validation."""
+        if self.tg_webhook_secret:
+            val = self.tg_webhook_secret.get_secret_value().strip()
+            if val:
+                return val
+        if db is not None:
+            configured = (
+                self.hmac_secret.get_secret_value() if self.hmac_secret else "anbar-webhook"
+            )
+            from .auth import effective_hmac_secret
+
+            sec = effective_hmac_secret(db, configured) or "anbar-webhook"
+        else:
+            sec = self.hmac_secret.get_secret_value() if self.hmac_secret else "anbar-webhook"
+        import hashlib
+        import hmac
+
+        return hmac.new(sec.encode("utf-8"), b"tg-webhook", hashlib.sha256).hexdigest()[:64]
 
     @property
     def bot_tokens(self) -> list[str]:

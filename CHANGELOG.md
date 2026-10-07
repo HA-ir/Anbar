@@ -4,6 +4,19 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
+## [0.16.0] — 2026-10-08
+
+### Added
+- **Telegram Bot Webhook & Protected-Post MTProto Ingest**:
+  - Implemented `POST /api/v1/tg/webhook` endpoint with `X-Telegram-Bot-Api-Secret-Token` verification and strict owner user ID authorization (`ANBAR_OWNER_TG_IDS` / `ANBAR_OWNER_TG_ID`).
+  - Added Mode A direct media ingest streaming forwarded or uploaded documents, videos, audio, and photos directly via Telegram Bot API `getFile` into `ObjectService`.
+  - Added Mode B protected post ingest resolving restricted channel/group post links (`t.me/c/<channel_id>/<msg_id>` and `t.me/<username>/<msg_id>`) via MTProto Telethon client and streaming chunks directly in memory without touching disk.
+  - Added real-time user progress feedback via Telegram Bot API messages (initial status, real-time updates, and final download link `https://<BASE_URL>/f/<id>`).
+  - Added operational CLI commands to `anbarctl`:
+    - `anbarctl webhook set <public_url>`: Configures webhook with secret token and allowed updates.
+    - `anbarctl webhook info`: Inspects webhook status, pending updates, and errors.
+    - `anbarctl webhook delete`: Removes active webhook.
+
 ## [0.15.59] — 2026-10-07
 
 ### Added

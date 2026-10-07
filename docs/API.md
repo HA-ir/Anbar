@@ -87,6 +87,20 @@ payload: pass 1 stored 3×16 MB chunks then the client hard-dropped; pass 2
 re-sent the full 100 MB in 13.9 s, server drained 3 chunks / posted 4 new,
 and the committed object's SHA-256 matched the client-side hash exactly.
 
+### `POST /api/v1/tg/webhook`  *(v0.16.0)*
+
+Telegram Bot Webhook endpoint for direct media ingestion and restricted channel post links via MTProto.
+
+**Headers:**
+- `X-Telegram-Bot-Api-Secret-Token`: Configured secret token (`ANBAR_TG_WEBHOOK_SECRET` or derived from `ANBAR_HMAC_SECRET`).
+
+**Payload:** Standard Telegram Update JSON containing a message.
+
+**Capabilities:**
+- **Mode A (Direct Media):** Ingests forwarded or uploaded documents, videos, audio, and photos. Streams <= 20MB files via Bot API `getFile`.
+- **Mode B (Protected Post Links):** Parses `t.me/c/<channel_id>/<msg_id>` and `t.me/<username>/<msg_id>`, resolves the restricted entity via MTProto (`Telethon`), and streams media chunks directly without saving to disk.
+- Returns HTTP 200 immediately (`{"ok": true, "status": "enqueued"}`) and executes streaming in the background, providing real-time status and link feedback via Bot API messages.
+
 ### `GET /f/{id}`  *(F3)*
 
 Streams the object. Honors `Range`.
