@@ -372,11 +372,36 @@ async def handle_bot_command(
             "<code>https://t.me/...</code> for restricted channel posts.\n"
             "• <b>Web Download URLs:</b> Send direct HTTP/HTTPS download links.\n\n"
             "<b>Commands:</b>\n"
+            "/cancel — Abort currently active ingest task\n"
             "/status — System telemetry & storage health\n"
             "/stats — Detailed media storage breakdown\n"
             "/help — Show this guide"
         )
         await send_telegram_message(bot_token, chat_id, help_text, reply_to_message_id=msg_id)
+        return True
+
+    if cmd in ("/cancel", "/stop"):
+        active_tasks = TASK_MANAGER.list_active()
+        if not active_tasks:
+            await send_telegram_message(
+                bot_token,
+                chat_id,
+                "ℹ️ <b>No active ingest tasks found.</b>",
+                reply_to_message_id=msg_id,
+            )
+            return True
+
+        cancelled_names = []
+        for t in active_tasks:
+            if TASK_MANAGER.cancel(t["id"]):
+                cancelled_names.append(t.get("filename") or t["id"])
+
+        if cancelled_names:
+            names_text = "\n".join(f"• <code>{name}</code>" for name in cancelled_names)
+            text = f"🛑 <b>Cancelled Ingest Task(s):</b>\n{names_text}"
+        else:
+            text = "ℹ️ Active tasks were already completing or finished."
+        await send_telegram_message(bot_token, chat_id, text, reply_to_message_id=msg_id)
         return True
 
     if cmd == "/status":
@@ -386,6 +411,16 @@ async def handle_bot_command(
         backend_name = getattr(backend, "name", settings.backend.value).upper()
         bot_pool = getattr(app.state, "bot_pool", None)
         bot_count = bot_pool.size if bot_pool else len(settings.bot_tokens)
+
+        # Check hybrid mode in SQLite runtime settings
+        from . import runtime
+
+        hyb_default = 1 if getattr(settings, "hybrid_enabled", False) else 0
+        hybrid_on = bool(runtime.get_int(db, "hybrid_enabled", hyb_default))
+        if hybrid_on and backend_name == "MTPROTO":
+            backend_display = "HYBRID (MTProto + Bot CDN)"
+        else:
+            backend_display = backend_name
 
         # Check MTProto health
         mtproto_client = await get_active_mtproto_client(app)
@@ -407,7 +442,7 @@ async def handle_bot_command(
             f"📁 <b>Stored Objects:</b> {total_objects}\n"
             f"💾 <b>Storage Used:</b> {format_size(total_bytes)}\n"
             f"⬇️ <b>Total Downloads:</b> {total_dl}\n"
-            f"⚙️ <b>Storage Backend:</b> <code>{backend_name}</code>\n"
+            f"⚙️ <b>Storage Backend:</b> <code>{backend_display}</code>\n"
             f"🤖 <b>Bot Tokens in Pool:</b> {bot_count}\n"
             f"🔑 <b>MTProto Session:</b> {mtproto_status}\n"
             f"🌐 <b>Dashboard:</b> {settings.base_url}"

@@ -323,6 +323,48 @@ async def test_mode_c_web_url_ingest(client: TestClient):
         assert "movie.mp4" in call_text
 
 
+async def test_bot_command_cancel_and_status(client: TestClient):
+    from anbar import runtime
+    from anbar.ingest_manager import TASK_MANAGER
+    from anbar.telegram_ingest import handle_bot_command
+
+    app = client.app
+    chat_id = 12345
+    bot_token = "123:ABC"
+
+    # 1. Test /cancel with no active tasks
+    with patch("anbar.telegram_ingest.send_telegram_message", new_callable=AsyncMock) as mock_send:
+        res = await handle_bot_command(app, {"message_id": 10}, bot_token, chat_id, "/cancel")
+        assert res is True
+        assert mock_send.called
+        assert "No active ingest tasks found" in mock_send.call_args[0][2]
+
+    # 2. Test /cancel with active task
+    task = TASK_MANAGER.create("t_canc_bot", "telegram", "sample.rar")
+    with patch("anbar.telegram_ingest.send_telegram_message", new_callable=AsyncMock) as mock_send:
+        res = await handle_bot_command(app, {"message_id": 11}, bot_token, chat_id, "/cancel")
+        assert res is True
+        assert task.cancel_event.is_set()
+        assert "Cancelled Ingest Task" in mock_send.call_args[0][2]
+        assert "sample.rar" in mock_send.call_args[0][2]
+
+    # 3. Test /status shows HYBRID when hybrid_enabled is True
+    runtime.set_int(app.state.db, "hybrid_enabled", 1)
+    orig_backend = getattr(app.state, "backend", None)
+    app.state.backend = MagicMock(name="mtproto")
+    app.state.backend.name = "mtproto"
+    try:
+        with patch(
+            "anbar.telegram_ingest.send_telegram_message", new_callable=AsyncMock
+        ) as mock_send:
+            res = await handle_bot_command(app, {"message_id": 12}, bot_token, chat_id, "/status")
+            assert res is True
+            call_text = mock_send.call_args[0][2]
+            assert "HYBRID (MTProto + Bot CDN)" in call_text
+    finally:
+        app.state.backend = orig_backend
+
+
 async def test_mode_a_large_file_fallback_to_mtproto(client: TestClient):
     from anbar.telegram_ingest import _ingest_direct_media
 
