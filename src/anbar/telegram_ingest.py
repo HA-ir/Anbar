@@ -16,12 +16,14 @@ import asyncio
 import logging
 import re
 import time
+import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from .api.ingest import _filename_from_url, _guess_content_type
+from .ingest_manager import TASK_MANAGER
 from .mtproto_provider import get_active_mtproto_client
 from .object_service import ObjectService
 from .tasks import spawn_background_task
@@ -179,7 +181,7 @@ async def edit_telegram_message(
 
 
 class ProgressReporter:
-    """Reports streaming progress, speed, ETA, and progress bar to Telegram."""
+    """Reports streaming progress, rolling speed, dynamic ETA, and progress bar to Telegram."""
 
     def __init__(
         self,
@@ -190,6 +192,8 @@ class ProgressReporter:
         total_bytes: int | None,
         source_label: str = "",
         interval_s: float = 3.5,
+        task_id: str | None = None,
+        source: str = "telegram",
     ):
         self.bot_token = bot_token
         self.chat_id = chat_id
@@ -200,21 +204,32 @@ class ProgressReporter:
         self.interval_s = interval_s
         self.start_time = time.time()
         self.last_update_time = self.start_time
+        self.task_id = task_id or uuid.uuid4().hex[:12]
+        self.task = TASK_MANAGER.create(
+            task_id=self.task_id,
+            source=source,
+            filename=filename,
+            total_bytes=total_bytes,
+        )
 
     async def update(self, current_bytes: int) -> None:
         now = time.time()
+        if self.task:
+            self.task.update_bytes(current_bytes, window_s=10.0)
+
         if now - self.last_update_time < self.interval_s:
             return
         elapsed = now - self.start_time
         if elapsed <= 0:
             return
-        speed = current_bytes / elapsed
+
+        speed = self.task.speed if self.task else (current_bytes / elapsed)
         speed_str = f"{format_size(speed)}/s"
 
         if self.total_bytes and self.total_bytes > 0:
             pct = min(99.9, (current_bytes / self.total_bytes) * 100)
             remaining = max(0, self.total_bytes - current_bytes)
-            eta_s = remaining / speed if speed > 0 else None
+            eta_s = self.task.eta if self.task else (remaining / speed if speed > 0 else None)
             eta_str = format_eta(eta_s)
             prog_bar = render_progress_bar(pct)
             text = (
@@ -235,13 +250,14 @@ class ProgressReporter:
 
 
 class AsyncIteratorReader:
-    """Adapts an async byte iterator into an async `.read(n)` stream with progress hooks."""
+    """Adapts an async byte iterator into an async `.read(n)` stream with cancel support."""
 
     def __init__(
         self,
         aiter: AsyncIterator[bytes],
         idle_timeout_s: float = 60.0,
         on_progress: Any = None,
+        task: Any = None,
     ):
         self._aiter = aiter.__aiter__()
         self._buf = bytearray()
@@ -249,8 +265,11 @@ class AsyncIteratorReader:
         self._timeout = idle_timeout_s
         self.bytes_read = 0
         self.on_progress = on_progress
+        self.task = task
 
     async def read(self, n: int) -> bytes:
+        if self.task and self.task.cancel_event.is_set():
+            raise RuntimeError("Ingest cancelled by admin")
         while len(self._buf) < n and not self._eof:
             piece = b""
             try:
@@ -262,6 +281,8 @@ class AsyncIteratorReader:
                     f"Download stream stalled: no bytes for {self._timeout:.0f}s"
                 ) from e
             if piece:
+                if self.task and self.task.cancel_event.is_set():
+                    raise RuntimeError("Ingest cancelled by admin")
                 self._buf.extend(piece)
                 self.bytes_read += len(piece)
                 if self.on_progress:
@@ -361,6 +382,125 @@ async def handle_bot_command(
     return False
 
 
+# Module-level album buffers & timers
+ALBUM_BUFFERS: dict[str, list[dict[str, Any]]] = {}
+ALBUM_TIMERS: dict[str, asyncio.Task] = {}
+ALBUM_LOCK = asyncio.Lock()
+
+
+async def _enqueue_album_item(app: FastAPI, message: dict[str, Any], group_id: str) -> None:
+    """Debounce incoming album items sharing a media_group_id for 1.5s."""
+    async with ALBUM_LOCK:
+        if group_id not in ALBUM_BUFFERS:
+            ALBUM_BUFFERS[group_id] = []
+        ALBUM_BUFFERS[group_id].append(message)
+
+        prev_timer = ALBUM_TIMERS.get(group_id)
+        if prev_timer and not prev_timer.done():
+            prev_timer.cancel()
+
+        async def _debounced_runner() -> None:
+            try:
+                await asyncio.sleep(1.5)
+                async with ALBUM_LOCK:
+                    items = ALBUM_BUFFERS.pop(group_id, [])
+                    ALBUM_TIMERS.pop(group_id, None)
+                if items:
+                    await _process_album_batch(app, group_id, items)
+            except asyncio.CancelledError:
+                pass
+            except Exception as ex:
+                log.exception("Error in album batch processor: %s", ex)
+
+        ALBUM_TIMERS[group_id] = asyncio.create_task(_debounced_runner())
+
+
+async def _process_album_batch(app: FastAPI, group_id: str, items: list[dict[str, Any]]) -> None:
+    """Process an album batch sequentially with a unified status message."""
+    settings = app.state.settings
+    bot_token = settings.bot_tokens[0] if settings.bot_tokens else None
+    if not bot_token or not items:
+        return
+
+    first_msg = items[0]
+    chat_id = first_msg.get("chat", {}).get("id")
+    reply_id = first_msg.get("message_id")
+    if not chat_id:
+        return
+
+    total_files = len(items)
+    status_msg_id = await send_telegram_message(
+        bot_token,
+        chat_id,
+        f"⏳ Ingesting Album (0/{total_files} files)...",
+        reply_to_message_id=reply_id,
+    )
+
+    completed: list[dict[str, Any]] = []
+    failed: list[tuple[str, str]] = []
+
+    album_task = TASK_MANAGER.create(
+        task_id=f"alb_{group_id[:8]}",
+        source="telegram_album",
+        filename=f"Album ({total_files} files)",
+        total_bytes=None,
+    )
+
+    for idx, msg in enumerate(items, 1):
+        if album_task.cancel_event.is_set():
+            album_task.state = "cancelled"
+            if status_msg_id:
+                cancel_text = (
+                    f"❌ <b>Album Ingest Cancelled by Admin</b> "
+                    f"({len(completed)}/{total_files} saved)"
+                )
+                await edit_telegram_message(bot_token, chat_id, status_msg_id, cancel_text)
+            return
+
+        media_info = _extract_direct_media(msg)
+        if not media_info:
+            continue
+
+        fname = media_info["filename"]
+        fsize = media_info.get("size") or 0
+
+        if status_msg_id:
+            album_prog_text = (
+                f"⏳ <b>Ingesting Album ({idx}/{total_files}):</b>\n"
+                f"<code>{fname}</code> ({format_size(fsize)})"
+            )
+            await edit_telegram_message(bot_token, chat_id, status_msg_id, album_prog_text)
+
+        try:
+            await _ingest_direct_media(
+                app=app,
+                message=msg,
+                media_info=media_info,
+                bot_token=bot_token,
+                chat_id=chat_id,
+                status_msg_id=None,
+                task_id=f"alb_{group_id[:6]}_{idx}",
+            )
+            completed.append({"filename": fname, "size": fsize})
+        except Exception as ex:
+            log.warning("Failed to ingest album item %s: %s", fname, ex)
+            failed.append((fname, str(ex)))
+
+    album_task.state = "done" if not failed else "error"
+    base_url = settings.base_url.rstrip("/")
+
+    if status_msg_id:
+        lines = [f"✅ <b>Album Ingest Complete!</b> ({len(completed)}/{total_files} saved)\n"]
+        for c in completed:
+            lines.append(f"• <code>{c['filename']}</code> ({format_size(c['size'])})")
+        if failed:
+            lines.append(f"\n⚠️ <i>{len(failed)} file(s) failed:</i>")
+            for fn, err in failed:
+                lines.append(f"• <code>{fn}</code>: {err[:60]}")
+        lines.append(f"\n🌐 {base_url}")
+        await edit_telegram_message(bot_token, chat_id, status_msg_id, "\n".join(lines))
+
+
 async def execute_telegram_ingest(app: FastAPI, message: dict[str, Any]) -> None:
     """Background ingestion worker processing direct media, post links, or web URLs."""
     settings = app.state.settings
@@ -378,6 +518,12 @@ async def execute_telegram_ingest(app: FastAPI, message: dict[str, Any]) -> None
     if text_content.strip().startswith("/"):
         if await handle_bot_command(app, message, bot_token, chat_id, text_content):
             return
+
+    # Check for Album / Media Group (multi-file forward / upload debounce)
+    media_group_id = message.get("media_group_id")
+    if media_group_id:
+        await _enqueue_album_item(app, message, str(media_group_id))
+        return
 
     # Check for Mode B: Protected / Restricted post link
     post_link = parse_telegram_post_link(text_content)
@@ -523,6 +669,7 @@ async def _ingest_direct_media(
     bot_token: str,
     chat_id: int | str,
     status_msg_id: int | None,
+    task_id: str | None = None,
 ) -> None:
     """Mode A: Ingest direct media via Bot API getFile, falling back to MTProto for >20MB."""
     settings = app.state.settings
@@ -556,11 +703,12 @@ async def _ingest_direct_media(
             ProgressReporter(
                 bot_token,
                 chat_id,
-                status_msg_id,
+                status_msg_id or 0,
                 filename,
                 filesize,
+                task_id=task_id,
             )
-            if status_msg_id
+            if (status_msg_id or task_id)
             else None
         )
 
@@ -573,6 +721,7 @@ async def _ingest_direct_media(
                     stream_resp.aiter_bytes(256 * 1024),
                     idle_timeout_s=settings.body_idle_timeout_s,
                     on_progress=reporter.update if reporter else None,
+                    task=reporter.task if reporter else None,
                 )
                 service = ObjectService(
                     backend=backend,
@@ -582,9 +731,20 @@ async def _ingest_direct_media(
                     content_type=content_type,
                     pool=pool,
                 )
-                manifest, sha_hex = await service.store_stream(reader)
+                try:
+                    manifest, sha_hex = await service.store_stream(reader)
+                except BaseException:
+                    if reporter and reporter.task:
+                        reporter.task.state = (
+                            "cancelled" if reporter.task.cancel_event.is_set() else "error"
+                        )
+                    await service.rollback()
+                    raise
+
                 obj_id = service.commit(sha_hex=sha_hex, uploader_key="tg_webhook")
                 service.drop_checkpoint()
+                if reporter and reporter.task:
+                    reporter.task.state = "done"
 
                 _schedule_post_commit_tasks(settings, obj_id, content_type, filename, service)
 
@@ -610,6 +770,7 @@ async def _ingest_direct_media(
             bot_token=bot_token,
             chat_id=chat_id,
             status_msg_id=status_msg_id,
+            task_id=task_id,
         )
         return
 
@@ -644,6 +805,7 @@ async def _ingest_direct_media(
         bot_token=bot_token,
         chat_id=chat_id,
         status_msg_id=status_msg_id,
+        task_id=task_id,
     )
 
 
@@ -654,6 +816,7 @@ async def _ingest_protected_post(
     bot_token: str,
     chat_id: int | str,
     status_msg_id: int | None,
+    task_id: str | None = None,
 ) -> None:
     """Mode B: Ingest restricted/protected channel media via Telethon MTProto client."""
     mtproto_client = await get_active_mtproto_client(app)
@@ -693,6 +856,7 @@ async def _ingest_protected_post(
         bot_token=bot_token,
         chat_id=chat_id,
         status_msg_id=status_msg_id,
+        task_id=task_id,
     )
 
 
@@ -706,6 +870,7 @@ async def _stream_telethon_media(
     bot_token: str,
     chat_id: int | str,
     status_msg_id: int | None,
+    task_id: str | None = None,
 ) -> None:
     """Download chunks from Telethon MTProto and upload to Anbar via Bot Tokens."""
     settings = app.state.settings
@@ -717,11 +882,12 @@ async def _stream_telethon_media(
         ProgressReporter(
             bot_token,
             chat_id,
-            status_msg_id,
+            status_msg_id or 0,
             filename,
             filesize,
+            task_id=task_id,
         )
-        if status_msg_id
+        if (status_msg_id or task_id)
         else None
     )
 
@@ -782,36 +948,106 @@ async def _stream_telethon_media(
                 except Exception as conn_err:
                     log.debug("Telethon reconnect attempt notice: %s", conn_err)
 
-    async def _pipelined_telethon_iter():
-        # Buffer up to 16 slices (8MB) to overlap MTProto downloading with Bot CDN uploading
-        queue: asyncio.Queue[bytes | Exception | None] = asyncio.Queue(maxsize=16)
+    async def _parallel_telethon_iter():
+        part_size = 512 * 1024
+        total_expected = filesize or 0
 
-        async def _producer():
-            try:
-                async for chunk in _resilient_telethon_iter():
-                    await queue.put(chunk)
-            except Exception as ex:
-                await queue.put(ex)
-            finally:
-                await queue.put(None)
+        # If file size is unknown or small (<= 1MB), use resilient single stream
+        if total_expected <= 2 * part_size:
+            async for chunk in _resilient_telethon_iter():
+                yield chunk
+            return
 
-        prod_task = asyncio.create_task(_producer())
+        total_parts = (total_expected + part_size - 1) // part_size
+        num_workers = min(3, total_parts)
+        next_part = 0
+        part_lock = asyncio.Lock()
+        queue: asyncio.Queue[tuple[int, bytes] | Exception] = asyncio.Queue(maxsize=16)
+        stop_event = asyncio.Event()
+
+        async def _worker() -> None:
+            nonlocal next_part
+            while not stop_event.is_set():
+                async with part_lock:
+                    if next_part >= total_parts:
+                        break
+                    p_idx = next_part
+                    next_part += 1
+
+                offset = p_idx * part_size
+                retries = 0
+                max_retries = 10
+                while not stop_event.is_set():
+                    try:
+                        chunk = b""
+                        async for piece in mtproto_client.iter_download(
+                            media,
+                            offset=offset,
+                            limit=1,
+                            request_size=part_size,
+                        ):
+                            chunk = piece
+                            break
+                        await queue.put((p_idx, chunk))
+                        break
+                    except Exception as e:
+                        if "FloodWait" in type(e).__name__:
+                            wait_s = int(getattr(e, "seconds", 10))
+                            log.warning("Telethon download FloodWait: sleeping %s seconds", wait_s)
+                            await asyncio.sleep(wait_s + 1)
+                            continue
+                        retries += 1
+                        if retries > max_retries:
+                            log.error("Worker failed on part %d (offset %d): %s", p_idx, offset, e)
+                            await queue.put(e)
+                            return
+                        backoff = min(10.0, 1.0 * (1.5**retries))
+                        await asyncio.sleep(backoff)
+                        if not mtproto_client.is_connected():
+                            try:
+                                await mtproto_client.connect()
+                            except Exception:
+                                pass
+
+        workers = [asyncio.create_task(_worker()) for _ in range(num_workers)]
+
+        async def _sentinel() -> None:
+            await asyncio.gather(*workers, return_exceptions=True)
+            await queue.put((-1, b""))
+
+        sentinel_task = asyncio.create_task(_sentinel())
+        expected_part = 0
+        reorder_buf: dict[int, bytes] = {}
+
         try:
-            while True:
-                item = await queue.get()
-                if item is None:
+            while expected_part < total_parts:
+                while expected_part in reorder_buf:
+                    yield reorder_buf.pop(expected_part)
+                    expected_part += 1
+                if expected_part >= total_parts:
                     break
+
+                item = await queue.get()
                 if isinstance(item, Exception):
                     raise item
-                yield item
+                p_idx, data = item
+                if p_idx == -1:
+                    break
+                reorder_buf[p_idx] = data
+                while expected_part in reorder_buf:
+                    yield reorder_buf.pop(expected_part)
+                    expected_part += 1
         finally:
-            if not prod_task.done():
-                prod_task.cancel()
+            stop_event.set()
+            for w in workers:
+                w.cancel()
+            sentinel_task.cancel()
 
     reader = AsyncIteratorReader(
-        _pipelined_telethon_iter(),
+        _parallel_telethon_iter(),
         idle_timeout_s=settings.body_idle_timeout_s,
         on_progress=reporter.update if reporter else None,
+        task=reporter.task if reporter else None,
     )
     service = ObjectService(
         backend=backend,
@@ -821,9 +1057,18 @@ async def _stream_telethon_media(
         content_type=content_type,
         pool=pool,
     )
-    manifest, sha_hex = await service.store_stream(reader)
+    try:
+        manifest, sha_hex = await service.store_stream(reader)
+    except BaseException:
+        if reporter and reporter.task:
+            reporter.task.state = "cancelled" if reporter.task.cancel_event.is_set() else "error"
+        await service.rollback()
+        raise
+
     obj_id = service.commit(sha_hex=sha_hex, uploader_key="tg_webhook_mtproto")
     service.drop_checkpoint()
+    if reporter and reporter.task:
+        reporter.task.state = "done"
 
     _schedule_post_commit_tasks(settings, obj_id, content_type, filename, service)
 
@@ -844,6 +1089,7 @@ async def _ingest_web_url(
     bot_token: str,
     chat_id: int | str,
     status_msg_id: int | None,
+    task_id: str | None = None,
 ) -> None:
     """Mode C: Stream an external web URL into Anbar using the configured storage strategy."""
     settings = app.state.settings
@@ -866,11 +1112,13 @@ async def _ingest_web_url(
                 ProgressReporter(
                     bot_token,
                     chat_id,
-                    status_msg_id,
+                    status_msg_id or 0,
                     filename,
                     total_bytes,
+                    task_id=task_id,
+                    source="url",
                 )
-                if status_msg_id
+                if (status_msg_id or task_id)
                 else None
             )
 
@@ -878,6 +1126,7 @@ async def _ingest_web_url(
                 resp.aiter_bytes(256 * 1024),
                 idle_timeout_s=settings.body_idle_timeout_s,
                 on_progress=reporter.update if reporter else None,
+                task=reporter.task if reporter else None,
             )
             service = ObjectService(
                 backend=backend,
@@ -887,9 +1136,20 @@ async def _ingest_web_url(
                 content_type=content_type,
                 pool=pool,
             )
-            manifest, sha_hex = await service.store_stream(reader)
+            try:
+                manifest, sha_hex = await service.store_stream(reader)
+            except BaseException:
+                if reporter and reporter.task:
+                    reporter.task.state = (
+                        "cancelled" if reporter.task.cancel_event.is_set() else "error"
+                    )
+                await service.rollback()
+                raise
+
             obj_id = service.commit(sha_hex=sha_hex, uploader_key="tg_webhook_url")
             service.drop_checkpoint()
+            if reporter and reporter.task:
+                reporter.task.state = "done"
 
             _schedule_post_commit_tasks(settings, obj_id, content_type, filename, service)
 

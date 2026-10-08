@@ -1442,6 +1442,26 @@ async def telegram_webhook_delete(request: Request):
         return {"status": "ok", "description": data.get("description", "Webhook deleted")}
 
 
+@router.get("/admin/ingest/active")
+async def get_active_ingests(request: Request):
+    """Retrieve all in-progress background ingest tasks (Telegram & URL)."""
+    require_admin(request)
+    from ..ingest_manager import TASK_MANAGER
+
+    return {"tasks": TASK_MANAGER.list_active()}
+
+
+@router.post("/admin/ingest/{task_id}/cancel")
+async def cancel_active_ingest(request: Request, task_id: str):
+    """Cancel an in-progress background ingest task."""
+    require_admin(request)
+    from ..ingest_manager import TASK_MANAGER
+
+    if TASK_MANAGER.cancel(task_id):
+        return {"status": "ok", "task_id": task_id}
+    raise HTTPException(404, "task not found or already finished")
+
+
 @router.get("/admin/telegram-config/reveal-api-hash")
 async def telegram_config_reveal_api_hash(request: Request):
     """BUG-v0.15.28: return the RAW Telegram API hash to the admin only.

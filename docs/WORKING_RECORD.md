@@ -822,7 +822,49 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 - **Current Git Commit / Branch**:
   - `b2aca74` on `main` (deployed to Falkenstein).
 - **Exact Next Step for Next Session**:
-  - All features deployed, verified, and operational in production.
+  - Finalize Option 1 (Rolling-window speed & dynamic ETA), Option 2 (Active Ingest Task Monitor UI & Cancel API), Option 3 (Parallel MTProto Streaming Engine), and Option 4 (Telegram Album Debouncing).
+
+---
+
+### Session: 2026-10-08 — Strategic Ingest Enhancements: Rolling-Window Speed, Active Task Monitor, Parallel MTProto Streaming, & Album Debouncing
+
+- **Current Objective**:
+  - Implement Option 1: Rolling-window speed calculation (10s sliding window) & responsive ETA estimation in `ProgressReporter` and `IngestTask`.
+  - Implement Option 2: Centralized active ingest task manager (`TASK_MANAGER`), admin endpoints (`GET /api/v1/admin/ingest/active`, `POST /api/v1/admin/ingest/{task_id}/cancel`), and live task monitor modal in `src/anbar/ui/index.html`.
+  - Implement Option 3: Fast parallel bounded MTProto downloader (`_parallel_telethon_iter`) fetching slices via 3 concurrent workers with in-order sequential reassembly and zero-disk streaming.
+  - Implement Option 4: Telegram album / multi-file forwarding support with 1.5s `media_group_id` debouncing, sequential batch processing, and a unified status progress message.
+- **Completed Work**:
+  - Implemented `src/anbar/ingest_manager.py` providing `IngestTask` and singleton `TASK_MANAGER` tracking active background downloads with rolling 10-second throughput tracking and cancellation events.
+  - Added REST endpoints in `src/anbar/api/admin.py`: `GET /api/v1/admin/ingest/active` and `POST /api/v1/admin/ingest/{task_id}/cancel`.
+  - Integrated `TASK_MANAGER` cancellation and progress updates into `src/anbar/api/ingest.py` for URL ingests and `src/anbar/telegram_ingest.py` for Telegram ingests.
+  - Added `#ingestBtn` toolbar button and `#activeIngestModal` live task monitor in `src/anbar/ui/index.html` with real-time progress bars, speeds, ETAs, and Cancel buttons, auto-polling active tasks.
+  - Implemented `_parallel_telethon_iter()` in `src/anbar/telegram_ingest.py` with 3 bounded concurrent workers, automatic FloodWait compliance, exponential backoff, connection recovery, and ordered chunk reassembly.
+  - Implemented album debouncing buffer with a 1.5s window in `src/anbar/telegram_ingest.py`, unified multi-file progress tracking, and batch status summary.
+  - Added test suite `tests/test_ingest_enhancements.py` covering rolling speed, task cancellation, admin API, album debouncing, and parallel stream reassembly.
+  - Added Playwright test `test_active_ingests_modal_and_cancel` in `tests/test_e2e_playwright.py`.
+- **Files/Components Changed**:
+  - `src/anbar/ingest_manager.py` (new)
+  - `src/anbar/api/admin.py`
+  - `src/anbar/api/ingest.py`
+  - `src/anbar/telegram_ingest.py`
+  - `src/anbar/ui/index.html`
+  - `tests/test_ingest_enhancements.py` (new)
+  - `tests/test_e2e_playwright.py`
+  - `CHANGELOG.md`
+  - `docs/WORKING_RECORD.md`
+- **Tests Executed**:
+  - `tests/test_ingest_enhancements.py`: 5/5 passed (100%).
+  - `tests/test_tg_webhook.py`: 13/13 passed (100%).
+  - `tests/test_e2e_playwright.py`: `test_active_ingests_modal_and_cancel` passed in Chromium.
+  - `ruff check src/ tests/`: 0 errors.
+  - `ruff format --check src/ tests/`: 100% compliant.
+  - `mypy src/anbar`: 0 errors across 42 source files.
+- **Deployment Status**:
+  - Ready for commit and deployment to Falkenstein production.
+- **Current Git Commit / Branch**:
+  - `main`.
+- **Exact Next Step for Next Session**:
+  - Commit, push, and deploy to Falkenstein production server.
 
 
 

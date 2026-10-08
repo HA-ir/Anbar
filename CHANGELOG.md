@@ -25,6 +25,16 @@ versioning follows [SemVer](https://semver.org/).
     - `/stats`: Displays comprehensive storage distribution breakdown by file categories.
   - Added Pipelined Async Ingestion Buffer:
     - Decoupled MTProto downloading and Bot token chunk uploading into an in-memory pipelined queue, overlapping chunk downloads with chunk uploads for significantly faster transfer throughput.
+  - Added Rolling-Window Transfer Rate & Dynamic ETA:
+    - Replaced cumulative average speed with a 10-second rolling sliding window in `ProgressReporter` and `IngestTask`, reflecting true momentary throughput and accurate, dynamic ETAs.
+  - Added Centralized Ingest Task Manager & Web Panel Task Monitor:
+    - Implemented `TASK_MANAGER` in `src/anbar/ingest_manager.py` tracking in-progress Telegram and URL ingest jobs.
+    - Added admin API endpoints `GET /api/v1/admin/ingest/active` and `POST /api/v1/admin/ingest/{task_id}/cancel`.
+    - Added `#ingestBtn` badge in the web panel toolbar and `#activeIngestModal` live task monitor with progress bars, speeds, ETAs, and Cancel buttons, auto-polling active tasks.
+  - Added Parallel Bounded MTProto Streaming Engine:
+    - Concurrent 3-worker slice prefetching in `_parallel_telethon_iter` overcoming single-connection RTT caps (yielding 5–15+ MB/s) with sequential in-order reassembly and zero disk footprint.
+  - Added Telegram Album / Multi-File Forwarding Support:
+    - Automatic `media_group_id` 1.5-second debounce buffer collating multi-file forwards into a unified sequential pipeline with a single live status message, avoiding Telegram Bot API rate limits.
   - Added operational CLI commands to `anbarctl`:
     - `anbarctl webhook set <public_url>`: Configures webhook with secret token and allowed updates.
     - `anbarctl webhook info`: Inspects webhook status, pending updates, and errors.

@@ -843,6 +843,10 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         <button class="btn btn-ghost" id="linksBtn" style="width:auto;padding:8px 11px" title="links">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </button>
+        <button class="btn btn-ghost" id="ingestBtn" style="width:auto;padding:8px 11px;display:none;position:relative" title="active ingests">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span class="count" id="ingestCnt" style="display:none">0</span>
+        </button>
         <button class="btn btn-ghost" id="refBtn">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"/></svg>
           <span data-i18n="refresh">به‌روزرسانی</span>
@@ -1351,6 +1355,20 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
   </div>
 </div>
 
+<!-- active ingests modal -->
+<div class="modal" id="activeIngestModal">
+  <div class="modal-card" style="max-width:540px;width:100%">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px">
+      <h3 data-i18n="activeIngests" style="margin:0">دریافت‌های فعال</h3>
+    </div>
+    <p id="ingestSub" data-i18n="activeIngestsSub">فرایندهای در حال دانلود به انبار — امکان لغو لحظه‌ای</p>
+    <div id="ingestList" style="max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px"></div>
+    <div style="margin-top:14px;text-align:end;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost" id="ingestClose" data-i18n="close">بستن</button>
+    </div>
+  </div>
+</div>
+
 <!-- link manage modal (v0.10.4): edit one link in-place -->
 <div class="modal" id="manageModal">
   <div class="modal-card">
@@ -1680,7 +1698,9 @@ const I18N={
   themeLab:"پوسته", thDark:"تاریک", thLight:"روشن",
   previewToggleLab:"پیش‌نمایش مدیا و فایل‌ها", previewToggleSub:"بارگذاری تصاویر و فایل‌ها در گالری و مودال (برای کاهش مصرف اینترنت)",
   previewOffNotice:"پیش‌نمایش در تنظیمات غیرفعال شده است",
-  maxDlLab:"سقف تعداد دانلود (۰ = بی‌نهایت)"
+  maxDlLab:"سقف تعداد دانلود (۰ = بی‌نهایت)",
+  activeIngests:"دریافت‌های فعال", activeIngestsSub:"فرایندهای در حال دانلود به انبار — امکان لغو لحظه‌ای",
+  noActiveIngests:"هیچ فرایند دریافتی در حال انجام نیست", cancelIngest:"لغو", ingestCancelled:"فرایند لغو شد"
  },
  en:{
   title:"anbar", loginSub:"Sign in to anbar — Telegram-backed object storage",
@@ -1869,7 +1889,9 @@ const I18N={
   themeLab:"Theme", thDark:"Dark", thLight:"Light",
   previewToggleLab:"Media & File Previews", previewToggleSub:"Load thumbnails and media in gallery and modal (disable to save data)",
   previewOffNotice:"Previews disabled in settings",
-  maxDlLab:"Download cap (0 = unlimited)"
+  maxDlLab:"Download cap (0 = unlimited)",
+  activeIngests:"Active Ingests", activeIngestsSub:"Background tasks downloading to Anbar — instant cancellation",
+  noActiveIngests:"No active background ingest tasks", cancelIngest:"Cancel", ingestCancelled:"Task cancelled"
  }
 };
 let lang=localStorage.getItem("anbar-lang")||(navigator.language.startsWith("fa")?"fa":"fa");
@@ -1900,6 +1922,7 @@ function applyI18n(){
   // open modals re-render in the new language
   if($("#linksModal").classList.contains("on"))openLinks();
   if($("#trashModal").classList.contains("on"))openTrash();
+  if($("#activeIngestModal").classList.contains("on"))checkActiveIngests();
   // md preview toggle buttons inside an open text preview
   const mdR=$("#mdTabRender"),mdRaw=$("#mdTabRaw");
   if(mdR)mdR.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'+(lang==="fa"?"پیش‌نمایش":"Preview");
@@ -2164,6 +2187,10 @@ function showApp(){
   }
   syncClientZkUI();
   refresh();
+  checkActiveIngests();
+  if(!activeIngestsTimer){
+    activeIngestsTimer=setInterval(checkActiveIngests,3000);
+  }
   // UX-03: re-attach to a still-running ingest job after a page reload
   const activeJob=sessionStorage.getItem("anbar-ingest-job");
   if(activeJob){pollIngest(activeJob);}
@@ -3325,6 +3352,97 @@ async function openLinks(){
 $("#linksBtn").onclick=openLinks;
 $("#linksClose").onclick=()=>$("#linksModal").classList.remove("on");
 $("#linksModal").onclick=e=>{if(e.target.id==="linksModal")$("#linksModal").classList.remove("on");};
+
+/* ── active background ingests modal (v0.16.0) ── */
+let activeIngestsTimer=null;
+let prevActiveCount=0;
+
+async function checkActiveIngests(){
+  try{
+    const r=await api("/api/v1/admin/ingest/active");
+    const tasks=r.tasks||[];
+    const btn=$("#ingestBtn");
+    const cnt=$("#ingestCnt");
+    if(tasks.length>0){
+      btn.style.display="inline-flex";
+      cnt.style.display="inline-block";
+      cnt.textContent=tasks.length;
+      if($("#activeIngestModal").classList.contains("on")){
+        renderIngestList(tasks);
+      }
+    }else{
+      btn.style.display="none";
+      cnt.style.display="none";
+      if($("#activeIngestModal").classList.contains("on")){
+        $("#ingestList").innerHTML='<div class="empty" style="padding:24px"><p>'+esc(t("noActiveIngests"))+'</p></div>';
+      }
+      if(prevActiveCount>0){
+        // Tasks just completed: refresh file list automatically
+        refresh();
+      }
+    }
+    prevActiveCount=tasks.length;
+  }catch(e){
+    // silent catch on polling
+  }
+}
+
+function renderIngestList(tasks){
+  const box=$("#ingestList");
+  box.innerHTML="";
+  tasks.forEach(task=>{
+    const d=document.createElement("div");
+    d.className="keyrow";
+    d.style.flexDirection="column";
+    d.style.alignItems="stretch";
+    d.style.gap="8px";
+    d.style.padding="12px 14px";
+
+    const speedStr=task.speed?humanSize(task.speed)+"/s":"...";
+    const etaStr=task.eta?humanTtl(task.eta):"calc...";
+    const pct=task.pct!=null?task.pct+"%":"...";
+    const progWidth=task.pct!=null?task.pct:50;
+    const isIndeterminate=task.pct==null;
+
+    d.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+      +'<div style="direction:ltr;text-align:left;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:13.5px">'
+      +esc(task.filename||task.id)
+      +'</div>'
+      +'<button class="btn btn-warn btn-sm cancel-ing-btn" style="width:auto;padding:3px 10px;font-size:11.5px">'
+      +esc(t("cancelIngest"))
+      +'</button>'
+      +'</div>'
+      +'<div style="height:6px;background:var(--bg3);border-radius:4px;overflow:hidden;margin:4px 0">'
+      +'<div style="height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:4px;width:'+progWidth+'%;transition:width .3s ease"></div>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--tx2);direction:ltr">'
+      +'<span>'+humanSize(task.transferred_bytes)+(task.total_bytes?' / '+humanSize(task.total_bytes):'')+' ('+pct+')</span>'
+      +'<span>⚡ '+speedStr+' | ⏱ '+etaStr+'</span>'
+      +'</div>';
+
+    d.querySelector(".cancel-ing-btn").onclick=async()=>{
+      try{
+        await api("/api/v1/admin/ingest/"+encodeURIComponent(task.id)+"/cancel",{method:"POST"});
+        toast(t("ingestCancelled"));
+        checkActiveIngests();
+      }catch(err){
+        toast(err.message,"err");
+      }
+    };
+    box.appendChild(d);
+  });
+}
+
+async function openActiveIngests(){
+  $("#activeIngestModal").classList.add("on");
+  const box=$("#ingestList");
+  box.innerHTML='<div class="empty" style="padding:24px">…</div>';
+  await checkActiveIngests();
+}
+
+$("#ingestBtn").onclick=openActiveIngests;
+$("#ingestClose").onclick=()=>$("#activeIngestModal").classList.remove("on");
+$("#activeIngestModal").onclick=e=>{if(e.target.id==="activeIngestModal")$("#activeIngestModal").classList.remove("on");};
 const revokeAllBtn=$("#revokeAllLinksBtn");
 let linksLiveCount=0;   /* BUG-v0.15.38: was scoped inside openLinks() → handler threw ReferenceError, button appeared dead */
 if(revokeAllBtn){

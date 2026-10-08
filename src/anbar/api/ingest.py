@@ -196,6 +196,10 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                         raise RuntimeError("remote file exceeds configured ceiling")
                     job["total"] = decl  # 0 = unknown → indeterminate progress
 
+                    from ..ingest_manager import TASK_MANAGER
+
+                    task = TASK_MANAGER.create(job_id, "url", fname, decl or None)
+
                     reader = _UrlReader(resp, IDLE_TIMEOUT)
                     total_in = 0
 
@@ -216,9 +220,12 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
 
                         async def read(self, n: int) -> bytes:
                             nonlocal total_in
+                            if task.cancel_event.is_set():
+                                raise RuntimeError("Ingest cancelled by admin")
                             data = await reader.read(n)
                             total_in += len(data)
                             job["bytes"] = total_in
+                            task.update_bytes(total_in)
                             # ARCH-02: mirror progress into the durable jobs row
                             if jq is not None:
                                 try:
@@ -230,6 +237,7 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
                     try:
                         _, sha = await svc.store_stream(_JobReader())
                     except BaseException:
+                        task.state = "cancelled" if task.cancel_event.is_set() else "error"
                         await svc.rollback()
                         raise
                     manifest = svc.manifest
@@ -237,6 +245,7 @@ async def _run_job(app, job_id: str, url: str, filename: str | None) -> None:
 
                     # commit into the DB exactly like a normal upload
                     obj_id = svc.commit(sha_hex=sha, uploader_key=job.get("key"))
+                    task.state = "done"
                     job["object"] = {
                         "id": obj_id,
                         "url": f"/f/{obj_id}",

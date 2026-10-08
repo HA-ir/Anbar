@@ -1168,3 +1168,64 @@ def test_settings_telegram_webhook_and_owner_id_panel(authed_page: Page):
 
     page.click("#setClose")
     page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
+
+
+def test_active_ingests_modal_and_cancel(authed_page: Page):
+    """Test 28: Active Ingests toolbar pill, live task progress rendering, and cancel action."""
+    page = authed_page
+
+    # Mock /api/v1/admin/ingest/active to return an in-progress task
+    page.route(
+        "**/api/v1/admin/ingest/active",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body="""{
+            "tasks": [
+                {
+                    "id": "test-task-123",
+                    "source": "telegram",
+                    "filename": "ubuntu_server.iso",
+                    "transferred_bytes": 524288000,
+                    "total_bytes": 1048576000,
+                    "pct": 50.0,
+                    "speed": 10485760.0,
+                    "eta": 50.0,
+                    "state": "pulling"
+                }
+            ]
+        }""",
+        ),
+    )
+
+    # Trigger poll
+    page.evaluate("() => checkActiveIngests()")
+    page.wait_for_selector("#ingestBtn", state="visible", timeout=3000)
+
+    btn_visible, cnt = page.evaluate("""() => {
+        const btn = document.querySelector("#ingestBtn");
+        const cnt = document.querySelector("#ingestCnt");
+        return [btn && btn.style.display !== "none", cnt ? cnt.textContent : ""];
+    }""")
+    assert btn_visible is True
+    assert cnt == "1"
+
+    # 2. Click Active Ingests button to open modal
+    page.click("#ingestBtn")
+    page.wait_for_selector("#activeIngestModal.on", timeout=3000)
+    page.wait_for_selector("#ingestList .keyrow", timeout=3000)
+
+    # Check that card content is rendered
+    assert page.locator("#ingestList").is_visible()
+    card_text = page.inner_text("#ingestList")
+    assert "ubuntu_server.iso" in card_text
+    assert "50%" in card_text
+    assert "10.0 MB" in card_text
+
+    # Cancel button is visible
+    cancel_btn = page.locator(".cancel-ing-btn")
+    assert cancel_btn.is_visible()
+
+    # Close modal
+    page.click("#ingestClose")
+    page.wait_for_selector("#activeIngestModal.on", state="detached", timeout=3000)
