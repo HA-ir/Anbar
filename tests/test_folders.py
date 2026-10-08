@@ -140,7 +140,7 @@ def test_move_objects(client):
     assert "archive/deep/report.pdf" not in fns
 
 
-def test_move_objects_collision_skipped(client):
+def test_move_objects_same_name_allowed(client):
     ADMIN = {"Authorization": "Bearer test-admin-key"}
     x = _upload(client, "file.txt", b"one", headers=ADMIN)
     y = _upload(client, "other/file.txt", b"two", headers=ADMIN)
@@ -152,15 +152,12 @@ def test_move_objects_collision_skipped(client):
     )
     assert r.status_code == 200
     j = r.json()
-    # x is already at root (no-op, counted), y collides with x
-    assert j["moved"] == 1
-    assert len(j["skipped"]) == 1
-    assert j["skipped"][0]["id"] == y["id"]
-    assert j["skipped"][0]["reason"] == "exists"
-    # nothing was overwritten
+    # x is already at root, y moves to root; multiple files with the same name are allowed
+    assert j["moved"] == 2
+    assert len(j["skipped"]) == 0
     objs = client.get("/api/v1/admin/objects", headers=ADMIN).json()["objects"]
     fns = sorted(o["filename"] for o in objs)
-    assert fns.count("file.txt") == 1
+    assert fns.count("file.txt") == 2
 
 
 def test_move_objects_validation(client):

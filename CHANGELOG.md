@@ -31,6 +31,11 @@ versioning follows [SemVer](https://semver.org/).
     - Implemented `TASK_MANAGER` in `src/anbar/ingest_manager.py` tracking in-progress Telegram and URL ingest jobs.
     - Added admin API endpoints `GET /api/v1/admin/ingest/active` and `POST /api/v1/admin/ingest/{task_id}/cancel`.
     - Added `#ingestBtn` badge in the web panel toolbar and `#activeIngestModal` live task monitor with progress bars, speeds, ETAs, and Cancel buttons, auto-polling active tasks.
+  - Added Support for Multiple Files with the Same Name in Directories:
+    - Lifted filename uniqueness check in `db.move_objects_to_prefix()`, allowing multiple objects with identical basenames to reside within the same directory.
+    - Updated `test_move_objects_same_name_allowed` verifying collision-free folder moves and co-existence.
+  - Fixed CI Playwright Settings Drawer Re-open Race Condition:
+    - Synchronized `test_settings_telegram_webhook_and_owner_id_panel` on `expect_response` for `POST /api/v1/admin/telegram-config` and extended function timeouts to 10s to eliminate flakiness on virtual GitHub Actions runners.
   - Added Parallel Bounded MTProto Streaming Engine (FastTelethon pattern):
     - Concurrent 4-worker slice pipelining in `_fast_telethon_iter` using low-level `upload.GetFileRequest` directly against the DC sender, overcoming single-connection RTT stop-and-wait caps (reaching 5–15+ MB/s) with sequential in-order reassembly and bounded 8MB buffer footprint.
   - Added Telegram Album / Multi-File Forwarding Support:

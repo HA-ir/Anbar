@@ -1158,10 +1158,14 @@ def test_settings_telegram_webhook_and_owner_id_panel(authed_page: Page):
     page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
 
     # Re-open settings to verify persistence in UI
-    page.click("#setBtn")
-    page.wait_for_selector("#drawer.on", timeout=4000)
+    with page.expect_response(
+        lambda r: "/api/v1/admin/telegram-config" in r.url and r.status == 200,
+        timeout=10000,
+    ):
+        page.click("#setBtn")
+    page.wait_for_selector("#drawer.on", timeout=10000)
     page.wait_for_function(
-        "() => document.querySelector('#s_tg_owner_ids').value !== ''", timeout=4000
+        "() => document.querySelector('#s_tg_owner_ids').value !== ''", timeout=10000
     )
     val = page.input_value("#s_tg_owner_ids")
     assert val == "11223344, 55667788"

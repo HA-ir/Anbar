@@ -545,8 +545,8 @@ class Database:
     @_locked
     def move_objects_to_prefix(self, ids: list[str], new_prefix: str) -> dict[str, Any]:
         """Move objects into a folder (prefix). Only the path portion of the
-        filename changes; the basename is preserved. Collisions are skipped,
-        not overwritten. Returns {"moved": int, "skipped": [{id, reason}]}.
+        filename changes; the basename is preserved. Multiple files with the
+        same name are supported. Returns {"moved": int, "skipped": [{id, reason}]}.
         """
         self._obj_cache.clear()
         if not ids:
@@ -570,13 +570,6 @@ class Database:
             new_name = prefix + base
             if new_name == old_name:
                 moved += 1  # already at the destination
-                continue
-            clash = self._conn.execute(
-                "SELECT 1 FROM objects WHERE filename = ? AND id != ? AND deleted_at IS NULL",
-                (new_name, obj_id),
-            ).fetchone()
-            if clash:
-                skipped.append({"id": obj_id, "reason": "exists", "name": new_name})
                 continue
             self._conn.execute("UPDATE objects SET filename = ? WHERE id = ?", (new_name, obj_id))
             moved += 1

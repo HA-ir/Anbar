@@ -1753,8 +1753,8 @@ async def folder_delete(request: Request):
 
 @router.post("/admin/objects/move")
 async def objects_move(request: Request):
-    """Move real objects into a folder (prefix). Basename preserved; existing
-    names are never overwritten — collisions are reported as skipped.
+    """Move real objects into a folder (prefix). Basename preserved.
+    Multiple files with the same name are supported in any directory.
     Folder *markers* are moved with /admin/folders/rename instead."""
     require_admin(request)
     try:

@@ -942,9 +942,41 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - Rebuilt and restarted production container `anbar-anbar-1` at `/opt/anbar`.
   - Local `http://127.0.0.1:8318/healthz` and public `https://dl.amiri-dev.ir/healthz` returned `{"status":"ok","service":"anbar","version":"0.15.58"}`.
 - **Current Git Commit / Branch**:
-  - `main` (`fab7449`).
+  - `main` (`603f65d`).
 - **Exact Next Step for Next Session**:
   - Test real-world live ingest transfer on Telegram bot with large media file.
+
+---
+
+### Session: 2026-10-08 (Part 5) — Multiple Files with Same Name in Directories & CI Flake Fix
+
+- **Current Objective**:
+  - Allow multiple files with identical basenames to reside in the same directory/folder (lifting collision check in `move_objects_to_prefix`).
+  - Fix intermittent Playwright test failure on GitHub Actions CI (`test_settings_telegram_webhook_and_owner_id_panel`).
+- **Completed Work**:
+  - Removed collision-skipping query in `Database.move_objects_to_prefix()` in `src/anbar/db.py`, allowing files with identical names to be moved into any destination folder.
+  - Updated `test_move_objects_same_name_allowed` in `tests/test_folders.py`.
+  - Updated `tests/test_e2e_playwright.py` to synchronize drawer re-opening on `expect_response("/api/v1/admin/telegram-config")` with a 10s timeout, eliminating runner latency flake.
+- **Files/Components Changed**:
+  - `src/anbar/db.py`
+  - `src/anbar/api/admin.py`
+  - `tests/test_folders.py`
+  - `tests/test_e2e_playwright.py`
+  - `CHANGELOG.md`
+  - `docs/WORKING_RECORD.md`
+- **Tests Executed**:
+  - `tests/test_folders.py`: 5/5 passed (100%).
+  - `tests/test_e2e_playwright.py`: `test_settings_telegram_webhook_and_owner_id_panel` passed in Chromium.
+  - `ruff check src/ tests/`: 0 errors.
+  - `ruff format --check src/ tests/`: 100% compliant.
+  - `mypy src/anbar`: 0 errors across 42 source files.
+- **Deployment Status**:
+  - Ready for commit and deployment to Falkenstein production.
+- **Current Git Commit / Branch**:
+  - `main`.
+- **Exact Next Step for Next Session**:
+  - Commit, push, and deploy to Falkenstein production server.
+
 
 
 
