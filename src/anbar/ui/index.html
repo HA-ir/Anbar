@@ -483,6 +483,13 @@ html[dir="rtl"] .drawer{--sx:-100%}
   transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .sw.on i{transform:translateX(18px)}
 html[dir="rtl"] .sw.on i{transform:translateX(-18px)}
+.set-card{background:var(--bg3);border:1px solid var(--line2);border-radius:12px;padding:14px 16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.03);box-sizing:border-box}
+.set-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.set-card-title{font-size:13.5px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:7px}
+.set-card-title svg{width:16px;height:16px;stroke:var(--brand);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.set-card-sub{font-size:11.5px;color:var(--tx3);margin-top:2px;font-weight:400}
+.set-card .set-row{padding:9px 0;border-bottom:1px solid var(--line)}
+.set-card .set-row:last-child{border-bottom:none}
 .drawer-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--bg2);flex:none}
 
 /* Desktop Two-Column Settings Dialog (>=768px) */
@@ -1097,134 +1104,166 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
         </button>
       </div>
 
-      <!-- Telegram MTProto Authentication Box -->
-      <div id="tgAuthConnectedBox" style="display:none;background:var(--ok-soft);border:1.5px solid var(--ok);border-radius:12px;padding:14px;margin-top:8px;align-items:center;justify-content:space-between;gap:12px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:32px;height:32px;min-width:32px;flex:none;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div>
-            <div style="font-weight:700;font-size:13.5px;color:var(--ok)" data-i18n="tgAuthOnT">لاگین تلگرام فعال است</div>
-            <small style="color:var(--tx2);font-size:11.5px" data-i18n="tgAuthOnS">کلاینت MTProto متصل و مجاز می‌باشد</small>
+      <!-- Card 1: MTProto Client & Interactive Login -->
+      <div class="set-card" id="tgCardAuth">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5L22 1l-2 3-3-1-1 3-3-1"/></svg>
+            <span data-i18n="tgAuthLoginT">احراز هویت کلاینت MTProto تلگرام</span>
           </div>
         </div>
-        <button type="button" class="btn btn-ghost" id="btnTgLogout" data-i18n="tgAuthLogout" style="border-color:var(--err);color:var(--err);font-size:12px;padding:6px 12px;white-space:nowrap">خروج از تلگرام</button>
-      </div>
+        <div id="tgAuthConnectedBox" style="display:none;background:var(--ok-soft);border:1.5px solid var(--ok);border-radius:10px;padding:12px;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:30px;height:30px;min-width:30px;flex:none;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div>
+              <div style="font-weight:700;font-size:13px;color:var(--ok)" data-i18n="tgAuthOnT">لاگین تلگرام فعال است</div>
+              <small style="color:var(--tx2);font-size:11.5px" data-i18n="tgAuthOnS">کلاینت MTProto متصل و مجاز می‌باشد</small>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost" id="btnTgLogout" data-i18n="tgAuthLogout" style="border-color:var(--err);color:var(--err);font-size:11.5px;padding:5px 10px;white-space:nowrap">خروج از تلگرام</button>
+        </div>
 
-      <div id="tgAuthLoginForm" class="set-row" style="flex-direction:column;align-items:stretch;gap:8px;background:var(--bg3);border:1.5px solid var(--line2);border-radius:10px;padding:12px;margin-top:6px">
-        <div style="font-weight:600;font-size:13px;color:var(--tx);display:flex;align-items:center;gap:6px">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5L22 1l-2 3-3-1-1 3-3-1"/></svg> <span data-i18n="tgAuthLoginT">احراز هویت کلاینت MTProto تلگرام</span>
-        </div>
-        <small style="color:var(--tx2);font-size:11.5px" data-i18n="tgAuthLoginS">برای اسکن خودکار و بازسازی تاریخچه کانال بدون نیاز به ورود دستی سشن</small>
-        <div style="display:flex;gap:6px">
-          <input type="tel" id="s_tg_phone" placeholder="+98912..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
-          <button type="button" class="btn btn-ghost" id="btnTgSendCode" data-i18n="tgAuthSendCode" style="font-size:12px;padding:7px 12px;white-space:nowrap">ارسال کد</button>
-        </div>
-        <div id="tgOtpRow" style="display:none;flex-direction:column;gap:8px;margin-top:4px">
+        <div id="tgAuthLoginForm" style="display:flex;flex-direction:column;gap:8px">
+          <small style="color:var(--tx2);font-size:11.5px" data-i18n="tgAuthLoginS">برای اسکن خودکار و بازسازی تاریخچه کانال بدون نیاز به ورود دستی سشن</small>
           <div style="display:flex;gap:6px">
-            <input type="text" id="s_tg_code" placeholder="کد دریافتی از تلگرام (OTP)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
-            <button type="button" class="btn btn-primary" id="btnTgVerifyCode" data-i18n="tgAuthVerify" style="font-size:12px;padding:7px 14px;white-space:nowrap">تأیید و اتصال</button>
+            <input type="tel" id="s_tg_phone" placeholder="+98912..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
+            <button type="button" class="btn btn-ghost" id="btnTgSendCode" data-i18n="tgAuthSendCode" style="font-size:12px;padding:7px 12px;white-space:nowrap">ارسال کد</button>
           </div>
-          <div id="tg2faRow" style="display:none">
-            <input type="password" id="s_tg_2fa_pw" placeholder="رمز عبور دو مرحله‌ای (2FA Password)" style="width:100%;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
+          <div id="tgOtpRow" style="display:none;flex-direction:column;gap:8px;margin-top:4px">
+            <div style="display:flex;gap:6px">
+              <input type="text" id="s_tg_code" placeholder="کد دریافتی از تلگرام (OTP)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
+              <button type="button" class="btn btn-primary" id="btnTgVerifyCode" data-i18n="tgAuthVerify" style="font-size:12px;padding:7px 14px;white-space:nowrap">تأیید و اتصال</button>
+            </div>
+            <div id="tg2faRow" style="display:none">
+              <input type="password" id="s_tg_2fa_pw" placeholder="رمز عبور دو مرحله‌ای (2FA Password)" style="width:100%;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="set-row col">
-        <div class="lab"><span data-i18n="tgBackendLab">نوع بک‌اند ذخیره‌سازی</span><small data-i18n="tgBackendSub">استراتژی هیبریدی (توصیه‌شده)، MTProto یا Bot</small></div>
-        <select id="s_tg_backend" data-dirty-key="backend" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
-          <option value="hybrid" data-i18n="tgBackendHybrid">Hybrid (MTProto + Bot CDN)</option>
-          <option value="mtproto" data-i18n="tgBackendMtproto">MTProto (Direct Client)</option>
-          <option value="bot" data-i18n="tgBackendBot">Bot API (Bots Pool)</option>
-        </select>
+      <!-- Card 2: Ingest & Storage Strategy -->
+      <div class="set-card" id="tgCardStrategy">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>استراتژی ذخیره‌سازی و سرعت دانلود</span>
+          </div>
+        </div>
+        <div class="set-row col">
+          <div class="lab"><span data-i18n="tgBackendLab">نوع بک‌اند ذخیره‌سازی</span><small data-i18n="tgBackendSub">استراتژی هیبریدی (توصیه‌شده)، MTProto یا Bot</small></div>
+          <select id="s_tg_backend" data-dirty-key="backend" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
+            <option value="hybrid" data-i18n="tgBackendHybrid">Hybrid (MTProto + Bot CDN)</option>
+            <option value="mtproto" data-i18n="tgBackendMtproto">MTProto (Direct Client)</option>
+            <option value="bot" data-i18n="tgBackendBot">Bot API (Bots Pool)</option>
+          </select>
+        </div>
+        <div class="set-row col">
+          <div class="lab"><span data-i18n="tgIngestStratLab">استراتژی ذخیره‌سازی دریافت تلگرام</span><small data-i18n="tgIngestStratSub">روش آپلود تکه‌ها به کانال ذخیره‌سازی در هنگام دریافت فایل از تلگرام</small></div>
+          <select id="s_tg_ingest_strategy" data-dirty-key="tg_ingest_storage_strategy" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
+            <option value="configured" data-i18n="tgIngestStratConfigured">⚡ سرعت بالا — طبق استراتژی اصلی (هیبرید/ام‌تی‌پروتو · ۱۵ تا ۲۵ مگابایت/ثانیه)</option>
+            <option value="bot_only" data-i18n="tgIngestStratBot">🛡️ فقط توکن‌های بات — ضد بن سخت‌گیرانه (Bot API · ۳۰۰ تا ۷۰۰ کیلوبایت/ثانیه)</option>
+          </select>
+        </div>
+        <div class="set-row col">
+          <div class="lab"><span data-i18n="tgIngestWorkersLab">تعداد اتصال‌های موازی دانلود (Pipelined Workers)</span><small data-i18n="tgIngestWorkersSub">تعداد درخواست‌های همزمان ۵۱۲ کیلوبایتی از سرورهای تلگرام برای شتاب دانلود</small></div>
+          <select id="s_tg_ingest_concurrency" data-dirty-key="tg_ingest_concurrency" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
+            <option value="2">2 Workers (~2.5–5 MB/s · کم‌مصرف)</option>
+            <option value="4" selected>4 Workers (~5–15 MB/s · پیش‌فرض بهینه)</option>
+            <option value="6">6 Workers (~15–22 MB/s · سرعت بالا)</option>
+            <option value="8">8 Workers (~20–30+ MB/s · حداکثر سرعت)</option>
+          </select>
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="tgChunkLab">حجم هر چانک (MB)</span><small data-i18n="tgChunkSub">حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto</small></div>
+          <input type="number" min="1" max="49" id="s_tg_chunk_size" data-dirty-key="chunk_size_mb" style="direction:ltr;width:80px">
+        </div>
       </div>
-      <div class="set-row col">
-        <div class="lab"><span data-i18n="tgIngestStratLab">استراتژی ذخیره‌سازی دریافت تلگرام</span><small data-i18n="tgIngestStratSub">روش آپلود تکه‌ها به کانال ذخیره‌سازی در هنگام دریافت فایل از تلگرام</small></div>
-        <select id="s_tg_ingest_strategy" data-dirty-key="tg_ingest_storage_strategy" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
-          <option value="configured" data-i18n="tgIngestStratConfigured">⚡ سرعت بالا — طبق استراتژی اصلی (هیبرید/ام‌تی‌پروتو · ۱۵ تا ۲۵ مگابایت/ثانیه)</option>
-          <option value="bot_only" data-i18n="tgIngestStratBot">🛡️ فقط توکن‌های بات — ضد بن سخت‌گیرانه (Bot API · ۳۰۰ تا ۷۰۰ کیلوبایت/ثانیه)</option>
-        </select>
-      </div>
-      <div class="set-row col">
-        <div class="lab"><span data-i18n="tgIngestWorkersLab">تعداد اتصال‌های موازی دانلود (Pipelined Workers)</span><small data-i18n="tgIngestWorkersSub">تعداد درخواست‌های همزمان ۵۱۲ کیلوبایتی از سرورهای تلگرام برای شتاب دانلود</small></div>
-        <select id="s_tg_ingest_concurrency" data-dirty-key="tg_ingest_concurrency" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
-          <option value="2">2 Workers (~2.5–5 MB/s · کم‌مصرف)</option>
-          <option value="4" selected>4 Workers (~5–15 MB/s · پیش‌فرض بهینه)</option>
-          <option value="6">6 Workers (~15–22 MB/s · سرعت بالا)</option>
-          <option value="8">8 Workers (~20–30+ MB/s · حداکثر سرعت)</option>
-        </select>
-      </div>
-      <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
-        <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
-          <span data-i18n="tgTokensLab">توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)</span>
+
+      <!-- Card 3: Bot Pool & Storage Channel -->
+      <div class="set-card" id="tgCardStorage">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><path d="M21.5 2L2 9.5l7 3 1.5 6.5 3.5-3.5 5 3.5 2.5-17z"/></svg>
+            <span>مخزن بات‌ها و کانال ذخیره‌سازی</span>
+          </div>
           <small id="tgTokensCount" style="color:var(--brand);font-weight:600"></small>
         </div>
-        <!-- BUG-v0.15.26b: per-token list (masked) with add/remove — the old
-             textarea forced retyping ALL tokens to add just one -->
-        <div id="tgTokensList" style="display:flex;flex-direction:column;gap:5px"></div>
-        <div style="display:flex;gap:6px">
-          <input type="text" id="s_tg_bot_add" data-dirty-key="bot_add_token" data-i18n-ph="tgAddTokenPh" placeholder="توکن بات جدید (123456:ABC-DEF...)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
-          <button type="button" class="btn btn-ghost" id="btnTgTokenAdd" data-i18n="tgAddToken" style="white-space:nowrap;font-size:12px;padding:7px 12px">+ افزودن</button>
+        <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
+          <div class="lab"><span data-i18n="tgTokensLab">توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)</span></div>
+          <div id="tgTokensList" style="display:flex;flex-direction:column;gap:5px"></div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="s_tg_bot_add" data-dirty-key="bot_add_token" data-i18n-ph="tgAddTokenPh" placeholder="توکن بات جدید (123456:ABC-DEF...)" style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:7px 9px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
+            <button type="button" class="btn btn-ghost" id="btnTgTokenAdd" data-i18n="tgAddToken" style="white-space:nowrap;font-size:12px;padding:7px 12px">+ افزودن</button>
+          </div>
+          <small data-i18n="tgTokensSub" style="color:var(--tx3);font-size:11.5px">اعمال بعد از ذخیره + ری‌استارت.</small>
         </div>
-        <small data-i18n="tgTokensSub" style="color:var(--tx3);font-size:11.5px">اعمال بعد از ذخیره + ری‌استارت.</small>
-      </div>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="tgChannelLab">شناسه کانال (ANBAR_CHANNEL_ID)</span></div>
-        <input type="text" id="s_tg_channel_id" data-dirty-key="channel_id" placeholder="-100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
-      </div>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="tgThreadLab">شناسه تاپیک / ترد (اختیاری)</span></div>
-        <input type="text" id="s_tg_thread_id" data-dirty-key="channel_thread_id" placeholder="123..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
-      </div>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="tgApiIdLab">Telegram API ID (ANBAR_API_ID)</span></div>
-        <input type="text" id="s_tg_api_id" data-dirty-key="api_id" placeholder="12345678" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
-      </div>
-      <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
-        <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
-          <span data-i18n="tgApiHashLab">Telegram API Hash (ANBAR_API_HASH)</span>
-          <button type="button" class="btn btn-ghost" id="s_tg_hash_toggle" style="width:auto;padding:2px 8px;font-size:11px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>نمایش / پنهان</button>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="tgChannelLab">شناسه کانال (ANBAR_CHANNEL_ID)</span></div>
+          <input type="text" id="s_tg_channel_id" data-dirty-key="channel_id" placeholder="-100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
         </div>
-        <input type="password" id="s_tg_api_hash" data-dirty-key="api_hash" placeholder="••••••••••••••••••••••••••••••••" style="width:100%;direction:ltr;font-family:ui-monospace,monospace;font-size:12px">
-      </div>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="tgPeerLab">MTProto Peer (ANBAR_MTPROTO_PEER)</span></div>
-        <input type="text" id="s_tg_peer" data-dirty-key="mtproto_peer" data-i18n-ph="tgPeerPh" placeholder="me یا -100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        <div class="set-row">
+          <div class="lab"><span data-i18n="tgThreadLab">شناسه تاپیک / ترد (اختیاری)</span></div>
+          <input type="text" id="s_tg_thread_id" data-dirty-key="channel_thread_id" placeholder="123..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="tgPeerLab">MTProto Peer (ANBAR_MTPROTO_PEER)</span></div>
+          <input type="text" id="s_tg_peer" data-dirty-key="mtproto_peer" data-i18n-ph="tgPeerPh" placeholder="me یا -100..." style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        </div>
       </div>
 
-      <div class="set-row">
-        <div class="lab"><span data-i18n="tgChunkLab">حجم هر چانک (MB)</span><small data-i18n="tgChunkSub">حداکثر ۱۹ برای بات، حداکثر ۴۹ برای MTProto</small></div>
-        <input type="number" min="1" max="49" id="s_tg_chunk_size" data-dirty-key="chunk_size_mb" style="direction:ltr;width:80px">
+      <!-- Card 4: Security, Access & Webhook -->
+      <div class="set-card" id="tgCardAccess">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>کنترل دسترسی و وب‌هوک بات</span>
+          </div>
+          <span id="tgWebhookBadge" class="badge" style="font-size:11px;padding:2px 8px;border-radius:12px;background:var(--bg2);color:var(--tx2)">—</span>
+        </div>
+        <div class="set-row">
+          <div class="lab">
+            <span data-i18n="tgOwnerLab">شناسه مجاز تلگرام (ANBAR_OWNER_TG_IDS)</span>
+            <small data-i18n="tgOwnerSub">شناسه‌های عددی مجاز تلگرام برای ارسال مستقیم فایل یا لینک پست</small>
+          </div>
+          <input type="text" id="s_tg_owner_ids" data-dirty-key="owner_tg_ids" placeholder="12345678, 87654321" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        </div>
+        <div class="set-row">
+          <div class="lab">
+            <span data-i18n="tgWebhookSecretLab">رمز هدر وب‌هوک (اختیاری)</span>
+            <small data-i18n="tgWebhookSecretSub">توکن X-Telegram-Bot-Api-Secret-Token (در صورت خالی بودن خودکار تولید می‌شود)</small>
+          </div>
+          <input type="text" id="s_tg_webhook_secret" data-dirty-key="tg_webhook_secret" placeholder="••••••••" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
+        </div>
+        <div class="set-row" style="flex-direction:column;align-items:stretch;gap:8px">
+          <div class="lab"><span data-i18n="tgWebhookStatusLab">مدیریت وب‌هوک بات تلگرام</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button type="button" class="btn btn-primary" id="btnTgSetWebhook" data-i18n="tgSetWebhook" style="font-size:12px;padding:6px 12px;border-radius:8px">ثبت وب‌هوک تلگرام</button>
+            <button type="button" class="btn btn-ghost" id="btnTgWebhookInfo" data-i18n="tgWebhookInfo" style="font-size:12px;padding:6px 12px;border-radius:8px">بررسی وضعیت</button>
+            <button type="button" class="btn btn-ghost" id="btnTgDelWebhook" data-i18n="tgDelWebhook" style="font-size:12px;padding:6px 12px;border-radius:8px;color:var(--err);border-color:var(--err)">حذف وب‌هوک</button>
+          </div>
+          <div id="tgWebhookInfoBox" style="display:none;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;font-size:12px;font-family:ui-monospace,monospace;direction:ltr;white-space:pre-wrap;color:var(--tx2)"></div>
+        </div>
       </div>
 
-      <!-- Telegram Webhook & Ingest Settings -->
-      <div class="set-row">
-        <div class="lab">
-          <span data-i18n="tgOwnerLab">شناسه مجاز تلگرام (ANBAR_OWNER_TG_IDS)</span>
-          <small data-i18n="tgOwnerSub">شناسه‌های عددی مجاز تلگرام برای ارسال مستقیم فایل یا لینک پست</small>
+      <!-- Card 5: Developer Credentials -->
+      <div class="set-card" id="tgCardDev">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <span>شناسه‌های توسعه‌دهنده (my.telegram.org)</span>
+          </div>
         </div>
-        <input type="text" id="s_tg_owner_ids" data-dirty-key="owner_tg_ids" placeholder="12345678, 87654321" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
-      </div>
-
-      <div class="set-row">
-        <div class="lab">
-          <span data-i18n="tgWebhookSecretLab">رمز هدر وب‌هوک (اختیاری)</span>
-          <small data-i18n="tgWebhookSecretSub">توکن X-Telegram-Bot-Api-Secret-Token (در صورت خالی بودن خودکار تولید می‌شود)</small>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="tgApiIdLab">Telegram API ID (ANBAR_API_ID)</span></div>
+          <input type="text" id="s_tg_api_id" data-dirty-key="api_id" placeholder="12345678" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
         </div>
-        <input type="text" id="s_tg_webhook_secret" data-dirty-key="tg_webhook_secret" placeholder="••••••••" style="direction:ltr;font-family:ui-monospace,monospace;flex:1;max-width:200px">
-      </div>
-
-      <!-- Webhook Management Actions -->
-      <div class="set-row" style="flex-direction:column;align-items:stretch;gap:8px">
-        <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
-          <span data-i18n="tgWebhookStatusLab">مدیریت وب‌هوک بات تلگرام</span>
-          <span id="tgWebhookBadge" class="badge" style="font-size:11px;padding:2px 8px;border-radius:12px;background:var(--bg3);color:var(--tx2)">—</span>
+        <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
+          <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
+            <span data-i18n="tgApiHashLab">Telegram API Hash (ANBAR_API_HASH)</span>
+            <button type="button" class="btn btn-ghost" id="s_tg_hash_toggle" style="width:auto;padding:2px 8px;font-size:11px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-inline-end:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>نمایش / پنهان</button>
+          </div>
+          <input type="password" id="s_tg_api_hash" data-dirty-key="api_hash" placeholder="••••••••••••••••••••••••••••••••" style="width:100%;direction:ltr;font-family:ui-monospace,monospace;font-size:12px">
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px">
-          <button type="button" class="btn btn-primary" id="btnTgSetWebhook" data-i18n="tgSetWebhook" style="font-size:12px;padding:6px 12px;border-radius:8px">ثبت وب‌هوک تلگرام</button>
-          <button type="button" class="btn btn-ghost" id="btnTgWebhookInfo" data-i18n="tgWebhookInfo" style="font-size:12px;padding:6px 12px;border-radius:8px">بررسی وضعیت</button>
-          <button type="button" class="btn btn-ghost" id="btnTgDelWebhook" data-i18n="tgDelWebhook" style="font-size:12px;padding:6px 12px;border-radius:8px;color:var(--err);border-color:var(--err)">حذف وب‌هوک</button>
-        </div>
-        <div id="tgWebhookInfoBox" style="display:none;background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;font-size:12px;font-family:ui-monospace,monospace;direction:ltr;white-space:pre-wrap;color:var(--tx2)"></div>
       </div>
     </div>
 

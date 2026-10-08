@@ -1233,3 +1233,72 @@ def test_active_ingests_modal_and_cancel(authed_page: Page):
     # Close modal
     page.click("#ingestClose")
     page.wait_for_selector("#activeIngestModal.on", state="detached", timeout=3000)
+
+
+def test_settings_tab_navigation_and_section_sync(authed_page: Page):
+    """Test 29: Settings drawer categories navigation and smooth section synchronization."""
+    page = authed_page
+    page.click("#setBtn")
+    page.wait_for_selector("#drawer.on", timeout=6000)
+
+    expected_tabs = [
+        "all",
+        "secUI",
+        "secAuth",
+        "secS3",
+        "secCrypto",
+        "secRate",
+        "secTgConfig",
+        "secBackup",
+        "secAuditLogs",
+    ]
+    for tab_key in expected_tabs:
+        loc = page.locator(f'.dtab[data-sec="{tab_key}"]')
+        assert loc.is_visible(), f"Tab {tab_key} must be visible"
+
+    # Click Telegram tab
+    page.click('.dtab[data-sec="secTgConfig"]')
+    page.wait_for_function(
+        "() => document.querySelector('.dtab[data-sec=\"secTgConfig\"]').classList.contains('active')",
+        timeout=3000,
+    )
+    assert page.locator("#secTgConfig").is_visible()
+
+    # Click Rate/Limits tab
+    page.click('.dtab[data-sec="secRate"]')
+    page.wait_for_function(
+        "() => document.querySelector('.dtab[data-sec=\"secRate\"]').classList.contains('active')",
+        timeout=3000,
+    )
+    assert page.locator("#secRate").is_visible()
+
+    page.click("#setClose")
+    page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
+
+
+def test_telegram_settings_cards_rendered(authed_page: Page):
+    """Test 30: Telegram settings organized into structured modular cards."""
+    page = authed_page
+    page.click("#setBtn")
+    page.wait_for_selector("#drawer.on", timeout=6000)
+
+    # Required inputs inside Telegram settings must be present and visible
+    required_ids = [
+        "#s_tg_backend",
+        "#s_tg_ingest_strategy",
+        "#s_tg_ingest_concurrency",
+        "#s_tg_channel_id",
+        "#s_tg_owner_ids",
+        "#s_tg_webhook_secret",
+        "#btnTgTestConn",
+        "#btnTgSetWebhook",
+    ]
+    for sel in required_ids:
+        assert page.locator(sel).is_visible(), f"{sel} must be visible in Telegram settings"
+
+    # Card containers exist
+    assert page.locator(".set-card").count() >= 4
+
+    page.click("#setClose")
+    page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
+
