@@ -127,6 +127,22 @@ def get_bot_storage_backend(app: Any):
     return backend, pool
 
 
+def get_ingest_storage_backend(app: Any):
+    """Select chunk storage backend based on operator's tg_ingest_storage_strategy.
+
+    - Option A (default, 0): uses configured backend (Hybrid / MTProto) for 15-25 MB/s.
+    - Option B (bot_only, 1): forces chunk uploads through Bot API tokens (strict anti-ban).
+    """
+    db = getattr(app.state, "db", None)
+    pool = getattr(app.state, "bot_pool", None)
+    from . import runtime
+
+    bot_only = bool(runtime.get_int(db, "tg_ingest_bot_only", 0)) if db is not None else False
+    if bot_only:
+        return get_bot_storage_backend(app)
+    return app.state.backend, pool
+
+
 async def send_telegram_message(
     bot_token: str,
     chat_id: int | str,
@@ -422,6 +438,12 @@ async def handle_bot_command(
         else:
             backend_display = backend_name
 
+        ingest_mode = (
+            "🛡️ Strict Bot-Only (~300-700 KB/s)"
+            if bool(runtime.get_int(db, "tg_ingest_bot_only", 0))
+            else "⚡ High Speed (Configured Strategy)"
+        )
+
         # Check MTProto health
         mtproto_client = await get_active_mtproto_client(app)
         is_auth = False
@@ -443,6 +465,7 @@ async def handle_bot_command(
             f"💾 <b>Storage Used:</b> {format_size(total_bytes)}\n"
             f"⬇️ <b>Total Downloads:</b> {total_dl}\n"
             f"⚙️ <b>Storage Backend:</b> <code>{backend_display}</code>\n"
+            f"📥 <b>Ingest Upload Mode:</b> <code>{ingest_mode}</code>\n"
             f"🤖 <b>Bot Tokens in Pool:</b> {bot_count}\n"
             f"🔑 <b>MTProto Session:</b> {mtproto_status}\n"
             f"🌐 <b>Dashboard:</b> {settings.base_url}"
@@ -781,8 +804,8 @@ async def _ingest_direct_media(
     """Mode A: Ingest direct media via Bot API getFile, falling back to MTProto for >20MB."""
     settings = app.state.settings
     db = app.state.db
-    # Anti-ban routing: chunk uploads to Anbar storage strictly use Bot tokens
-    backend, pool = get_bot_storage_backend(app)
+    # Chunk storage backend: respects tg_ingest_storage_strategy (configured vs bot_only)
+    backend, pool = get_ingest_storage_backend(app)
 
     file_id = media_info["file_id"]
     filename = media_info["filename"]
@@ -987,8 +1010,8 @@ async def _stream_telethon_media(
     """Download chunks from Telethon MTProto and upload to Anbar via Bot Tokens."""
     settings = app.state.settings
     db = app.state.db
-    # Anti-ban routing: chunk uploads to Anbar storage strictly use Bot tokens
-    backend, pool = get_bot_storage_backend(app)
+    # Chunk storage backend: respects tg_ingest_storage_strategy (configured vs bot_only)
+    backend, pool = get_ingest_storage_backend(app)
 
     reporter = (
         ProgressReporter(

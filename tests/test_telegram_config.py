@@ -165,3 +165,31 @@ def test_telegram_config_webhook_and_owner_ids(client: TestClient, tmp_path, mon
         r_del = client.post("/api/v1/admin/telegram/webhook/delete", headers=ADMIN)
         assert r_del.status_code == 200
         assert r_del.json()["status"] == "ok"
+
+
+def test_telegram_config_ingest_storage_strategy(client: TestClient, tmp_path, monkeypatch):
+    _authed(client)
+    fake_env = tmp_path / ".env"
+    fake_env.write_text("ANBAR_BACKEND=mtproto\n", encoding="utf-8")
+
+    from anbar.api import admin
+
+    monkeypatch.setattr(admin, "_get_env_file_path", lambda: fake_env)
+
+    # 1. Update ingest strategy to bot_only
+    payload = {"tg_ingest_storage_strategy": "bot_only"}
+    r = client.post("/api/v1/admin/telegram-config", json=payload, headers=ADMIN)
+    assert r.status_code == 200
+
+    r_get = client.get("/api/v1/admin/telegram-config", headers=ADMIN)
+    assert r_get.status_code == 200
+    assert r_get.json()["tg_ingest_storage_strategy"] == "bot_only"
+
+    # 2. Update ingest strategy back to configured
+    payload = {"tg_ingest_storage_strategy": "configured"}
+    r = client.post("/api/v1/admin/telegram-config", json=payload, headers=ADMIN)
+    assert r.status_code == 200
+
+    r_get2 = client.get("/api/v1/admin/telegram-config", headers=ADMIN)
+    assert r_get2.status_code == 200
+    assert r_get2.json()["tg_ingest_storage_strategy"] == "configured"

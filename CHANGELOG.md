@@ -35,6 +35,13 @@ versioning follows [SemVer](https://semver.org/).
     - Concurrent 3-worker slice prefetching in `_parallel_telethon_iter` overcoming single-connection RTT caps (yielding 5–15+ MB/s) with sequential in-order reassembly and zero disk footprint.
   - Added Telegram Album / Multi-File Forwarding Support:
     - Automatic `media_group_id` 1.5-second debounce buffer collating multi-file forwards into a unified sequential pipeline with a single live status message, avoiding Telegram Bot API rate limits.
+  - Added Telegram Ingest Storage Strategy Selection:
+    - Selectable independent storage upload strategy for Telegram ingests: Option A (High Speed · Configured Strategy / Hybrid · 15–25 MB/s) vs Option B (Strict Anti-Ban · Bot API Tokens Only · ~300–700 KB/s).
+    - Added `#s_tg_ingest_strategy` select in the web panel Settings drawer with live runtime SQLite persistence (`tg_ingest_bot_only`).
+  - Added Telegram Bot Ingest Cancellation (`/cancel` / `/stop`):
+    - Real-time abort of in-progress media and URL ingests directly from Telegram, triggering immediate blob rollback and cleanup.
+  - Fixed `/status` Bot Command Storage Backend Reflection:
+    - Truthfully displays `HYBRID (MTProto + Bot CDN)` when hybrid mode is active, plus the selected Ingest Upload Mode.
   - Added operational CLI commands to `anbarctl`:
     - `anbarctl webhook set <public_url>`: Configures webhook with secret token and allowed updates.
     - `anbarctl webhook info`: Inspects webhook status, pending updates, and errors.

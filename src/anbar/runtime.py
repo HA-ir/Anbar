@@ -45,6 +45,9 @@ SPEC = {
     # upload + the admin import-embedded endpoint). 0 = off (no probing, no
     # tmp-file chunk gathering), 1 = on when ffmpeg is installed.
     "subs_extract_enabled": (0, 1),
+    # telegram ingest storage upload mode: 0 = configured strategy (high speed 15-25MB/s),
+    # 1 = strict bot-only upload (~300-700KB/s)
+    "tg_ingest_bot_only": (0, 1),
 }
 
 

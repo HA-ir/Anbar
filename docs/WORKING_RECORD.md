@@ -879,27 +879,35 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 
 ---
 
-### Session: 2026-10-08 (Part 2) — High-Speed Continuous MTProto Pipeline & Rich Album Telemetry Overhaul
+### Session: 2026-10-08 (Part 3) — Independent Ingest Storage Strategy, Bot /cancel Command & Accurate /status Reflection
 
 - **Current Objective**:
-  - Root-cause and eliminate MTProto throughput degradation: restore continuous streaming (`iter_download`) with a 16MB async prefetch buffer (`_pipelined_telethon_iter`), removing slice re-initialization overhead and avoiding Telegram CDN rate throttling.
-  - Overhaul Telegram Album live status messages: provide real-time updates for each active file in the album (progress bar, percentage, streamed size, momentary speed, ETA) along with overall album progress and direct download links for all finished items.
-  - Fix Web Panel active ingest task monitor for albums: consolidate all files in an album under a single unified task card with true cumulative progress and `Album` badge.
+  - Solve throughput bottleneck on large Telegram file ingests by allowing the operator to select the ingest chunk storage strategy independently from global storage backend:
+    - Option A: High Speed (Configured Strategy / Hybrid · 15–25 MB/s)
+    - Option B: Strict Anti-Ban (Bot API Tokens Only · ~300–700 KB/s)
+  - Implement `/cancel` and `/stop` bot commands in Telegram to abort active ingests with transactional rollback (`ObjectService.rollback()`).
+  - Fix `/status` bot command to truthfully reflect `HYBRID (MTProto + Bot CDN)` when active in SQLite runtime, plus active Ingest Upload Mode.
+  - Expose ingest strategy selector `#s_tg_ingest_strategy` in Web Panel Settings drawer with runtime SQLite persistence (`tg_ingest_bot_only`).
 - **Completed Work**:
-  - Restored continuous MTProto streaming in `_stream_telethon_media` with an asynchronous 32-slice (16MB) prefetch queue (`_pipelined_telethon_iter`), avoiding per-slice generator teardown and achieving full line speed.
-  - Updated `ProgressReporter` with `album_context` awareness: dynamically edits the live Telegram status message with current file progress and overall album stats.
-  - Enhanced `_process_album_batch`: passes `status_msg_id` and `album_context` to child media tasks, records object IDs, and emits a structured completion message with clickable links for all files.
-  - Updated `renderIngestList` in `src/anbar/ui/index.html`: added distinctive `Album` badge and corrected indeterminate progress width calculation.
-  - Updated `tests/test_ingest_enhancements.py` with continuous pipeline buffer verification.
+  - Added `tg_ingest_bot_only` (0, 1) to `runtime.SPEC` and `_env_defaults(s)` in `src/anbar/api/admin.py`.
+  - Added `get_ingest_storage_backend(app)` in `src/anbar/telegram_ingest.py` routing chunk uploads according to `tg_ingest_bot_only`.
+  - Integrated `tg_ingest_storage_strategy` in `GET` / `POST /api/v1/admin/telegram-config` and wired into Web Panel UI `#s_tg_ingest_strategy` with bilingual i18n (`fa` / `en`).
+  - Added `/cancel` and `/stop` command handlers in `handle_bot_command`, cleanly cancelling active tasks via `TASK_MANAGER.cancel()` and notifying the user.
+  - Updated `/status` command in `handle_bot_command` to check SQLite `hybrid_enabled` and `tg_ingest_bot_only`, outputting accurate backend and ingest upload mode status.
+  - Added `test_telegram_config_ingest_storage_strategy` in `tests/test_telegram_config.py` and `test_bot_command_cancel_and_status` in `tests/test_tg_webhook.py`.
 - **Files/Components Changed**:
+  - `src/anbar/runtime.py`
+  - `src/anbar/api/admin.py`
   - `src/anbar/telegram_ingest.py`
   - `src/anbar/ui/index.html`
-  - `tests/test_ingest_enhancements.py`
+  - `tests/test_telegram_config.py`
+  - `CHANGELOG.md`
   - `docs/WORKING_RECORD.md`
 - **Tests Executed**:
+  - `tests/test_telegram_config.py`: 6/6 passed (100%).
+  - `tests/test_tg_webhook.py`: 14/14 passed (100%).
   - `tests/test_ingest_enhancements.py`: 5/5 passed (100%).
-  - `tests/test_tg_webhook.py`: 13/13 passed (100%).
-  - `tests/test_e2e_playwright.py`: `test_active_ingests_modal_and_cancel` passed in Chromium.
+  - Full suite (`pytest tests/`): 522/522 passed (100%).
   - `ruff check src/ tests/`: 0 errors.
   - `ruff format --check src/ tests/`: 100% compliant.
   - `mypy src/anbar`: 0 errors across 42 source files.
@@ -908,7 +916,8 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 - **Current Git Commit / Branch**:
   - `main`.
 - **Exact Next Step for Next Session**:
-  - Commit, push, and deploy to Falkenstein production server.
+  - Deploy to Falkenstein production server via `/home/hossein/anbar_deploy_falkenstein.sh`.
+
 
 
 

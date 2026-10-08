@@ -52,6 +52,7 @@ def _env_defaults(s) -> dict[str, int]:
         "auto_backup_enabled": 1 if getattr(s, "auto_backup_enabled", True) else 0,
         "seek_cache_mb": getattr(s, "seek_cache_mb", 32),
         "subs_extract_enabled": 1,
+        "tg_ingest_bot_only": 0,
     }
 
 
@@ -1226,6 +1227,9 @@ async def telegram_config_get(request: Request, test: bool = False):
             4,
         ),
         "webhook_url": f"{s.base_url.rstrip('/')}/api/v1/tg/webhook",
+        "tg_ingest_storage_strategy": (
+            "bot_only" if runtime.get_int(db, "tg_ingest_bot_only", 0) else "configured"
+        ),
         "session_authorized": (
             bool(db.kv_get("cfg_tg_session"))
             or (
@@ -1361,6 +1365,12 @@ async def telegram_config_update(request: Request):
 
             updates["ANBAR_TG_WEBHOOK_SECRET"] = wsec
             s.tg_webhook_secret = SecretStr(wsec)
+
+    if "tg_ingest_storage_strategy" in body:
+        strat = str(body["tg_ingest_storage_strategy"]).strip().lower()
+        is_bot_only = 1 if strat in ("bot_only", "bot") else 0
+        runtime.set_int(request.app.state.db, "tg_ingest_bot_only", is_bot_only)
+        updates["tg_ingest_storage_strategy"] = strat
 
     if updates and not _write_env_dict(env_path, updates):
         # BUG-v0.15.27: a silent persist failure used to return ok with the
