@@ -975,9 +975,55 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - Rebuilt and restarted production container `anbar-anbar-1` at `/opt/anbar`.
   - Local `http://127.0.0.1:8318/healthz` and public `https://dl.amiri-dev.ir/healthz` returned `{"status":"ok","service":"anbar","version":"0.15.58"}`.
 - **Current Git Commit / Branch**:
-  - `main` (`343abaf`).
+  - `main` (`62c4894`).
 - **Exact Next Step for Next Session**:
-  - All CI workflows passing green; verify directory operations in web panel.
+  - Implement Option 2 (Configurable download worker concurrency) and Option 3 (Bump version to v0.15.60 & release).
+
+---
+
+### Session: 2026-10-08 (Part 6) — Configurable Concurrency & Release v0.15.60
+
+- **Current Objective**:
+  - Implement Option 2: Configurable Telegram Ingest Download Worker Concurrency (`tg_ingest_concurrency`, 1–8 workers, default 4) in web panel Settings drawer and runtime SQLite.
+  - Implement Option 3: Bump package version to `v0.15.60`, tag release, and deploy to Falkenstein production.
+- **Completed Work**:
+  - Enforced strict sender authorization in `src/anbar/api/tg_webhook.py`: `ANBAR_OWNER_TG_IDS` is strictly required to access the bot; when empty or unauthorized, updates are silently dropped without replying.
+  - Removed "Access Denied" reply messages to unauthorized users.
+  - Added `"tg_ingest_concurrency": (1, 8)` in `runtime.SPEC` and `_env_defaults(s)` in `src/anbar/api/admin.py`.
+  - Exposed and persisted `tg_ingest_concurrency` in `GET` / `POST /api/v1/admin/telegram-config`.
+  - Added `#s_tg_ingest_concurrency` selector in Settings drawer with bilingual i18n (`fa` / `en`).
+  - Updated `_fast_telethon_iter()` in `src/anbar/telegram_ingest.py` to dynamically scale worker count according to `tg_ingest_concurrency`.
+  - Added `test_telegram_config_ingest_concurrency` in `tests/test_telegram_config.py`.
+  - Added `test_webhook_empty_owners_strictly_drops_all` and updated `test_webhook_unauthorized_sender` in `tests/test_tg_webhook.py`.
+  - Bumped version to `0.15.60` in `pyproject.toml` and `src/anbar/__init__.py`.
+  - Updated `CHANGELOG.md` with official release `[0.15.60] — 2026-10-08`.
+- **Files/Components Changed**:
+  - `src/anbar/runtime.py`
+  - `src/anbar/api/admin.py`
+  - `src/anbar/api/tg_webhook.py`
+  - `src/anbar/telegram_ingest.py`
+  - `src/anbar/ui/index.html`
+  - `src/anbar/__init__.py`
+  - `pyproject.toml`
+  - `tests/test_telegram_config.py`
+  - `tests/test_tg_webhook.py`
+  - `CHANGELOG.md`
+  - `docs/WORKING_RECORD.md`
+- **Tests Executed**:
+  - `tests/test_telegram_config.py`: 7/7 passed (100%).
+  - `tests/test_tg_webhook.py`: 15/15 passed (100%).
+  - `tests/test_ingest_enhancements.py`: 6/6 passed (100%).
+  - `tests/test_folders.py`: 5/5 passed (100%).
+  - `ruff check src/ tests/`: 0 errors.
+  - `ruff format --check src/ tests/`: 100% compliant.
+  - `mypy src/anbar`: 0 errors across 42 source files.
+- **Deployment Status**:
+  - Ready for commit, push, and deployment to Falkenstein production.
+- **Current Git Commit / Branch**:
+  - `main`.
+- **Exact Next Step for Next Session**:
+  - Commit, tag `v0.15.60`, push, and deploy to Falkenstein production server.
+
 
 
 

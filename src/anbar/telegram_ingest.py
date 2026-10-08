@@ -1167,8 +1167,13 @@ async def _stream_telethon_media(
                 yield chunk
             return
 
+        from . import runtime
+
+        concurrency = runtime.get_int(db, "tg_ingest_concurrency", 4) if db is not None else 4
+        concurrency = max(1, min(8, concurrency))
+
         total_parts = (total_expected + part_size - 1) // part_size
-        num_workers = min(4, total_parts)
+        num_workers = min(concurrency, total_parts)
         next_part = 0
         part_lock = asyncio.Lock()
         queue: asyncio.Queue[tuple[int, bytes] | Exception] = asyncio.Queue(maxsize=16)

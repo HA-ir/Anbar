@@ -1144,6 +1144,15 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
           <option value="bot_only" data-i18n="tgIngestStratBot">🛡️ فقط توکن‌های بات — ضد بن سخت‌گیرانه (Bot API · ۳۰۰ تا ۷۰۰ کیلوبایت/ثانیه)</option>
         </select>
       </div>
+      <div class="set-row col">
+        <div class="lab"><span data-i18n="tgIngestWorkersLab">تعداد اتصال‌های موازی دانلود (Pipelined Workers)</span><small data-i18n="tgIngestWorkersSub">تعداد درخواست‌های همزمان ۵۱۲ کیلوبایتی از سرورهای تلگرام برای شتاب دانلود</small></div>
+        <select id="s_tg_ingest_concurrency" data-dirty-key="tg_ingest_concurrency" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx);font-family:inherit;font-size:13px;direction:ltr">
+          <option value="2">2 Workers (~2.5–5 MB/s · کم‌مصرف)</option>
+          <option value="4" selected>4 Workers (~5–15 MB/s · پیش‌فرض بهینه)</option>
+          <option value="6">6 Workers (~15–22 MB/s · سرعت بالا)</option>
+          <option value="8">8 Workers (~20–30+ MB/s · حداکثر سرعت)</option>
+        </select>
+      </div>
       <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px">
         <div class="lab" style="display:flex;justify-content:space-between;align-items:center">
           <span data-i18n="tgTokensLab">توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)</span>
@@ -1581,6 +1590,8 @@ const I18N={
   tgIngestStratSub:"روش آپلود تکه‌ها به کانال ذخیره‌سازی در هنگام دریافت فایل از تلگرام",
   tgIngestStratConfigured:"⚡ سرعت بالا — طبق استراتژی اصلی (۱۵ تا ۲۵ مگابایت/ثانیه)",
   tgIngestStratBot:"🛡️ فقط توکن‌های بات — ضد بن سخت‌گیرانه (۳۰۰ تا ۷۰۰ کیلوبایت/ثانیه)",
+  tgIngestWorkersLab:"تعداد اتصال‌های همزمان دانلود تلگرام",
+  tgIngestWorkersSub:"تعداد درخواست‌های موازی ۵۱۲ کیلوبایتی به سرور تلگرام برای شتاب دانلود (پیش‌فرض: ۴)",
   tgTokensLab:"توکن‌های بات تلگرام (ANBAR_BOT_TOKENS)",
   tgTokensSub:"اعمال بعد از ذخیره + ری‌استارت.",
   tgChannelLab:"شناسه کانال (ANBAR_CHANNEL_ID)",
@@ -1776,6 +1787,8 @@ const I18N={
   tgIngestStratSub:"Method used to upload chunks to the storage channel when ingesting from Telegram",
   tgIngestStratConfigured:"⚡ High Speed — Configured Strategy (15–25 MB/s)",
   tgIngestStratBot:"🛡️ Strict Anti-Ban — Bot API Tokens Only (~300–700 KB/s)",
+  tgIngestWorkersLab:"Telegram Ingest Download Workers",
+  tgIngestWorkersSub:"Concurrent 512KB slice requests to Telegram servers for download acceleration (default: 4)",
   tgTokensLab:"Bot API Tokens (ANBAR_BOT_TOKENS)",
   tgTokensSub:"Applied after save + restart.",
   tgChannelLab:"Channel ID (ANBAR_CHANNEL_ID)",
@@ -5708,6 +5721,9 @@ async function loadTelegramConfig(){
     if($("#s_tg_ingest_strategy")){
       $("#s_tg_ingest_strategy").value=r.tg_ingest_storage_strategy||"configured";
     }
+    if($("#s_tg_ingest_concurrency")){
+      $("#s_tg_ingest_concurrency").value=r.tg_ingest_concurrency||4;
+    }
     if($("#s_tg_bot_tokens"))$("#s_tg_bot_tokens").value="";
     /* BUG-v0.15.28: the comma-joined textarea is gone — tokens are one-per-row
        in the list below. Drop the comma-joined placeholder too. */
@@ -6001,6 +6017,7 @@ $("#saveBtn").onclick=guardBtn($("#saveBtn"),async()=>{
   const tgBody={
     backend:$("#s_tg_backend")?.value,
     tg_ingest_storage_strategy:$("#s_tg_ingest_strategy")?.value,
+    tg_ingest_concurrency:+$("#s_tg_ingest_concurrency")?.value||4,
     channel_id:$("#s_tg_channel_id")?.value,
     channel_thread_id:$("#s_tg_thread_id")?.value,
     api_id:$("#s_tg_api_id")?.value,

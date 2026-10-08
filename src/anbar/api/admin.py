@@ -53,6 +53,7 @@ def _env_defaults(s) -> dict[str, int]:
         "seek_cache_mb": getattr(s, "seek_cache_mb", 32),
         "subs_extract_enabled": 1,
         "tg_ingest_bot_only": 0,
+        "tg_ingest_concurrency": 4,
     }
 
 
@@ -1230,6 +1231,7 @@ async def telegram_config_get(request: Request, test: bool = False):
         "tg_ingest_storage_strategy": (
             "bot_only" if runtime.get_int(db, "tg_ingest_bot_only", 0) else "configured"
         ),
+        "tg_ingest_concurrency": runtime.get_int(db, "tg_ingest_concurrency", 4),
         "session_authorized": (
             bool(db.kv_get("cfg_tg_session"))
             or (
@@ -1371,6 +1373,14 @@ async def telegram_config_update(request: Request):
         is_bot_only = 1 if strat in ("bot_only", "bot") else 0
         runtime.set_int(request.app.state.db, "tg_ingest_bot_only", is_bot_only)
         updates["tg_ingest_storage_strategy"] = strat
+
+    if "tg_ingest_concurrency" in body:
+        try:
+            conc = max(1, min(8, int(body["tg_ingest_concurrency"])))
+            runtime.set_int(request.app.state.db, "tg_ingest_concurrency", conc)
+            updates["tg_ingest_concurrency"] = str(conc)
+        except (ValueError, TypeError):
+            pass
 
     if updates and not _write_env_dict(env_path, updates):
         # BUG-v0.15.27: a silent persist failure used to return ok with the

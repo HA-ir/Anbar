@@ -13,7 +13,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from ..tasks import spawn_background_task
-from ..telegram_ingest import execute_telegram_ingest, send_telegram_message
+from ..telegram_ingest import execute_telegram_ingest
 
 router = APIRouter(prefix="/tg")
 log = logging.getLogger("anbar.tg_webhook")
@@ -53,21 +53,21 @@ async def telegram_webhook(request: Request) -> dict[str, Any]:
 
     sender = message.get("from", {})
     sender_id = sender.get("id")
-    chat_id = message.get("chat", {}).get("id")
     msg_id = message.get("message_id")
 
-    # 3. Check sender authorization
-    allowed_ids = settings.owner_tg_ids
-    if allowed_ids and sender_id not in allowed_ids:
-        log.warning("Unauthorized Telegram ingest attempt from user id %s", sender_id)
-        bot_token = settings.bot_tokens[0] if settings.bot_tokens else None
-        if bot_token and chat_id:
-            await send_telegram_message(
-                bot_token,
-                chat_id,
-                "⛔ <b>Access Denied:</b> Not authorized to ingest files into this Anbar instance.",
-                reply_to_message_id=msg_id,
-            )
+    # 3. Check sender authorization (Strict: ANBAR_OWNER_TG_IDS required; silent drop)
+    allowed_ids = set(settings.owner_tg_ids)
+    if db is not None and hasattr(db, "kv_get"):
+        kv_oids = db.kv_get("cfg_tg_owner_ids")
+        if kv_oids:
+            for p in kv_oids.split(","):
+                p_str = p.strip()
+                if p_str.isdigit():
+                    allowed_ids.add(int(p_str))
+
+    # Never allow unauthorized users or empty configurations; silently drop without replying
+    if not allowed_ids or not sender_id or sender_id not in allowed_ids:
+        log.warning("Ignored Telegram ingest update from unauthorized sender %s", sender_id)
         return {"ok": True, "status": "unauthorized"}
 
     # 4. Dispatch streaming ingestion in background

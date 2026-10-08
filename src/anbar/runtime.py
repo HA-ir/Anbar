@@ -48,6 +48,8 @@ SPEC = {
     # telegram ingest storage upload mode: 0 = configured strategy (high speed 15-25MB/s),
     # 1 = strict bot-only upload (~300-700KB/s)
     "tg_ingest_bot_only": (0, 1),
+    # telegram ingest parallel download workers (FastTelethon pipelining): default 4, bounds (1, 8)
+    "tg_ingest_concurrency": (1, 8),
 }
 
 

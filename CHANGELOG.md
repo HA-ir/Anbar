@@ -4,9 +4,15 @@ All notable changes to **anbar** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [SemVer](https://semver.org/).
 
-## [0.16.0] — 2026-10-08
+## [0.15.60] — 2026-10-08
 
 ### Added
+- **Strict Telegram Bot Authorization & Silent Drop**:
+  - Enforced strict authorization requiring configured `ANBAR_OWNER_TG_IDS`: if unconfigured or sender is not in the allowlist, updates are completely ignored.
+  - Eliminated "Access Denied" bot replies; unauthorized senders receive zero messages or footprint.
+- **Configurable Ingest Download Concurrency**:
+  - Added `#s_tg_ingest_concurrency` select in Settings drawer with runtime SQLite persistence (`tg_ingest_concurrency`, 1–8 workers, default 4).
+  - Fine-grained control over FastTelethon pipelining throughput (2 workers ~2.5–5 MB/s up to 8 workers ~20–30+ MB/s).
 - **Telegram Bot Webhook & Protected-Post MTProto Ingest**:
   - Implemented `POST /api/v1/tg/webhook` endpoint with `X-Telegram-Bot-Api-Secret-Token` verification and strict owner user ID authorization (`ANBAR_OWNER_TG_IDS` / `ANBAR_OWNER_TG_ID`).
   - Added Mode A direct media ingest streaming forwarded or uploaded documents, videos, audio, and photos directly via Telegram Bot API `getFile` into `ObjectService`.

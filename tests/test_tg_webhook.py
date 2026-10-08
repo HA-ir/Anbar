@@ -107,7 +107,7 @@ def test_webhook_unauthorized_sender(client: TestClient):
             "text": "Hello bot",
         },
     }
-    with patch("anbar.api.tg_webhook.send_telegram_message", new_callable=AsyncMock) as mock_send:
+    with patch("anbar.telegram_ingest.send_telegram_message", new_callable=AsyncMock) as mock_send:
         r = client.post(
             "/api/v1/tg/webhook",
             headers={"X-Telegram-Bot-Api-Secret-Token": secret},
@@ -115,7 +115,41 @@ def test_webhook_unauthorized_sender(client: TestClient):
         )
         assert r.status_code == 200
         assert r.json() == {"ok": True, "status": "unauthorized"}
-        assert mock_send.called
+        # Strict silent drop: NEVER reply any message to unauthorized users
+        assert not mock_send.called
+
+
+def test_webhook_empty_owners_strictly_drops_all(client: TestClient):
+    """When ANBAR_OWNER_TG_IDS is unconfigured or empty, all senders are dropped."""
+    app_settings: Settings = client.app.state.settings  # type: ignore[attr-defined]
+    app_db = client.app.state.db  # type: ignore[attr-defined]
+    secret = app_settings.effective_webhook_secret(app_db)
+
+    # Clear all owner IDs
+    app_settings.owner_tg_id = None
+    app_settings.owner_tg_ids_raw = None
+    app_settings.miniapp_allowed_users_raw = None
+    if hasattr(app_db, "kv_delete"):
+        app_db.kv_delete("cfg_tg_owner_ids")
+
+    payload = {
+        "update_id": 100,
+        "message": {
+            "message_id": 10,
+            "from": {"id": 12345, "first_name": "Anyone"},
+            "chat": {"id": 12345},
+            "text": "/help",
+        },
+    }
+    with patch("anbar.telegram_ingest.send_telegram_message", new_callable=AsyncMock) as mock_send:
+        r = client.post(
+            "/api/v1/tg/webhook",
+            headers={"X-Telegram-Bot-Api-Secret-Token": secret},
+            json=payload,
+        )
+        assert r.status_code == 200
+        assert r.json() == {"ok": True, "status": "unauthorized"}
+        assert not mock_send.called
 
 
 def test_webhook_authorized_sender_enqueued(client: TestClient):

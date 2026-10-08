@@ -193,3 +193,27 @@ def test_telegram_config_ingest_storage_strategy(client: TestClient, tmp_path, m
     r_get2 = client.get("/api/v1/admin/telegram-config", headers=ADMIN)
     assert r_get2.status_code == 200
     assert r_get2.json()["tg_ingest_storage_strategy"] == "configured"
+
+
+def test_telegram_config_ingest_concurrency(client: TestClient, tmp_path, monkeypatch):
+    _authed(client)
+    fake_env = tmp_path / ".env"
+    fake_env.write_text("ANBAR_BACKEND=mtproto\n", encoding="utf-8")
+
+    from anbar.api import admin
+
+    monkeypatch.setattr(admin, "_get_env_file_path", lambda: fake_env)
+
+    # 1. Update concurrency to 6
+    payload = {"tg_ingest_concurrency": 6}
+    r = client.post("/api/v1/admin/telegram-config", json=payload, headers=ADMIN)
+    assert r.status_code == 200
+
+    r_get = client.get("/api/v1/admin/telegram-config", headers=ADMIN)
+    assert r_get.status_code == 200
+    assert r_get.json()["tg_ingest_concurrency"] == 6
+
+    # 2. Clamp invalid values (e.g. 99 clamped to 8, -5 clamped to 1)
+    client.post("/api/v1/admin/telegram-config", json={"tg_ingest_concurrency": 99}, headers=ADMIN)
+    r_get_clamped = client.get("/api/v1/admin/telegram-config", headers=ADMIN)
+    assert r_get_clamped.json()["tg_ingest_concurrency"] == 8
