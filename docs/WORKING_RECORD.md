@@ -938,11 +938,13 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff format --check src/ tests/`: 100% compliant.
   - `mypy src/anbar`: 0 errors across 42 source files.
 - **Deployment Status**:
-  - Verified locally; ready for commit and deployment to Falkenstein production.
+  - Successfully deployed to Falkenstein production (`167.233.55.81:9898`) at commit `fab7449`.
+  - Rebuilt and restarted production container `anbar-anbar-1` at `/opt/anbar`.
+  - Local `http://127.0.0.1:8318/healthz` and public `https://dl.amiri-dev.ir/healthz` returned `{"status":"ok","service":"anbar","version":"0.15.58"}`.
 - **Current Git Commit / Branch**:
-  - `main`.
+  - `main` (`fab7449`).
 - **Exact Next Step for Next Session**:
-  - Deploy to Falkenstein production server via `/home/hossein/anbar_deploy_falkenstein.sh`.
+  - Test real-world live ingest transfer on Telegram bot with large media file.
 
 
 
