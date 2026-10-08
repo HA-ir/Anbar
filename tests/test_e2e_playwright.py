@@ -1351,3 +1351,22 @@ def test_system_health_and_backup_controls(authed_page: Page):
     page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
 
 
+def test_settings_dirty_state_and_restart_banner(authed_page: Page):
+    """Test 33: Modifying a .env setting displays a clear restart notice banner."""
+    page = authed_page
+    page.click("#setBtn")
+    page.wait_for_selector("#drawer.on", timeout=6000)
+
+    # Change channel ID
+    page.fill("#s_tg_channel_id", "-100999888777")
+    page.locator("#s_tg_channel_id").dispatch_event("input")
+
+    # Restart banner should become visible
+    banner = page.locator("#restartNoticeBanner")
+    assert banner.is_visible()
+
+    page.click("#setClose")
+    page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
+
+
+
