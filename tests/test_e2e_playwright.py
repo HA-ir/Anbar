@@ -1327,3 +1327,27 @@ def test_security_and_performance_cards_rendered(authed_page: Page):
     page.click("#setClose")
     page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
 
+
+def test_system_health_and_backup_controls(authed_page: Page):
+    """Test 32: System health telemetry, storage distribution bar, and backup action controls inside cards."""
+    page = authed_page
+    page.click("#setBtn")
+    page.wait_for_selector("#drawer.on", timeout=6000)
+
+    page.click('.dtab[data-sec="secBackup"]')
+    assert page.locator(".stat-grid").is_visible()
+    assert page.locator("#storageDistBar").is_visible()
+    assert page.locator("#btnDownloadBackup").is_visible()
+    assert page.locator("#btnPushTgBackup").is_visible()
+    assert page.locator("#btnChannelRebuild").is_visible()
+    assert page.locator("#secBackup .set-card").count() >= 2
+
+    # Click Audit logs tab
+    page.click('.dtab[data-sec="secAuditLogs"]')
+    assert page.locator("#auditLogList").is_visible()
+    assert page.locator("#secAuditLogs .set-card").count() >= 1
+
+    page.click("#setClose")
+    page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
+
+
