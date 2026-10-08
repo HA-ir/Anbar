@@ -1018,11 +1018,14 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff format --check src/ tests/`: 100% compliant.
   - `mypy src/anbar`: 0 errors across 42 source files.
 - **Deployment Status**:
-  - Ready for commit, push, and deployment to Falkenstein production.
+  - Successfully deployed to Falkenstein production (`167.233.55.81:9898`) at commit `18d9393` (tag `v0.15.60`).
+  - Rebuilt and restarted production container `anbar-anbar-1` at `/opt/anbar`.
+  - Local `http://127.0.0.1:8318/healthz` and public `https://dl.amiri-dev.ir/healthz` returned `{"status":"ok","service":"anbar","version":"0.15.60"}`.
+  - All GitHub Actions workflows (`CI`, `Security`, `Publish GHCR image`) passed 100% green.
 - **Current Git Commit / Branch**:
-  - `main`.
+  - `main` (`18d9393`), tag `v0.15.60`.
 - **Exact Next Step for Next Session**:
-  - Commit, tag `v0.15.60`, push, and deploy to Falkenstein production server.
+  - Publish GitHub release v0.15.60 via `gh release create`.
 
 
 
