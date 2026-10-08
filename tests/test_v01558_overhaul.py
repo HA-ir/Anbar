@@ -10,12 +10,16 @@ INDEX_HTML = (ROOT / "src" / "anbar" / "ui" / "index.html").read_text()
 
 
 def test_version_bumped_to_0_15_58():
-    assert '__version__ = "0.15.58"' in INIT
-    assert 'version = "0.15.58"' in PYPROJECT
+    import re
+
+    assert re.search(r'__version__ = "0\.15\.(5[8-9]|6\d)"', INIT)
+    assert re.search(r'version = "0\.15\.(5[8-9]|6\d)"', PYPROJECT)
 
 
 def test_uv_lock_version_bumped_to_0_15_58():
-    assert 'name = "anbar"\nversion = "0.15.58"' in UVLOCK
+    import re
+
+    assert re.search(r'name = "anbar"\nversion = "0\.15\.(5[8-9]|6\d)"', UVLOCK)
 
 
 def test_design_tokens_defined_in_index_html():

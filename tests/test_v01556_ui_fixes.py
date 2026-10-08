@@ -67,11 +67,11 @@ def test_softened_light_theme_tokens():
 def test_version_bumped_to_0_15_56():
     import re
 
-    assert re.search(r'__version__ = "0\.15\.(56|57|58)"', INIT)
-    assert re.search(r'version = "0\.15\.(56|57|58)"', PYPROJECT)
+    assert re.search(r'__version__ = "0\.15\.(5[6-9]|6\d)"', INIT)
+    assert re.search(r'version = "0\.15\.(5[6-9]|6\d)"', PYPROJECT)
 
 
 def test_uv_lock_version_bumped_to_0_15_56():
     import re
 
-    assert re.search(r'version = "0\.15\.(56|57|58)"', UVLOCK)
+    assert re.search(r'version = "0\.15\.(5[6-9]|6\d)"', UVLOCK)
