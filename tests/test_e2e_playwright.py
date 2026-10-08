@@ -1068,6 +1068,9 @@ def test_settings_mobile_responsiveness_and_telegram_test(authed_page: Page):
     has_on = page.evaluate("() => document.querySelector('#drawer').classList.contains('on')")
     assert not has_on
 
+    # Restore desktop viewport
+    page.set_viewport_size({"width": 1280, "height": 800})
+
 
 def test_upload_queue_pause_resume_and_audio_controls(authed_page: Page, tmp_path: Path):
     """Test 26: Upload queue pause/resume controls and enhanced audio preview playback speeds."""
@@ -1259,7 +1262,8 @@ def test_settings_tab_navigation_and_section_sync(authed_page: Page):
     # Click Telegram tab
     page.click('.dtab[data-sec="secTgConfig"]')
     page.wait_for_function(
-        "() => document.querySelector('.dtab[data-sec=\"secTgConfig\"]').classList.contains('active')",
+        "() => document.querySelector('.dtab[data-sec=\"secTgConfig\"]')"
+        ".classList.contains('active')",
         timeout=3000,
     )
     assert page.locator("#secTgConfig").is_visible()
@@ -1329,7 +1333,7 @@ def test_security_and_performance_cards_rendered(authed_page: Page):
 
 
 def test_system_health_and_backup_controls(authed_page: Page):
-    """Test 32: System health telemetry, storage distribution bar, and backup action controls inside cards."""
+    """Test 32: System health telemetry, storage bar, and backup action controls in cards."""
     page = authed_page
     page.click("#setBtn")
     page.wait_for_selector("#drawer.on", timeout=6000)
@@ -1367,6 +1371,3 @@ def test_settings_dirty_state_and_restart_banner(authed_page: Page):
 
     page.click("#setClose")
     page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
-
-
-
