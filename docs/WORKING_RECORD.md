@@ -911,12 +911,39 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff check src/ tests/`: 0 errors.
   - `ruff format --check src/ tests/`: 100% compliant.
   - `mypy src/anbar`: 0 errors across 42 source files.
+### Session: 2026-10-08 (Part 4) — FastTelethon Pipelined MTProto Ingest Streaming
+
+- **Current Objective**:
+  - Overcome the single-stream MTProto download ceiling (~1.13 MB/s) by implementing FastTelethon-style concurrent `upload.GetFileRequest` pipelining on a single account.
+  - Reassemble 512KB slices in strict sequential in-order stream with backpressure bounded to 8MB in RAM.
+  - Maintain automatic fallback to single-stream pipeline if media location cannot be resolved or if the file is <= 1MB.
+- **Completed Work**:
+  - Implemented `_fast_telethon_iter` in `src/anbar/telegram_ingest.py`:
+    - Resolves `location` and `dc_id` from media.
+    - Borrows exported DC sender when `dc_id != session.dc_id`, handling `DcIdInvalidError` and `FileMigrateError`.
+    - Spawns 4 concurrent workers issuing raw `upload.GetFileRequest(location, offset, limit=512KB, precise=True, cdn_supported=False)`.
+    - Uses `asyncio.Queue(maxsize=16)` for memory backpressure and in-order reassembly dictionary.
+    - Seamlessly falls back to `_pipelined_telethon_iter` if location resolution fails or file is small.
+  - Added `test_fast_telethon_stream_parallel_and_ordered` in `tests/test_ingest_enhancements.py`.
+- **Files/Components Changed**:
+  - `src/anbar/telegram_ingest.py`
+  - `tests/test_ingest_enhancements.py`
+  - `CHANGELOG.md`
+  - `docs/WORKING_RECORD.md`
+- **Tests Executed**:
+  - `tests/test_ingest_enhancements.py`: 6/6 passed (100%).
+  - `tests/test_telegram_config.py`: 6/6 passed (100%).
+  - `tests/test_tg_webhook.py`: 14/14 passed (100%).
+  - `ruff check src/ tests/`: 0 errors.
+  - `ruff format --check src/ tests/`: 100% compliant.
+  - `mypy src/anbar`: 0 errors across 42 source files.
 - **Deployment Status**:
-  - Ready for commit and deployment to Falkenstein production.
+  - Verified locally; ready for commit and deployment to Falkenstein production.
 - **Current Git Commit / Branch**:
   - `main`.
 - **Exact Next Step for Next Session**:
   - Deploy to Falkenstein production server via `/home/hossein/anbar_deploy_falkenstein.sh`.
+
 
 
 

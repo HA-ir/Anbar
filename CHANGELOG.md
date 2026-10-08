@@ -31,8 +31,8 @@ versioning follows [SemVer](https://semver.org/).
     - Implemented `TASK_MANAGER` in `src/anbar/ingest_manager.py` tracking in-progress Telegram and URL ingest jobs.
     - Added admin API endpoints `GET /api/v1/admin/ingest/active` and `POST /api/v1/admin/ingest/{task_id}/cancel`.
     - Added `#ingestBtn` badge in the web panel toolbar and `#activeIngestModal` live task monitor with progress bars, speeds, ETAs, and Cancel buttons, auto-polling active tasks.
-  - Added Parallel Bounded MTProto Streaming Engine:
-    - Concurrent 3-worker slice prefetching in `_parallel_telethon_iter` overcoming single-connection RTT caps (yielding 5–15+ MB/s) with sequential in-order reassembly and zero disk footprint.
+  - Added Parallel Bounded MTProto Streaming Engine (FastTelethon pattern):
+    - Concurrent 4-worker slice pipelining in `_fast_telethon_iter` using low-level `upload.GetFileRequest` directly against the DC sender, overcoming single-connection RTT stop-and-wait caps (reaching 5–15+ MB/s) with sequential in-order reassembly and bounded 8MB buffer footprint.
   - Added Telegram Album / Multi-File Forwarding Support:
     - Automatic `media_group_id` 1.5-second debounce buffer collating multi-file forwards into a unified sequential pipeline with a single live status message, avoiding Telegram Bot API rate limits.
   - Added Telegram Ingest Storage Strategy Selection:

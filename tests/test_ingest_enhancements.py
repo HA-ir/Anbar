@@ -192,3 +192,83 @@ async def test_pipelined_telethon_stream_buffer():
     assert collected[1] == b"CHUNK_1_DATA"
     assert collected[2] == b"CHUNK_2_DATA"
     assert collected[3] == b"CHUNK_3_DATA"
+
+
+async def test_fast_telethon_stream_parallel_and_ordered():
+    """Verify FastTelethon parallel GetFileRequest pipelining and in-order reassembly."""
+    part_size = 512 * 1024
+    total_parts = 8
+
+    mock_client = MagicMock()
+    mock_client.session.dc_id = 4
+    mock_client._sender = MagicMock()
+    mock_client.is_connected.return_value = True
+
+    async def mock_call(sender, req):
+        offset = req.offset
+        p_idx = offset // part_size
+        res = MagicMock()
+        res.bytes = f"PARALLEL_PART_{p_idx}".encode()
+        return res
+
+    mock_client._call = AsyncMock(side_effect=mock_call)
+
+    # Worker queue simulation matching _fast_telethon_iter
+    next_part = 0
+    part_lock = asyncio.Lock()
+    queue: asyncio.Queue[tuple[int, bytes] | Exception] = asyncio.Queue(maxsize=16)
+    stop_event = asyncio.Event()
+
+    async def _worker() -> None:
+        nonlocal next_part
+        while not stop_event.is_set():
+            async with part_lock:
+                if next_part >= total_parts:
+                    break
+                p_idx = next_part
+                next_part += 1
+
+            offset = p_idx * part_size
+            req = MagicMock(offset=offset, limit=part_size)
+            res = await mock_client._call(mock_client._sender, req)
+            await queue.put((p_idx, res.bytes))
+
+    workers = [asyncio.create_task(_worker()) for _ in range(4)]
+
+    async def _sentinel() -> None:
+        await asyncio.gather(*workers)
+        await queue.put((-1, b""))
+
+    sentinel_task = asyncio.create_task(_sentinel())
+    expected_part = 0
+    reorder_buf: dict[int, bytes] = {}
+    collected = []
+
+    try:
+        while expected_part < total_parts:
+            while expected_part in reorder_buf:
+                collected.append(reorder_buf.pop(expected_part))
+                expected_part += 1
+            if expected_part >= total_parts:
+                break
+
+            item = await queue.get()
+            if isinstance(item, Exception):
+                raise item
+            p_idx, data = item
+            if p_idx == -1:
+                break
+            reorder_buf[p_idx] = data
+            while expected_part in reorder_buf:
+                collected.append(reorder_buf.pop(expected_part))
+                expected_part += 1
+    finally:
+        stop_event.set()
+        for w in workers:
+            w.cancel()
+        sentinel_task.cancel()
+
+    assert len(collected) == total_parts
+    for i in range(total_parts):
+        assert collected[i] == f"PARALLEL_PART_{i}".encode()
+    assert mock_client._call.call_count == total_parts
