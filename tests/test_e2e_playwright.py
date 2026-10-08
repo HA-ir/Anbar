@@ -1302,3 +1302,28 @@ def test_telegram_settings_cards_rendered(authed_page: Page):
     page.click("#setClose")
     page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
 
+
+def test_security_and_performance_cards_rendered(authed_page: Page):
+    """Test 31: Security and Performance controls organized into modular cards."""
+    page = authed_page
+    page.click("#setBtn")
+    page.wait_for_selector("#drawer.on", timeout=6000)
+
+    # Click secCrypto tab
+    page.click('.dtab[data-sec="secCrypto"]')
+    assert page.locator("#swEnc").is_visible()
+    assert page.locator("#swClientZk").is_visible()
+    assert page.locator("#s_enc_secret").is_visible()
+    assert page.locator("#secCrypto .set-card").count() >= 2
+
+    # Click secRate tab
+    page.click('.dtab[data-sec="secRate"]')
+    assert page.locator("#s_rate_download").is_visible()
+    assert page.locator("#s_max_upload_mb").is_visible()
+    assert page.locator("#swCache").is_visible()
+    assert page.locator("#purgeBtn").is_visible()
+    assert page.locator("#secRate .set-card").count() >= 2
+
+    page.click("#setClose")
+    page.wait_for_selector("#drawer.on", state="detached", timeout=3000)
+

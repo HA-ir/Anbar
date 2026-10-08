@@ -997,101 +997,158 @@ html[dir="rtl"] .stat-box .val{direction:rtl !important;unicode-bidi:isolate;tex
     </div>
     <div class="sec" id="secAuth">
       <h3 data-i18n="secAuth">احراز هویت</h3>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="authLab">احراز هویت API</span><small data-i18n="authSub">با غیرفعال‌سازی، دانلود بدون کلید آزاد است</small></div>
-        <div class="sw" id="swAuth" role="switch"><i></i></div>
+      <div class="set-card" id="cardAuthApi">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span data-i18n="authLab">احراز هویت API</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="authLab">احراز هویت عمومی API</span><small data-i18n="authSub">با غیرفعال‌سازی، دانلود بدون کلید آزاد است</small></div>
+          <div class="sw" id="swAuth" role="switch"><i></i></div>
+        </div>
+      </div>
+      <div class="set-card" id="cardApiKeys">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5L22 1l-2 3-3-1-1 3-3-1"/></svg>
+            <span data-i18n="secKeys">کلیدهای API</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <input type="text" id="newKeyName" data-i18n-ph="keyNamePh" placeholder="نام کلید (مثلاً ci-bot)" maxlength="60" style="flex:1;direction:ltr">
+          <button class="btn btn-ghost" id="mkKeyBtn" data-i18n="mkKey">ساخت کلید</button>
+        </div>
+        <div id="keyList"></div>
       </div>
     </div>
     <div class="sec" id="secS3">
       <h3 data-i18n="secS3">سرویس S3 و تلگرام</h3>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="s3Endpoint">اندپوینت S3</span><small style="direction:ltr;text-align:left;font-family:ui-monospace,monospace">/s3/{bucket}/{key}</small></div>
-      </div>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="tgAppEndpoint">مینی‌اپ تلگرام</span><small style="direction:ltr;text-align:left;font-family:ui-monospace,monospace">/tg-app</small></div>
-        <a href="/tg-app" target="_blank" class="btn btn-ghost" style="width:auto;padding:6px 12px;font-size:12px" data-i18n="openTgApp">باز کردن ↗</a>
+      <div class="set-card" id="cardS3Endpoints">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            <span data-i18n="secS3">سرویس S3 و تلگرام</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="s3Endpoint">اندپوینت S3</span><small style="direction:ltr;text-align:left;font-family:ui-monospace,monospace">/s3/{bucket}/{key}</small></div>
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="tgAppEndpoint">مینی‌اپ تلگرام</span><small style="direction:ltr;text-align:left;font-family:ui-monospace,monospace">/tg-app</small></div>
+          <a href="/tg-app" target="_blank" class="btn btn-ghost" style="width:auto;padding:6px 12px;font-size:12px" data-i18n="openTgApp">باز کردن ↗</a>
+        </div>
       </div>
     </div>
     <div class="sec" id="secCrypto">
       <h3 data-i18n="secCrypto">امنیت و رمزنگاری</h3>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="encLab">رمزنگاری caption و متادیتا (AES-256-GCM)</span><small data-i18n="encSub">رمزنگاری کپشن چانک‌ها روی تلگرام — خود فایل‌ها رمز نمی‌شوند؛ برای رمز واقعی، Client ZK را فعال کنید</small></div>
-        <div class="sw" id="swEnc" role="switch"><i></i></div>
-      </div>
-      <div class="set-row col" style="gap:8px">
-        <div class="lab"><span data-i18n="secretKeyLab">کلید مخفی اشتقاق رمزنگاری و امضا (Secret)</span><small data-i18n="secretKeySub">کلید اصلی جهت مشتق‌سازی کلید AES-256 و اعتبارسنجی لینک‌های موقت</small></div>
-        <div style="display:flex;gap:8px;width:100%;box-sizing:border-box">
-          <input type="password" id="s_enc_secret" placeholder="HMAC / Master Secret..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
-          <button type="button" class="btn btn-ghost" id="btnToggleSecretVis" style="width:auto;padding:8px 11px;font-size:12px" aria-label="toggle secret"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <div class="set-card" id="cardCryptoSecret">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span data-i18n="secretKeyLab">رمزنگاری سرور و کلید Master</span>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;width:100%">
-          <button type="button" class="btn btn-ghost" id="btnSetCustomSecret" style="flex:1;font-size:12px" data-i18n="btnSetSecret">تنظیم کلید</button>
-          <button type="button" class="btn btn-warn" id="btnRotateSecret" style="flex:1;font-size:12px" data-i18n="btnRotateSecret">چرخش تصادفی</button>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="encLab">رمزنگاری caption و متادیتا (AES-256-GCM)</span><small data-i18n="encSub">رمزنگاری کپشن چانک‌ها روی تلگرام — خود فایل‌ها رمز نمی‌شوند؛ برای رمز واقعی، Client ZK را فعال کنید</small></div>
+          <div class="sw" id="swEnc" role="switch"><i></i></div>
+        </div>
+        <div class="set-row col" style="gap:8px">
+          <div class="lab"><span data-i18n="secretKeyLab">کلید مخفی اشتقاق رمزنگاری و امضا (Secret)</span><small data-i18n="secretKeySub">کلید اصلی جهت مشتق‌سازی کلید AES-256 و اعتبارسنجی لینک‌های موقت</small></div>
+          <div style="display:flex;gap:8px;width:100%;box-sizing:border-box">
+            <input type="password" id="s_enc_secret" placeholder="HMAC / Master Secret..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
+            <button type="button" class="btn btn-ghost" id="btnToggleSecretVis" style="width:auto;padding:8px 11px;font-size:12px" aria-label="toggle secret"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          </div>
+          <div style="display:flex;gap:8px;width:100%">
+            <button type="button" class="btn btn-ghost" id="btnSetCustomSecret" style="flex:1;font-size:12px" data-i18n="btnSetSecret">تنظیم کلید</button>
+            <button type="button" class="btn btn-warn" id="btnRotateSecret" style="flex:1;font-size:12px" data-i18n="btnRotateSecret">چرخش تصادفی</button>
+          </div>
         </div>
       </div>
       <!-- Client-Side True ZK (v0.15.6) -->
-      <div class="set-row">
-        <div class="lab"><span data-i18n="clientZkLab">رمزنگاری سمت مرورگر (Client-Side True ZK)</span><small data-i18n="clientZkSub">رمزنگاری بایت‌ها در حافظه مرورگر با WebCrypto API قبل از ارسال به سرور</small></div>
-        <div class="sw" id="swClientZk" role="switch"><i></i></div>
-      </div>
-      <div id="clientZkPassRow" style="display:none;margin-top:6px;gap:8px;flex-direction:column">
-        <div class="lab"><span data-i18n="clientZkPassLab">رمز عبور اختصاصی کلاینت (اختیاری)</span><small data-i18n="clientZkPassSub">در صورت خالی بودن، از کلید ورود نشست استفاده می‌شود</small></div>
-        <div style="display:flex;gap:8px;width:100%">
-          <input type="password" id="s_client_zk_pass" placeholder="Client passphrase..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg3);color:var(--tx)">
-          <button type="button" class="btn btn-ghost" id="btnToggleClientZkVis" style="width:auto;padding:8px 11px;font-size:12px" aria-label="toggle zk secret"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <div class="set-card" id="cardClientZk">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            <span data-i18n="clientZkLab">رمزنگاری سمت مرورگر (Client-Side True ZK)</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="clientZkLab">رمزنگاری سمت مرورگر (Client-Side True ZK)</span><small data-i18n="clientZkSub">رمزنگاری بایت‌ها در حافظه مرورگر با WebCrypto API قبل از ارسال به سرور</small></div>
+          <div class="sw" id="swClientZk" role="switch"><i></i></div>
+        </div>
+        <div id="clientZkPassRow" style="display:none;margin-top:6px;gap:8px;flex-direction:column">
+          <div class="lab"><span data-i18n="clientZkPassLab">رمز عبور اختصاصی کلاینت (اختیاری)</span><small data-i18n="clientZkPassSub">در صورت خالی بودن، از کلید ورود نشست استفاده می‌شود</small></div>
+          <div style="display:flex;gap:8px;width:100%">
+            <input type="password" id="s_client_zk_pass" placeholder="Client passphrase..." style="flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:12px;padding:8px 10px;border:1.5px solid var(--line2);border-radius:8px;background:var(--bg2);color:var(--tx)">
+            <button type="button" class="btn btn-ghost" id="btnToggleClientZkVis" style="width:auto;padding:8px 11px;font-size:12px" aria-label="toggle zk secret"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          </div>
         </div>
       </div>
     </div>
     <div class="sec" id="secRate">
-      <h3 data-i18n="secRate">محدودیت سرعت (در دقیقه)</h3>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="rDl">دانلود</span><small data-i18n="rDlS">به ازای هر IP + فایل · ۰ = بدون محدودیت</small></div>
-        <input type="number" min="0" id="s_rate_download" style="direction:ltr">
+      <h3 data-i18n="secRate">محدودیت سرعت، سقف‌ها و کش</h3>
+      <div class="set-card" id="cardRateLimits">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span data-i18n="secRate">محدودیت سرعت (در دقیقه)</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="rDl">دانلود</span><small data-i18n="rDlS">به ازای هر IP + فایل · ۰ = بدون محدودیت</small></div>
+          <input type="number" min="0" id="s_rate_download" style="direction:ltr">
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="rUp">آپلود</span><small data-i18n="rUpS">به ازای هر کلید API</small></div>
+          <input type="number" min="0" id="s_rate_upload" style="direction:ltr">
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="rLn">ورود (UI)</span><small data-i18n="rLnS">به ازای هر IP — در برابر brute-force</small></div>
+          <input type="number" min="0" id="s_rate_login" style="direction:ltr">
+        </div>
       </div>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="rUp">آپلود</span><small data-i18n="rUpS">به ازای هر کلید API</small></div>
-        <input type="number" min="0" id="s_rate_upload" style="direction:ltr">
+
+      <div class="set-card" id="cardLimits">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span data-i18n="secLimits">سقف‌ها و نشست‌ها</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="maxUp">حداکثر سایز فایل</span><small data-i18n="maxUpS">در حال حاضر backend بوت: حداکثر ۲۰MB واقعی</small></div>
+          <input type="number" min="1" id="s_max_upload_mb" style="direction:ltr"><span class="unit">MB</span>
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="sessTtl">عمر نشست UI</span><small data-i18n="sessTtlS">cookie ورود چند ساعت باقی می‌ماند</small></div>
+          <input type="number" min="1" id="s_session_ttl_h" style="direction:ltr"><span class="unit">h</span>
+        </div>
       </div>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="rLn">ورود (UI)</span><small data-i18n="rLnS">به ازای هر IP — در برابر brute-force</small></div>
-        <input type="number" min="0" id="s_rate_login" style="direction:ltr">
-      </div>
-    </div>
-    <div class="sec">
-      <h3 data-i18n="secLimits">سقف‌ها</h3>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="maxUp">حداکثر سایز فایل</span><small data-i18n="maxUpS">در حال حاضر backend بوت: حداکثر ۲۰MB واقعی</small></div>
-        <input type="number" min="1" id="s_max_upload_mb" style="direction:ltr"><span class="unit">MB</span>
-      </div>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="sessTtl">عمر نشست UI</span><small data-i18n="sessTtlS">cookie ورود چند ساعت باقی می‌ماند</small></div>
-        <input type="number" min="1" id="s_session_ttl_h" style="direction:ltr"><span class="unit">h</span>
-      </div>
-    </div>
-    <div class="sec">
-      <h3 data-i18n="secKeys">کلیدهای API</h3>
-      <div class="set-row">
-        <input type="text" id="newKeyName" data-i18n-ph="keyNamePh" placeholder="نام کلید (مثلاً ci-bot)" maxlength="60" style="flex:1;direction:ltr">
-        <button class="btn btn-ghost" id="mkKeyBtn" data-i18n="mkKey">ساخت کلید</button>
-      </div>
-      <div id="keyList"></div>
-    </div>
-    <div class="sec">
-      <h3 data-i18n="secCache">کش دانلود</h3>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="cacheSwitchLab">وضعیت کش دانلود</span><small data-i18n="cacheSwitchSub">خاموش = هیچ فایلی کش نمی‌شود · روشن = بودجه‌ی زیر اعمال می‌شود</small></div>
-        <div class="sw" id="swCache" role="switch"><i></i></div>
-      </div>
-      <div class="set-row">
-        <div class="lab"><span data-i18n="cacheLab">حداکثر حجم کش</span><small data-i18n="cacheSub">روی volume data · LRU · ۰ = خالی شود</small></div>
-        <input type="number" min="0" id="s_cache_mb" style="direction:ltr"><span class="unit">MB</span>
-      </div>
-      <div class="set-row" style="flex-direction:column;align-items:stretch;gap:4px">
-        <div class="lab"><span data-i18n="cacheFillLab">فضای پرشده از کش</span><small id="cacheNow" class="num">—</small></div>
-        <button class="btn btn-warn" id="purgeBtn" data-i18n="purge">پاک‌کردن کش</button>
-      </div>
-      <div class="set-row" id="cacheOff" hidden>
-        <div class="lab"><small data-i18n="cacheMasterOff" style="color:var(--warn)"></small></div>
+
+      <div class="set-card" id="cardCache">
+        <div class="set-card-head">
+          <div class="set-card-title">
+            <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            <span data-i18n="secCache">کش دانلود</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="cacheSwitchLab">وضعیت کش دانلود</span><small data-i18n="cacheSwitchSub">خاموش = هیچ فایلی کش نمی‌شود · روشن = بودجه‌ی زیر اعمال می‌شود</small></div>
+          <div class="sw" id="swCache" role="switch"><i></i></div>
+        </div>
+        <div class="set-row">
+          <div class="lab"><span data-i18n="cacheLab">حداکثر حجم کش</span><small data-i18n="cacheSub">روی volume data · LRU · ۰ = خالی شود</small></div>
+          <input type="number" min="0" id="s_cache_mb" style="direction:ltr"><span class="unit">MB</span>
+        </div>
+        <div class="set-row" style="flex-direction:column;align-items:stretch;gap:4px">
+          <div class="lab"><span data-i18n="cacheFillLab">فضای پرشده از کش</span><small id="cacheNow" class="num">—</small></div>
+          <button class="btn btn-warn" id="purgeBtn" data-i18n="purge">پاک‌کردن کش</button>
+        </div>
+        <div class="set-row" id="cacheOff" hidden>
+          <div class="lab"><small data-i18n="cacheMasterOff" style="color:var(--warn)"></small></div>
+        </div>
       </div>
     </div>
 
