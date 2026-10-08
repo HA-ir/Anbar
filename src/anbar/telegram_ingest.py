@@ -188,7 +188,7 @@ class ProgressReporter:
         message_id: int,
         filename: str,
         total_bytes: int | None,
-        source_label: str,
+        source_label: str = "",
         interval_s: float = 3.5,
     ):
         self.bot_token = bot_token
@@ -221,15 +221,13 @@ class ProgressReporter:
                 f"⏳ <b>Ingesting:</b> <code>{self.filename}</code>\n"
                 f"{prog_bar} <b>{pct:.1f}%</b>\n"
                 f"📦 <b>Size:</b> {format_size(current_bytes)} / {format_size(self.total_bytes)}\n"
-                f"⚡ <b>Speed:</b> {speed_str} | ⏱ <b>ETA:</b> {eta_str}\n"
-                f"🛡️ <b>Path:</b> {self.source_label}"
+                f"⚡ <b>Speed:</b> {speed_str} | ⏱ <b>ETA:</b> {eta_str}"
             )
         else:
             text = (
                 f"⏳ <b>Ingesting:</b> <code>{self.filename}</code>\n"
                 f"📦 <b>Streamed:</b> {format_size(current_bytes)}\n"
-                f"⚡ <b>Speed:</b> {speed_str}\n"
-                f"🛡️ <b>Path:</b> {self.source_label}"
+                f"⚡ <b>Speed:</b> {speed_str}"
             )
 
         self.last_update_time = now
@@ -265,16 +263,16 @@ class AsyncIteratorReader:
                 ) from e
             if piece:
                 self._buf.extend(piece)
+                self.bytes_read += len(piece)
+                if self.on_progress:
+                    try:
+                        await self.on_progress(self.bytes_read)
+                    except Exception:
+                        pass
         if not self._buf:
             return b""
         out = bytes(self._buf[:n])
         del self._buf[:n]
-        self.bytes_read += len(out)
-        if self.on_progress:
-            try:
-                await self.on_progress(self.bytes_read)
-            except Exception:
-                pass
         return out
 
 
@@ -471,7 +469,6 @@ async def _ingest_direct_media(
                 status_msg_id,
                 filename,
                 filesize,
-                "Bot API ➔ Bot CDN",
             )
             if status_msg_id
             else None
@@ -633,18 +630,70 @@ async def _stream_telethon_media(
             status_msg_id,
             filename,
             filesize,
-            "MTProto Download ➔ Bot CDN Storage",
         )
         if status_msg_id
         else None
     )
 
-    async def _telethon_iter():
-        async for chunk in mtproto_client.iter_download(media, request_size=512 * 1024):
-            yield chunk
+    async def _resilient_telethon_iter():
+        offset = 0
+        max_retries = 10
+        retries = 0
+        total_expected = filesize or 0
+
+        while total_expected == 0 or offset < total_expected:
+            try:
+                # Telethon iter_download resuming from current offset
+                async for chunk in mtproto_client.iter_download(
+                    media,
+                    offset=offset,
+                    request_size=512 * 1024,
+                ):
+                    if not chunk:
+                        continue
+                    offset += len(chunk)
+                    retries = 0
+                    yield chunk
+
+                break
+            except Exception as e:
+                # Account safety: respect FloodWait unconditionally
+                if "FloodWait" in type(e).__name__:
+                    wait_s = int(getattr(e, "seconds", 10))
+                    log.warning("Telethon download FloodWait: sleeping %s seconds", wait_s)
+                    await asyncio.sleep(wait_s + 1)
+                    continue
+
+                retries += 1
+                if retries > max_retries:
+                    log.error(
+                        "Telethon download failed at offset %d after %d retries: %s",
+                        offset,
+                        max_retries,
+                        e,
+                    )
+                    raise
+
+                backoff = min(10.0, 1.0 * (1.5**retries))
+                log.warning(
+                    "Telethon download stalled at %s (offset %d): %s. "
+                    "Resuming in %.1fs (retry %d/%d)...",
+                    format_size(offset),
+                    offset,
+                    e,
+                    backoff,
+                    retries,
+                    max_retries,
+                )
+                await asyncio.sleep(backoff)
+                try:
+                    if not mtproto_client.is_connected():
+                        await mtproto_client.connect()
+                except Exception as conn_err:
+                    log.debug("Telethon reconnect attempt notice: %s", conn_err)
 
     reader = AsyncIteratorReader(
-        _telethon_iter(),
+        _resilient_telethon_iter(),
         idle_timeout_s=settings.body_idle_timeout_s,
         on_progress=reporter.update if reporter else None,
     )
@@ -704,7 +753,6 @@ async def _ingest_web_url(
                     status_msg_id,
                     filename,
                     total_bytes,
-                    f"Web URL ➔ {getattr(backend, 'name', 'storage').upper()}",
                 )
                 if status_msg_id
                 else None
