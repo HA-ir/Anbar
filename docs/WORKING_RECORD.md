@@ -875,7 +875,40 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 - **Current Git Commit / Branch**:
   - `0d113e5` on `main` (deployed to Falkenstein).
 - **Exact Next Step for Next Session**:
-  - All 4 strategic ingestion enhancements deployed, verified, and operational in production.
+  - Deploy continuous high-speed MTProto streaming & rich album feedback overhaul.
+
+---
+
+### Session: 2026-10-08 (Part 2) — High-Speed Continuous MTProto Pipeline & Rich Album Telemetry Overhaul
+
+- **Current Objective**:
+  - Root-cause and eliminate MTProto throughput degradation: restore continuous streaming (`iter_download`) with a 16MB async prefetch buffer (`_pipelined_telethon_iter`), removing slice re-initialization overhead and avoiding Telegram CDN rate throttling.
+  - Overhaul Telegram Album live status messages: provide real-time updates for each active file in the album (progress bar, percentage, streamed size, momentary speed, ETA) along with overall album progress and direct download links for all finished items.
+  - Fix Web Panel active ingest task monitor for albums: consolidate all files in an album under a single unified task card with true cumulative progress and `Album` badge.
+- **Completed Work**:
+  - Restored continuous MTProto streaming in `_stream_telethon_media` with an asynchronous 32-slice (16MB) prefetch queue (`_pipelined_telethon_iter`), avoiding per-slice generator teardown and achieving full line speed.
+  - Updated `ProgressReporter` with `album_context` awareness: dynamically edits the live Telegram status message with current file progress and overall album stats.
+  - Enhanced `_process_album_batch`: passes `status_msg_id` and `album_context` to child media tasks, records object IDs, and emits a structured completion message with clickable links for all files.
+  - Updated `renderIngestList` in `src/anbar/ui/index.html`: added distinctive `Album` badge and corrected indeterminate progress width calculation.
+  - Updated `tests/test_ingest_enhancements.py` with continuous pipeline buffer verification.
+- **Files/Components Changed**:
+  - `src/anbar/telegram_ingest.py`
+  - `src/anbar/ui/index.html`
+  - `tests/test_ingest_enhancements.py`
+  - `docs/WORKING_RECORD.md`
+- **Tests Executed**:
+  - `tests/test_ingest_enhancements.py`: 5/5 passed (100%).
+  - `tests/test_tg_webhook.py`: 13/13 passed (100%).
+  - `tests/test_e2e_playwright.py`: `test_active_ingests_modal_and_cancel` passed in Chromium.
+  - `ruff check src/ tests/`: 0 errors.
+  - `ruff format --check src/ tests/`: 100% compliant.
+  - `mypy src/anbar`: 0 errors across 42 source files.
+- **Deployment Status**:
+  - Ready for commit and deployment to Falkenstein production.
+- **Current Git Commit / Branch**:
+  - `main`.
+- **Exact Next Step for Next Session**:
+  - Commit, push, and deploy to Falkenstein production server.
 
 
 

@@ -194,6 +194,7 @@ class ProgressReporter:
         interval_s: float = 3.5,
         task_id: str | None = None,
         source: str = "telegram",
+        album_context: dict[str, Any] | None = None,
     ):
         self.bot_token = bot_token
         self.chat_id = chat_id
@@ -205,17 +206,29 @@ class ProgressReporter:
         self.start_time = time.time()
         self.last_update_time = self.start_time
         self.task_id = task_id or uuid.uuid4().hex[:12]
-        self.task = TASK_MANAGER.create(
-            task_id=self.task_id,
-            source=source,
-            filename=filename,
-            total_bytes=total_bytes,
-        )
+        self.album_context = album_context
+
+        existing_task = TASK_MANAGER.get(self.task_id) if (album_context and self.task_id) else None
+        if existing_task:
+            self.task = existing_task
+            c_idx = album_context.get("current_index", 1) if album_context else 1
+            t_files = album_context.get("total_files", 1) if album_context else 1
+            self.task.filename = f"Album ({c_idx}/{t_files}): {filename}"
+        else:
+            self.task = TASK_MANAGER.create(
+                task_id=self.task_id,
+                source=source,
+                filename=filename,
+                total_bytes=total_bytes,
+            )
 
     async def update(self, current_bytes: int) -> None:
         now = time.time()
+        completed_prev = self.album_context.get("completed_bytes", 0) if self.album_context else 0
+        effective_task_bytes = completed_prev + current_bytes
+
         if self.task:
-            self.task.update_bytes(current_bytes, window_s=10.0)
+            self.task.update_bytes(effective_task_bytes, window_s=10.0)
 
         if now - self.last_update_time < self.interval_s:
             return
@@ -226,27 +239,69 @@ class ProgressReporter:
         speed = self.task.speed if self.task else (current_bytes / elapsed)
         speed_str = f"{format_size(speed)}/s"
 
-        if self.total_bytes and self.total_bytes > 0:
-            pct = min(99.9, (current_bytes / self.total_bytes) * 100)
-            remaining = max(0, self.total_bytes - current_bytes)
-            eta_s = self.task.eta if self.task else (remaining / speed if speed > 0 else None)
-            eta_str = format_eta(eta_s)
-            prog_bar = render_progress_bar(pct)
+        if self.album_context:
+            c_idx = self.album_context.get("current_index", 1)
+            t_files = self.album_context.get("total_files", 1)
+            tot_album = self.album_context.get("total_album_bytes")
+
+            if self.total_bytes and self.total_bytes > 0:
+                pct = min(99.9, (current_bytes / self.total_bytes) * 100)
+                rem = max(0, self.total_bytes - current_bytes)
+                eta_s = rem / speed if speed > 0 else None
+                eta_str = format_eta(eta_s)
+                bar = render_progress_bar(pct)
+                cur_sz = format_size(current_bytes)
+                tot_sz = format_size(self.total_bytes)
+                file_line = (
+                    f"{bar} <b>{pct:.1f}%</b>\n"
+                    f"📦 <b>File:</b> {cur_sz} / {tot_sz}\n"
+                    f"⚡ <b>Speed:</b> {speed_str} | ⏱ <b>ETA:</b> {eta_str}"
+                )
+            else:
+                file_line = (
+                    f"📦 <b>File:</b> {format_size(current_bytes)}\n⚡ <b>Speed:</b> {speed_str}"
+                )
+
+            album_line = f"📊 <b>Completed:</b> {c_idx - 1}/{t_files} files"
+            if tot_album and tot_album > 0:
+                alb_pct = min(99.9, (effective_task_bytes / tot_album) * 100)
+                album_line += (
+                    f" ({alb_pct:.1f}%) · {format_size(effective_task_bytes)} / "
+                    f"{format_size(tot_album)}"
+                )
+
             text = (
-                f"⏳ <b>Ingesting:</b> <code>{self.filename}</code>\n"
-                f"{prog_bar} <b>{pct:.1f}%</b>\n"
-                f"📦 <b>Size:</b> {format_size(current_bytes)} / {format_size(self.total_bytes)}\n"
-                f"⚡ <b>Speed:</b> {speed_str} | ⏱ <b>ETA:</b> {eta_str}"
+                f"📚 <b>Album Ingest: File {c_idx}/{t_files}</b>\n"
+                f"📄 <b>Current:</b> <code>{self.filename}</code>\n"
+                f"{file_line}\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"{album_line}"
             )
         else:
-            text = (
-                f"⏳ <b>Ingesting:</b> <code>{self.filename}</code>\n"
-                f"📦 <b>Streamed:</b> {format_size(current_bytes)}\n"
-                f"⚡ <b>Speed:</b> {speed_str}"
-            )
+            if self.total_bytes and self.total_bytes > 0:
+                pct = min(99.9, (current_bytes / self.total_bytes) * 100)
+                remaining = max(0, self.total_bytes - current_bytes)
+                eta_s = self.task.eta if self.task else (remaining / speed if speed > 0 else None)
+                eta_str = format_eta(eta_s)
+                prog_bar = render_progress_bar(pct)
+                cur_sz = format_size(current_bytes)
+                tot_sz = format_size(self.total_bytes)
+                text = (
+                    f"⏳ <b>Ingesting:</b> <code>{self.filename}</code>\n"
+                    f"{prog_bar} <b>{pct:.1f}%</b>\n"
+                    f"📦 <b>Size:</b> {cur_sz} / {tot_sz}\n"
+                    f"⚡ <b>Speed:</b> {speed_str} | ⏱ <b>ETA:</b> {eta_str}"
+                )
+            else:
+                text = (
+                    f"⏳ <b>Ingesting:</b> <code>{self.filename}</code>\n"
+                    f"📦 <b>Streamed:</b> {format_size(current_bytes)}\n"
+                    f"⚡ <b>Speed:</b> {speed_str}"
+                )
 
         self.last_update_time = now
-        await edit_telegram_message(self.bot_token, self.chat_id, self.message_id, text)
+        if self.message_id:
+            await edit_telegram_message(self.bot_token, self.chat_id, self.message_id, text)
 
 
 class AsyncIteratorReader:
@@ -429,24 +484,32 @@ async def _process_album_batch(app: FastAPI, group_id: str, items: list[dict[str
         return
 
     total_files = len(items)
+    extracted_media: list[dict[str, Any] | None] = [_extract_direct_media(m) for m in items]
+    valid_media = [m for m in extracted_media if m is not None]
+    total_album_bytes: int | None = (
+        sum(m.get("size", 0) for m in valid_media) if valid_media else None
+    )
+
     status_msg_id = await send_telegram_message(
         bot_token,
         chat_id,
-        f"⏳ Ingesting Album (0/{total_files} files)...",
+        f"⏳ <b>Starting Album Ingest ({total_files} files)...</b>",
         reply_to_message_id=reply_id,
     )
 
     completed: list[dict[str, Any]] = []
     failed: list[tuple[str, str]] = []
+    completed_bytes = 0
 
+    album_task_id = f"alb_{group_id[:8]}"
     album_task = TASK_MANAGER.create(
-        task_id=f"alb_{group_id[:8]}",
+        task_id=album_task_id,
         source="telegram_album",
         filename=f"Album ({total_files} files)",
-        total_bytes=None,
+        total_bytes=total_album_bytes,
     )
 
-    for idx, msg in enumerate(items, 1):
+    for idx, (msg, media_info) in enumerate(zip(items, extracted_media, strict=True), 1):
         if album_task.cancel_event.is_set():
             album_task.state = "cancelled"
             if status_msg_id:
@@ -457,31 +520,34 @@ async def _process_album_batch(app: FastAPI, group_id: str, items: list[dict[str
                 await edit_telegram_message(bot_token, chat_id, status_msg_id, cancel_text)
             return
 
-        media_info = _extract_direct_media(msg)
         if not media_info:
             continue
 
         fname = media_info["filename"]
         fsize = media_info.get("size") or 0
 
-        if status_msg_id:
-            album_prog_text = (
-                f"⏳ <b>Ingesting Album ({idx}/{total_files}):</b>\n"
-                f"<code>{fname}</code> ({format_size(fsize)})"
-            )
-            await edit_telegram_message(bot_token, chat_id, status_msg_id, album_prog_text)
+        album_task.filename = f"Album ({idx}/{total_files}): {fname}"
+
+        album_ctx = {
+            "current_index": idx,
+            "total_files": total_files,
+            "completed_bytes": completed_bytes,
+            "total_album_bytes": total_album_bytes,
+        }
 
         try:
-            await _ingest_direct_media(
+            obj_id = await _ingest_direct_media(
                 app=app,
                 message=msg,
                 media_info=media_info,
                 bot_token=bot_token,
                 chat_id=chat_id,
-                status_msg_id=None,
-                task_id=f"alb_{group_id[:6]}_{idx}",
+                status_msg_id=status_msg_id,
+                task_id=album_task_id,
+                album_context=album_ctx,
             )
-            completed.append({"filename": fname, "size": fsize})
+            completed.append({"filename": fname, "size": fsize, "obj_id": obj_id})
+            completed_bytes += fsize
         except Exception as ex:
             log.warning("Failed to ingest album item %s: %s", fname, ex)
             failed.append((fname, str(ex)))
@@ -492,12 +558,17 @@ async def _process_album_batch(app: FastAPI, group_id: str, items: list[dict[str
     if status_msg_id:
         lines = [f"✅ <b>Album Ingest Complete!</b> ({len(completed)}/{total_files} saved)\n"]
         for c in completed:
-            lines.append(f"• <code>{c['filename']}</code> ({format_size(c['size'])})")
+            obj_link = (
+                f"{base_url}/f/{c['obj_id']}"
+                if c.get("obj_id")
+                else f"<code>{c['filename']}</code>"
+            )
+            f_hdr = f"• <code>{c['filename']}</code> ({format_size(c['size'])})"
+            lines.append(f"{f_hdr}\n  🔗 {obj_link}")
         if failed:
             lines.append(f"\n⚠️ <i>{len(failed)} file(s) failed:</i>")
             for fn, err in failed:
                 lines.append(f"• <code>{fn}</code>: {err[:60]}")
-        lines.append(f"\n🌐 {base_url}")
         await edit_telegram_message(bot_token, chat_id, status_msg_id, "\n".join(lines))
 
 
@@ -670,7 +741,8 @@ async def _ingest_direct_media(
     chat_id: int | str,
     status_msg_id: int | None,
     task_id: str | None = None,
-) -> None:
+    album_context: dict[str, Any] | None = None,
+) -> str | None:
     """Mode A: Ingest direct media via Bot API getFile, falling back to MTProto for >20MB."""
     settings = app.state.settings
     db = app.state.db
@@ -707,6 +779,7 @@ async def _ingest_direct_media(
                 filename,
                 filesize,
                 task_id=task_id,
+                album_context=album_context,
             )
             if (status_msg_id or task_id)
             else None
@@ -755,15 +828,15 @@ async def _ingest_direct_media(
                     f"📦 <b>Size:</b> {format_size(manifest.total_size)}\n"
                     f"🔗 <b>Link:</b> {base_url}/f/{obj_id}"
                 )
-                if status_msg_id is not None:
+                if not album_context and status_msg_id is not None:
                     await edit_telegram_message(bot_token, chat_id, status_msg_id, success_text)
-                return
+                return obj_id
 
     # Fallback to MTProto for large files (> 20MB)
     fwd_chat = message.get("forward_from_chat")
     fwd_msg_id = message.get("forward_from_message_id")
     if fwd_chat and fwd_chat.get("id") and fwd_msg_id:
-        await _ingest_protected_post(
+        return await _ingest_protected_post(
             app=app,
             entity=fwd_chat["id"],
             target_msg_id=fwd_msg_id,
@@ -771,8 +844,8 @@ async def _ingest_direct_media(
             chat_id=chat_id,
             status_msg_id=status_msg_id,
             task_id=task_id,
+            album_context=album_context,
         )
-        return
 
     mtproto_client = await get_active_mtproto_client(app)
     if mtproto_client is None:
@@ -795,7 +868,7 @@ async def _ingest_direct_media(
             "send the channel post link (https://t.me/c/...) so MTProto can stream it."
         )
 
-    await _stream_telethon_media(
+    return await _stream_telethon_media(
         app=app,
         mtproto_client=mtproto_client,
         media=target_msg.media,
@@ -806,6 +879,7 @@ async def _ingest_direct_media(
         chat_id=chat_id,
         status_msg_id=status_msg_id,
         task_id=task_id,
+        album_context=album_context,
     )
 
 
@@ -817,7 +891,8 @@ async def _ingest_protected_post(
     chat_id: int | str,
     status_msg_id: int | None,
     task_id: str | None = None,
-) -> None:
+    album_context: dict[str, Any] | None = None,
+) -> str | None:
     """Mode B: Ingest restricted/protected channel media via Telethon MTProto client."""
     mtproto_client = await get_active_mtproto_client(app)
     if mtproto_client is None:
@@ -846,7 +921,7 @@ async def _ingest_protected_post(
     if not content_type:
         content_type = "application/octet-stream"
 
-    await _stream_telethon_media(
+    return await _stream_telethon_media(
         app=app,
         mtproto_client=mtproto_client,
         media=msg.media,
@@ -857,6 +932,7 @@ async def _ingest_protected_post(
         chat_id=chat_id,
         status_msg_id=status_msg_id,
         task_id=task_id,
+        album_context=album_context,
     )
 
 
@@ -871,7 +947,8 @@ async def _stream_telethon_media(
     chat_id: int | str,
     status_msg_id: int | None,
     task_id: str | None = None,
-) -> None:
+    album_context: dict[str, Any] | None = None,
+) -> str | None:
     """Download chunks from Telethon MTProto and upload to Anbar via Bot Tokens."""
     settings = app.state.settings
     db = app.state.db
@@ -886,6 +963,7 @@ async def _stream_telethon_media(
             filename,
             filesize,
             task_id=task_id,
+            album_context=album_context,
         )
         if (status_msg_id or task_id)
         else None
@@ -899,7 +977,7 @@ async def _stream_telethon_media(
 
         while total_expected == 0 or offset < total_expected:
             try:
-                # Telethon iter_download resuming from current offset
+                # Telethon continuous streaming from current offset
                 async for chunk in mtproto_client.iter_download(
                     media,
                     offset=offset,
@@ -948,103 +1026,34 @@ async def _stream_telethon_media(
                 except Exception as conn_err:
                     log.debug("Telethon reconnect attempt notice: %s", conn_err)
 
-    async def _parallel_telethon_iter():
-        part_size = 512 * 1024
-        total_expected = filesize or 0
+    async def _pipelined_telethon_iter():
+        # Buffer up to 32 slices (16MB) to overlap continuous MTProto with Bot CDN uploads
+        queue: asyncio.Queue[bytes | Exception | None] = asyncio.Queue(maxsize=32)
 
-        # If file size is unknown or small (<= 1MB), use resilient single stream
-        if total_expected <= 2 * part_size:
-            async for chunk in _resilient_telethon_iter():
-                yield chunk
-            return
+        async def _producer() -> None:
+            try:
+                async for chunk in _resilient_telethon_iter():
+                    await queue.put(chunk)
+            except Exception as ex:
+                await queue.put(ex)
+            finally:
+                await queue.put(None)
 
-        total_parts = (total_expected + part_size - 1) // part_size
-        num_workers = min(3, total_parts)
-        next_part = 0
-        part_lock = asyncio.Lock()
-        queue: asyncio.Queue[tuple[int, bytes] | Exception] = asyncio.Queue(maxsize=16)
-        stop_event = asyncio.Event()
-
-        async def _worker() -> None:
-            nonlocal next_part
-            while not stop_event.is_set():
-                async with part_lock:
-                    if next_part >= total_parts:
-                        break
-                    p_idx = next_part
-                    next_part += 1
-
-                offset = p_idx * part_size
-                retries = 0
-                max_retries = 10
-                while not stop_event.is_set():
-                    try:
-                        chunk = b""
-                        async for piece in mtproto_client.iter_download(
-                            media,
-                            offset=offset,
-                            limit=1,
-                            request_size=part_size,
-                        ):
-                            chunk = piece
-                            break
-                        await queue.put((p_idx, chunk))
-                        break
-                    except Exception as e:
-                        if "FloodWait" in type(e).__name__:
-                            wait_s = int(getattr(e, "seconds", 10))
-                            log.warning("Telethon download FloodWait: sleeping %s seconds", wait_s)
-                            await asyncio.sleep(wait_s + 1)
-                            continue
-                        retries += 1
-                        if retries > max_retries:
-                            log.error("Worker failed on part %d (offset %d): %s", p_idx, offset, e)
-                            await queue.put(e)
-                            return
-                        backoff = min(10.0, 1.0 * (1.5**retries))
-                        await asyncio.sleep(backoff)
-                        if not mtproto_client.is_connected():
-                            try:
-                                await mtproto_client.connect()
-                            except Exception:
-                                pass
-
-        workers = [asyncio.create_task(_worker()) for _ in range(num_workers)]
-
-        async def _sentinel() -> None:
-            await asyncio.gather(*workers, return_exceptions=True)
-            await queue.put((-1, b""))
-
-        sentinel_task = asyncio.create_task(_sentinel())
-        expected_part = 0
-        reorder_buf: dict[int, bytes] = {}
-
+        prod_task = asyncio.create_task(_producer())
         try:
-            while expected_part < total_parts:
-                while expected_part in reorder_buf:
-                    yield reorder_buf.pop(expected_part)
-                    expected_part += 1
-                if expected_part >= total_parts:
-                    break
-
+            while True:
                 item = await queue.get()
+                if item is None:
+                    break
                 if isinstance(item, Exception):
                     raise item
-                p_idx, data = item
-                if p_idx == -1:
-                    break
-                reorder_buf[p_idx] = data
-                while expected_part in reorder_buf:
-                    yield reorder_buf.pop(expected_part)
-                    expected_part += 1
+                yield item
         finally:
-            stop_event.set()
-            for w in workers:
-                w.cancel()
-            sentinel_task.cancel()
+            if not prod_task.done():
+                prod_task.cancel()
 
     reader = AsyncIteratorReader(
-        _parallel_telethon_iter(),
+        _pipelined_telethon_iter(),
         idle_timeout_s=settings.body_idle_timeout_s,
         on_progress=reporter.update if reporter else None,
         task=reporter.task if reporter else None,
@@ -1079,8 +1088,9 @@ async def _stream_telethon_media(
         f"📦 <b>Size:</b> {format_size(manifest.total_size)}\n"
         f"🔗 <b>Link:</b> {base_url}/f/{obj_id}"
     )
-    if status_msg_id is not None:
+    if not album_context and status_msg_id is not None:
         await edit_telegram_message(bot_token, chat_id, status_msg_id, success_text)
+    return obj_id
 
 
 async def _ingest_web_url(

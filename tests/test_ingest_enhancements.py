@@ -143,81 +143,52 @@ async def test_telegram_album_debouncing(client: TestClient):
         assert len(batch_args[2]) == 3
 
 
-async def test_parallel_telethon_stream_reassembly():
-    """Verify parallel worker gathering and in-order chunk reassembly."""
+async def test_pipelined_telethon_stream_buffer():
+    """Verify continuous streaming pipeline with prefetch buffer."""
     part_size = 512 * 1024
     total_expected = 4 * part_size  # 2MB -> 4 parts
 
-    # Mock client with iter_download
     mock_client = MagicMock()
     mock_client.is_connected.return_value = True
 
     async def mock_iter_download(_media, offset: int = 0, **_kwargs):
-        part_idx = offset // part_size
-        yield f"CHUNK_{part_idx}_DATA".encode()
+        cur = offset
+        while cur < total_expected:
+            part_idx = cur // part_size
+            yield f"CHUNK_{part_idx}_DATA".encode()
+            cur += part_size
 
     mock_client.iter_download = mock_iter_download
 
-    # Recreate the parallel streaming logic to test reordering
-    total_parts = (total_expected + part_size - 1) // part_size
-    num_workers = min(3, total_parts)
-    next_part = 0
-    part_lock = asyncio.Lock()
-    queue = asyncio.Queue(maxsize=16)
-    stop_event = asyncio.Event()
+    queue: asyncio.Queue[bytes | Exception | None] = asyncio.Queue(maxsize=32)
 
-    async def _worker():
-        nonlocal next_part
-        while not stop_event.is_set():
-            async with part_lock:
-                if next_part >= total_parts:
-                    break
-                p_idx = next_part
-                next_part += 1
-            offset = p_idx * part_size
+    async def _producer():
+        try:
             async for chunk in mock_client.iter_download(
-                "dummy_media", offset=offset, limit=1, request_size=part_size
+                "dummy_media", offset=0, request_size=part_size
             ):
-                await queue.put((p_idx, chunk))
-                break
+                await queue.put(chunk)
+        except Exception as ex:
+            await queue.put(ex)
+        finally:
+            await queue.put(None)
 
-    workers = [asyncio.create_task(_worker()) for _ in range(num_workers)]
-
-    async def _sentinel():
-        await asyncio.gather(*workers, return_exceptions=True)
-        await queue.put((-1, b""))
-
-    sentinel_task = asyncio.create_task(_sentinel())
-
-    expected_part = 0
-    reorder_buf = {}
-    assembled_parts = []
-
+    prod_task = asyncio.create_task(_producer())
+    collected = []
     try:
-        while expected_part < total_parts:
-            while expected_part in reorder_buf:
-                assembled_parts.append(reorder_buf.pop(expected_part))
-                expected_part += 1
-            if expected_part >= total_parts:
-                break
+        while True:
             item = await queue.get()
+            if item is None:
+                break
             if isinstance(item, Exception):
                 raise item
-            p_idx, data = item
-            if p_idx == -1:
-                break
-            reorder_buf[p_idx] = data
-            while expected_part in reorder_buf:
-                assembled_parts.append(reorder_buf.pop(expected_part))
-                expected_part += 1
+            collected.append(item)
     finally:
-        stop_event.set()
-        for w in workers:
-            w.cancel()
-        sentinel_task.cancel()
+        if not prod_task.done():
+            prod_task.cancel()
 
-    assert len(assembled_parts) == 4
-    assert assembled_parts[0] == b"CHUNK_0_DATA"
-    assert assembled_parts[1] == b"CHUNK_1_DATA"
-    assert assembled_parts[2] == b"CHUNK_2_DATA"
-    assert assembled_parts[3] == b"CHUNK_3_DATA"
+    assert len(collected) == 4
+    assert collected[0] == b"CHUNK_0_DATA"
+    assert collected[1] == b"CHUNK_1_DATA"
+    assert collected[2] == b"CHUNK_2_DATA"
+    assert collected[3] == b"CHUNK_3_DATA"

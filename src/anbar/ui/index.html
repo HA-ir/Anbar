@@ -3398,17 +3398,24 @@ function renderIngestList(tasks){
     d.style.gap="8px";
     d.style.padding="12px 14px";
 
+    const isAlbum=task.source==="telegram_album";
+    const srcTag=isAlbum?'<span class="tag bot" style="background:var(--brand-soft);color:var(--brand);font-weight:700">Album</span>'
+      :task.source==="telegram"?'<span class="tag bot">TG</span>'
+      :'<span class="tag mtproto">URL</span>';
+
     const speedStr=task.speed?humanSize(task.speed)+"/s":"...";
     const etaStr=task.eta?humanTtl(task.eta):"calc...";
     const pct=task.pct!=null?task.pct+"%":"...";
-    const progWidth=task.pct!=null?task.pct:50;
-    const isIndeterminate=task.pct==null;
+    const progWidth=task.pct!=null?task.pct:(task.total_bytes?0:100);
 
     d.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
-      +'<div style="direction:ltr;text-align:left;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:13.5px">'
+      +'<div style="display:flex;align-items:center;gap:7px;overflow:hidden;flex:1">'
+      +srcTag
+      +'<div style="direction:ltr;text-align:left;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:13px" title="'+esc(task.filename||task.id)+'">'
       +esc(task.filename||task.id)
       +'</div>'
-      +'<button class="btn btn-warn btn-sm cancel-ing-btn" style="width:auto;padding:3px 10px;font-size:11.5px">'
+      +'</div>'
+      +'<button class="btn btn-warn btn-sm cancel-ing-btn" style="width:auto;padding:3px 10px;font-size:11.5px" data-tid="'+esc(task.id)+'">'
       +esc(t("cancelIngest"))
       +'</button>'
       +'</div>'
