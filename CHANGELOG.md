@@ -19,6 +19,12 @@ versioning follows [SemVer](https://semver.org/).
     - Automatically detects standard HTTP/HTTPS URLs sent to the bot, streaming them directly into memory and uploading via the configured Storage Backend Strategy.
   - Added Live ETA & Speed Feedback:
     - Live progress bar (`[████████░░]`), percentage, transferred/total bytes, transfer speed (`MB/s`), and remaining time estimation (`ETA: 1m 20s`) displayed in real-time Telegram message updates.
+  - Added Telegram Bot Commands (/help, /status, /stats):
+    - `/help` / `/start`: Shows usage guide for direct media, restricted channel links, and web URLs.
+    - `/status`: Reports real-time Anbar server telemetry, stored objects, storage strategy, and MTProto authorization status.
+    - `/stats`: Displays comprehensive storage distribution breakdown by file categories.
+  - Added Pipelined Async Ingestion Buffer:
+    - Decoupled MTProto downloading and Bot token chunk uploading into an in-memory pipelined queue, overlapping chunk downloads with chunk uploads for significantly faster transfer throughput.
   - Added operational CLI commands to `anbarctl`:
     - `anbarctl webhook set <public_url>`: Configures webhook with secret token and allowed updates.
     - `anbarctl webhook info`: Inspects webhook status, pending updates, and errors.

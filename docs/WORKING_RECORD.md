@@ -776,6 +776,8 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - Enhanced Telethon MTProto download with auto-healing offset resumption, reconnection backoff, and FloodWait compliance for large multi-GB transfers (e.g. 3.9GB).
   - Fixed live Telegram progress updates by incrementing byte counters on every 512KB slice and throttled edits at 3.5s intervals (no web refresh needed).
   - Cleaned up Telegram ingest feedback messages by removing the technical route path line.
+  - Implemented Telegram Bot commands (`/help`, `/status`, `/stats`) reporting live storage health, system telemetry, and category breakdown.
+  - Implemented pipelined asynchronous prefetch buffer (`asyncio.Queue`) overlapping MTProto chunk downloading with Bot token chunk uploading for significantly faster throughput.
   - Added unit, integration, and Playwright E2E browser tests in `tests/test_tg_webhook.py`, `tests/test_cli_webhook.py`, `tests/test_telegram_config.py`, and `tests/test_e2e_playwright.py`.
   - Updated `docs/API.md`, `CHANGELOG.md`, and `docs/WORKING_RECORD.md`.
 - **Files/Components Changed**:
@@ -795,8 +797,8 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `CHANGELOG.md`
   - `docs/WORKING_RECORD.md`
 - **Tests Executed**:
-  - `pytest -v`: 513/513 passed (100%).
-  - `tests/test_tg_webhook.py`: 12/12 passed.
+  - `pytest -v`: 514/514 passed (100%).
+  - `tests/test_tg_webhook.py`: 13/13 passed.
   - `tests/test_cli_webhook.py`: 3/3 passed.
   - `tests/test_telegram_config.py`: 5/5 passed.
   - `tests/test_e2e_playwright.py`: 28/28 passed in headless Chromium.

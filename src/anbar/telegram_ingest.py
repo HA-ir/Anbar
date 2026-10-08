@@ -276,6 +276,91 @@ class AsyncIteratorReader:
         return out
 
 
+async def handle_bot_command(
+    app: FastAPI,
+    message: dict[str, Any],
+    bot_token: str,
+    chat_id: int | str,
+    text: str,
+) -> bool:
+    """Handle /start, /help, /status, and /stats bot commands."""
+    cmd = text.strip().split()[0].split("@")[0].lower()
+    msg_id = message.get("message_id")
+
+    if cmd in ("/start", "/help"):
+        help_text = (
+            "📦 <b>Anbar Ingestion Bot</b>\n\n"
+            "Send or forward content to ingest it directly into Anbar:\n\n"
+            "• <b>Direct Media:</b> Forward or send any media file (up to 4 GB).\n"
+            "• <b>Post Links:</b> Send <code>https://t.me/c/...</code> or "
+            "<code>https://t.me/...</code> for restricted channel posts.\n"
+            "• <b>Web Download URLs:</b> Send direct HTTP/HTTPS download links.\n\n"
+            "<b>Commands:</b>\n"
+            "/status — System telemetry & storage health\n"
+            "/stats — Detailed media storage breakdown\n"
+            "/help — Show this guide"
+        )
+        await send_telegram_message(bot_token, chat_id, help_text, reply_to_message_id=msg_id)
+        return True
+
+    if cmd == "/status":
+        db = app.state.db
+        settings = app.state.settings
+        backend = getattr(app.state, "backend", None)
+        backend_name = getattr(backend, "name", settings.backend.value).upper()
+        bot_pool = getattr(app.state, "bot_pool", None)
+        bot_count = bot_pool.size if bot_pool else len(settings.bot_tokens)
+
+        # Check MTProto health
+        mtproto_client = await get_active_mtproto_client(app)
+        is_auth = False
+        if mtproto_client:
+            try:
+                is_auth = await mtproto_client.is_user_authorized()
+            except Exception:
+                is_auth = False
+        mtproto_status = "🟢 Connected & Authorized" if is_auth else "⚪ Offline / Not Auth"
+
+        stats = db.get_system_stats() if hasattr(db, "get_system_stats") else {}
+        total_objects = stats.get("total_objects", 0)
+        total_bytes = stats.get("total_bytes", 0)
+        total_dl = stats.get("total_downloads", 0)
+
+        status_text = (
+            "📊 <b>Anbar System Status</b>\n\n"
+            f"📁 <b>Stored Objects:</b> {total_objects}\n"
+            f"💾 <b>Storage Used:</b> {format_size(total_bytes)}\n"
+            f"⬇️ <b>Total Downloads:</b> {total_dl}\n"
+            f"⚙️ <b>Storage Backend:</b> <code>{backend_name}</code>\n"
+            f"🤖 <b>Bot Tokens in Pool:</b> {bot_count}\n"
+            f"🔑 <b>MTProto Session:</b> {mtproto_status}\n"
+            f"🌐 <b>Dashboard:</b> {settings.base_url}"
+        )
+        await send_telegram_message(bot_token, chat_id, status_text, reply_to_message_id=msg_id)
+        return True
+
+    if cmd == "/stats":
+        db = app.state.db
+        stats = db.get_system_stats() if hasattr(db, "get_system_stats") else {}
+        bd = stats.get("breakdown", {})
+        total_bytes = stats.get("total_bytes", 0)
+
+        stats_text = (
+            "📈 <b>Storage Distribution Breakdown</b>\n\n"
+            f"🎬 <b>Videos:</b> {format_size(bd.get('video', 0))}\n"
+            f"🎵 <b>Audio:</b> {format_size(bd.get('audio', 0))}\n"
+            f"🖼️ <b>Images:</b> {format_size(bd.get('image', 0))}\n"
+            f"📄 <b>Documents:</b> {format_size(bd.get('text', 0))}\n"
+            f"📦 <b>Archives:</b> {format_size(bd.get('archive', 0))}\n"
+            f"📁 <b>Other:</b> {format_size(bd.get('other', 0))}\n\n"
+            f"📊 <b>Total:</b> {format_size(total_bytes)} ({stats.get('total_objects', 0)} files)"
+        )
+        await send_telegram_message(bot_token, chat_id, stats_text, reply_to_message_id=msg_id)
+        return True
+
+    return False
+
+
 async def execute_telegram_ingest(app: FastAPI, message: dict[str, Any]) -> None:
     """Background ingestion worker processing direct media, post links, or web URLs."""
     settings = app.state.settings
@@ -288,6 +373,11 @@ async def execute_telegram_ingest(app: FastAPI, message: dict[str, Any]) -> None
     if not chat_id or not bot_token:
         log.warning("Cannot process ingest: missing chat_id or bot token")
         return
+
+    # Check for Bot Commands (/start, /help, /status, /stats)
+    if text_content.strip().startswith("/"):
+        if await handle_bot_command(app, message, bot_token, chat_id, text_content):
+            return
 
     # Check for Mode B: Protected / Restricted post link
     post_link = parse_telegram_post_link(text_content)
@@ -692,8 +782,34 @@ async def _stream_telethon_media(
                 except Exception as conn_err:
                     log.debug("Telethon reconnect attempt notice: %s", conn_err)
 
+    async def _pipelined_telethon_iter():
+        # Buffer up to 16 slices (8MB) to overlap MTProto downloading with Bot CDN uploading
+        queue: asyncio.Queue[bytes | Exception | None] = asyncio.Queue(maxsize=16)
+
+        async def _producer():
+            try:
+                async for chunk in _resilient_telethon_iter():
+                    await queue.put(chunk)
+            except Exception as ex:
+                await queue.put(ex)
+            finally:
+                await queue.put(None)
+
+        prod_task = asyncio.create_task(_producer())
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                if isinstance(item, Exception):
+                    raise item
+                yield item
+        finally:
+            if not prod_task.done():
+                prod_task.cancel()
+
     reader = AsyncIteratorReader(
-        _resilient_telethon_iter(),
+        _pipelined_telethon_iter(),
         idle_timeout_s=settings.body_idle_timeout_s,
         on_progress=reporter.update if reporter else None,
     )

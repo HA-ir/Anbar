@@ -377,3 +377,37 @@ async def test_mode_a_large_file_fallback_to_mtproto(client: TestClient):
         call_text = mock_edit.call_args[0][3]
         assert "Saved to Anbar!" in call_text
         assert "large_archive.zip" in call_text
+
+
+async def test_bot_commands_help_status_stats(client: TestClient):
+    from anbar.telegram_ingest import handle_bot_command
+
+    app = client.app
+    msg = {"message_id": 999}
+
+    with patch("anbar.telegram_ingest.send_telegram_message", new_callable=AsyncMock) as mock_send:
+        # 1. /help
+        handled = await handle_bot_command(app, msg, "fake_token", 12345, "/help")
+        assert handled is True
+        assert mock_send.called
+        assert "Anbar Ingestion Bot" in mock_send.call_args[0][2]
+
+        mock_send.reset_mock()
+
+        # 2. /status
+        handled = await handle_bot_command(app, msg, "fake_token", 12345, "/status")
+        assert handled is True
+        assert mock_send.called
+        assert "Anbar System Status" in mock_send.call_args[0][2]
+
+        mock_send.reset_mock()
+
+        # 3. /stats
+        handled = await handle_bot_command(app, msg, "fake_token", 12345, "/stats")
+        assert handled is True
+        assert mock_send.called
+        assert "Storage Distribution Breakdown" in mock_send.call_args[0][2]
+
+        # 4. Unknown / non-command
+        handled = await handle_bot_command(app, msg, "fake_token", 12345, "hello")
+        assert handled is False
