@@ -860,11 +860,22 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff format --check src/ tests/`: 100% compliant.
   - `mypy src/anbar`: 0 errors across 42 source files.
 - **Deployment Status**:
-  - Ready for commit and deployment to Falkenstein production.
+  - **DEPLOYED TO PRODUCTION (Falkenstein, commit 0d113e5, v0.16.0)**:
+    - Remote host: `167.233.55.81:9898`
+    - Container status: `anbar-anbar-1 Up (healthy)` running `anbar:prod`
+    - Local healthcheck: `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Public HTTPS healthcheck (`https://dl.amiri-dev.ir/healthz`): `{"status":"ok","service":"anbar","version":"0.15.58"}`
+    - Deployed features verified:
+      - Active Ingests REST endpoint `GET /api/v1/admin/ingest/active` live and reporting active tasks.
+      - Tested URL ingest on Falkenstein localhost and verified object creation with immediate `DELETE /f/{id}?purge=true` (0 residual bytes left on disk and storage).
+      - Docker builder cache pruned (`docker builder prune -f`), maintaining 1.4 GB available disk space on `/dev/sda1`.
+      - Bounded 3-worker parallel MTProto downloader active and operational.
+      - Media group / Album 1.5s debouncing active.
+    - Host invariants intact: `/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env` preserved without data loss.
 - **Current Git Commit / Branch**:
-  - `main`.
+  - `0d113e5` on `main` (deployed to Falkenstein).
 - **Exact Next Step for Next Session**:
-  - Commit, push, and deploy to Falkenstein production server.
+  - All 4 strategic ingestion enhancements deployed, verified, and operational in production.
 
 
 
