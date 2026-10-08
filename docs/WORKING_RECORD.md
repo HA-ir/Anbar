@@ -608,6 +608,46 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
 - **Exact Next Step for Next Session**:
   - Milestone 2 complete. Stand by for future requirements.
 
+### Session 16: Settings UI/UX Comprehensive Overhaul & MTProto Acceleration (2026-10-09)
+
+- **Current Objective**: Implement the full Settings UI/UX Comprehensive Overhaul plan (Tasks 1 through 6) across navigation, modular card architecture, security, performance, telemetry, real-time dirty state tracking, and MTProto download concurrency.
+- **Completed Work**:
+  1. **FastTelethon Multi-Worker MTProto Pipelining & Concurrency**:
+     - Replaced stop-and-wait `iter_download()` with 4 concurrent pipelined `upload.GetFileRequest` workers (512KB slices) with in-order queue reassembly, achieving 5–15+ MB/s download speed.
+     - Added configurable download concurrency (1–8 workers, default 4) in Settings UI (`#s_tg_ingest_concurrency`), SQLite runtime, and `.env`.
+  2. **Strict Bot Owner Authorization & Silent Drop**:
+     - Strictly enforced `ANBAR_OWNER_TG_IDS` for all bot webhook events; unauthorized requests are silently dropped without replying.
+  3. **Multi-File Same-Name Directory Support**:
+     - Removed basename clash constraints in `Database.move_objects_to_prefix()`, allowing files with identical basenames to co-exist in directories.
+  4. **Settings Drawer Modular Card Redesign (v0.15.60)**:
+     - Modularized Telegram configuration into 5 distinct `.set-card` containers: `#tgCardAuth`, `#tgCardStrategy`, `#tgCardStorage`, `#tgCardAccess`, `#tgCardDev`.
+     - Structured Security & Performance into clear modular cards (`#cardAuthApi`, `#cardApiKeys`, `#cardCryptoSecret`, `#cardClientZk`, `#cardRateLimits`, `#cardLimits`, `#cardCache`).
+     - Enhanced system telemetry, automated maintenance, disaster recovery, and security audit log cards.
+     - Added real-time dirty state tracking on `.env`-backed configuration keys with contextual alert banner (`#restartNoticeBanner`) and direct restart trigger (`#btnBannerRestart`).
+     - Enforced strict LTR styling on technical inputs (IDs, hashes, phone numbers, passphrases) with complete Persian and English i18n localization.
+  5. **Automated Testing & Quality Gates**:
+     - Added Playwright tests: `test_settings_tab_navigation_and_section_sync`, `test_telegram_settings_cards_rendered`, `test_security_and_performance_cards_rendered`, `test_system_health_and_backup_controls`, `test_settings_dirty_state_and_restart_banner`.
+     - 100% of 532 tests passing green (498 unit & integration tests + 34 Playwright E2E browser tests).
+     - Code quality: Ruff check (0 errors), Ruff format (100% formatted), Mypy (0 errors across 42 source files).
+- **Files/Components Changed**:
+  - `src/anbar/ui/index.html` (modular `.set-card` structure, dirty state tracking, restart banner, strict LTR inputs)
+  - `src/anbar/telegram_ingest.py` (FastTelethon pipelining)
+  - `src/anbar/api/tg_webhook.py` (strict silent drop authorization)
+  - `src/anbar/api/admin.py` (concurrency configuration support)
+  - `src/anbar/db.py` (same-name move support)
+  - `tests/test_e2e_playwright.py` (E2E card and dirty state tests)
+  - `docs/superpowers/plans/2026-10-08-settings-ui-ux-overhaul.md` (overhaul plan)
+- **Tests Executed**:
+  - `uv run pytest`: 532/532 passed (100% pass rate).
+  - Linters: `ruff check` (0 errors), `ruff format --check` (100% formatted), `mypy` (0 errors).
+- **Deployment Status**:
+  - Local branch `main` at `96d008b` pushed to `origin/main`. Ready for Falkenstein production deployment.
+- **Current Git Commit / Branch**:
+  - `96d008b` on `main`.
+- **Exact Next Step for Next Session**:
+  - Trigger Falkenstein production deployment via `/home/hossein/anbar_deploy_falkenstein.sh` upon user authorization and verify `https://dl.amiri-dev.ir/healthz`.
+
+
 ### Session 16: Video Seeking Defect Investigation & Resolution (2026-10-01)
 
 - **Current Objective**: Investigate and resolve the defect where seeking forward in a video (e.g., several minutes ahead in MP4/MKV) causes playback to freeze indefinitely in a waiting/loading state and never resume.
