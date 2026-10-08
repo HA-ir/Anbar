@@ -39,6 +39,14 @@ async def telegram_webhook(request: Request) -> dict[str, Any]:
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON payload") from None
 
+    # Feed update to bot_harvester if active (so channel posts map file_ids without polling)
+    harvester = getattr(request.app.state, "harvester", None)
+    if harvester is not None:
+        try:
+            harvester._process_update(update)
+        except Exception as e:
+            log.debug("harvester webhook feed notice: %s", e)
+
     message = update.get("message")
     if not message or not isinstance(message, dict):
         return {"ok": True, "status": "ignored"}

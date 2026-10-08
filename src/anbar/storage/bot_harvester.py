@@ -130,7 +130,12 @@ class BotHarvester:
                         updates = data.get("result", [])
                         for u in updates:
                             self._process_update(u)
-                await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.1)
+                elif r.status_code == 409:
+                    # Webhook is active; getUpdates is disabled by Telegram
+                    await asyncio.sleep(30.0)
+                else:
+                    await asyncio.sleep(1.0)
             except asyncio.CancelledError:
                 break
             except Exception as e:
