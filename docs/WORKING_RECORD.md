@@ -971,11 +971,13 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `ruff format --check src/ tests/`: 100% compliant.
   - `mypy src/anbar`: 0 errors across 42 source files.
 - **Deployment Status**:
-  - Ready for commit and deployment to Falkenstein production.
+  - Successfully deployed to Falkenstein production (`167.233.55.81:9898`) at commit `343abaf`.
+  - Rebuilt and restarted production container `anbar-anbar-1` at `/opt/anbar`.
+  - Local `http://127.0.0.1:8318/healthz` and public `https://dl.amiri-dev.ir/healthz` returned `{"status":"ok","service":"anbar","version":"0.15.58"}`.
 - **Current Git Commit / Branch**:
-  - `main`.
+  - `main` (`343abaf`).
 - **Exact Next Step for Next Session**:
-  - Commit, push, and deploy to Falkenstein production server.
+  - All CI workflows passing green; verify directory operations in web panel.
 
 
 
