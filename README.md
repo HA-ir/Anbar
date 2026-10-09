@@ -30,6 +30,8 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 | v0.10.x | Mobile responsive · pw unlock page (hidden sig+exp, eye toggle, keyed-HMAC fix) · link manager modal in-app · live-only links list + per-link download counters · shared albums (`/f/a/<token>`) · gallery audio/PDF previews | ✅ `v0.10.5` |
 | v0.14.x | Opaque zero-knowledge chunks · zero-overhead file/folder duplication · database backup/restore/import · system telemetry stats · mass link revocation · bounded code preview · Shamsi BiDi date formatting | ✅ `v0.14.3` — live |
 | v0.15.x | Self-Healing Disaster Recovery (DB-free channel reconstruction) · Client-Side True ZK (WebCrypto `ANBAR_ZK1`) · Metadata LRU cache & Lookahead 2-chunk prefetching · S3 protocol · BotPool · Conditional tombstone batched events | ✅ `v0.15.7` — live |
+| v0.15.58 | UX Overhaul · Interactive Hierarchical Move Browser & Breadcrumb Ascension · Semantic Toolbar Clusters · Universal Modal Submit Guards · Contextual Empty States | ✅ `v0.15.58` — live |
+| v0.15.60 | FastTelethon Parallel MTProto Pipelining (5–15+ MB/s) · Configurable Concurrency (1–8 workers) · Strict Bot Owner Authorization & Silent Drop · Same-Name Directory Support · Modular Settings Cards Overhaul · External S3 Client Compatibility (SigV4, SigV2, Multi-Delete) | ✅ `v0.15.60` — live |
 
 ## Why
 
@@ -53,21 +55,36 @@ remain on your server (SQLite, WAL mode). Users get plain direct-download links
 - **Streaming stays O(chunk)** — a download never buffers the whole object; a
   concurrent load test (20 × 48 MB) verifies byte-exactness and bounded memory.
 
-## Web UI (F7)
+## Web Dashboard & Storage Drive (v0.7–v0.15.60)
 
-A minimal RTL (Persian) single page at the site root (`/`):
+A modern, responsive, bilingual single-page application at the site root (`/`):
 
-- **Login** — enter the **admin** key. On success a signed session cookie
-  (`anbar_session`, `HttpOnly` + `SameSite=Lax` + `Secure`) is set. The raw key
-  is *not* stored in the browser afterward — every same-origin request carries
-  the cookie, and `whoami` resolves the role from it.
-- **List / upload / download / delete / share** — the page reuses the existing
-  JSON API (`/api/v1/*`, `/f/{id}`), so storage logic is not duplicated. Upload
-  supports drag&drop + multiple files with a progress bar; "link" mints a
-  24-hour signed URL; downloads stream through the same `/f/{id}` route.
-- **Stateless sessions** — the cookie is `HMAC-SHA256(secret, exp:tag)`, so a
-  tampered cookie fails the signature check and the login endpoint is
-  rate-limited per IP. Logout clears the cookie server-side.
+- **Login & Security** — Signed session cookie (`anbar_session`, `HttpOnly` + `SameSite=Lax` + `Secure`, HMAC-SHA256). The raw admin key is never kept client-side.
+- **Hierarchical Virtual Folders & Move Browser** — Organize files in virtual folder trees (`folder/subfolder/file.ext`). Interactive move dialog with multi-level folder drill-down, single-click breadcrumb ascension, and support for multiple files with identical names.
+- **Rich Media & Subtitle Previews** — Inline video streaming with range-seeking support and embedded subtitle extraction (ffmpeg), audio player cards with variable speed controls (0.75x–2x) and ±10s stepping, image thumbnails, and PDF lightboxes.
+- **Bulk Operations & Selection Bar** — Multi-file selection mode, bulk deletion, public album generation, and on-the-fly streaming ZIP downloads.
+- **Active Ingest Task Monitor** — Live modal reporting in-progress Telegram and URL ingest jobs with rolling 10-second transfer speeds, responsive ETAs, progress bars, and transactional cancellation.
+- **Modular Settings Drawer** — Organized into modular cards (`.set-card`) for MTProto client authentication, download concurrency tuning (1–8 workers), bot pools, owner access controls, rate limits, storage distribution telemetry, and real-time `.env` dirty-state tracking with service restart notices.
+
+## Telegram Bot Ingest & MTProto Engine (v0.15.59–v0.15.60)
+
+Anbar functions as a high-speed Telegram ingestion proxy:
+
+- **Mode A (Direct Media Forwarding)**: Forward any file, video, audio, or document to your bot to stream directly into object storage.
+- **Mode B (Protected Post Ingestion)**: Send private channel post links (`t.me/c/...` or `t.me/...`) to stream restricted media without saving intermediate bytes to disk.
+- **Mode C (Remote Web URL Ingest)**: Send any standard HTTP/HTTPS download link for automated streaming into storage.
+- **FastTelethon Parallel MTProto Pipelining**: Uses concurrent low-level `upload.GetFileRequest` workers (512 KB slices) directly against DC senders with in-order memory reassembly, achieving **5–15+ MB/s** download speeds (configurable 1–8 workers).
+- **Strict Owner Authorization & Silent Drop**: Only telegram user IDs specified in `ANBAR_OWNER_TG_IDS` are permitted. All unauthorized requests are dropped completely silently without replying.
+- **Interactive Bot Commands**: Live status updates, album batch debouncing (1.5s), `/cancel` (with transactional rollback), `/status`, and `/help`.
+
+## S3-Compatible Storage Gateway (v0.15.60)
+
+Anbar exposes an S3-compatible REST API at `/s3/{bucket}/{key}`:
+
+- **Multi-Protocol Authentication**: Compatible with standard AWS clients (`boto3`, `aws-cli`, `rclone`, Cyberduck) via AWS Signature Version 4 (SigV4), SigV2, pre-signed query URLs, and API keys.
+- **S3 Operations Supported**: `ListBuckets` (`GET /s3/`), `HeadBucket` (`HEAD /s3/{bucket}`), `CreateBucket` (`PUT /s3/{bucket}`), `PutObject` (`PUT /s3/{bucket}/{key}`), `GetObject` with HTTP Range (`GET /s3/{bucket}/{key}`), `HeadObject` (`HEAD /s3/{bucket}/{key}`), and `DeleteObject` (`DELETE /s3/{bucket}/{key}`).
+- **ListObjectsV2**: Supports `prefix` filtering and `delimiter="/"` for common prefix folder grouping.
+- **DeleteObjects Multi-Delete**: Batched object deletion via `POST /s3/{bucket}?delete` with XML payload and XXE protection.
 
 ## Runtime settings (F8)
 
@@ -370,8 +387,8 @@ docs/                 # ARCHITECTURE, API, DEPLOY, ROADMAP, DISASTER_RECOVERY
 
 ```bash
 uv sync --extra dev
-uv run pytest -q          # 208 passing
-uv run anbarctl version   # anbar 0.15.7
+uv run pytest -q          # 504 unit/integration + 34 Playwright E2E passing
+uv run anbarctl version   # anbar 0.15.60
 ```
 
 Run a local instance with the in-memory backend (no Telegram needed):
@@ -524,6 +541,6 @@ Anbar guarantees **zero local retention**: Telegram channels hold 100% of the se
 
 ## Non-goals
 
-- Folder trees / drive-style UI (flat objects only)
-- Online editing, versioning, granular sharing
-- Full web dashboard (REST API + CLI first; dashboard later, if ever)
+- In-browser document text editing or office-suite live collaboration (Anbar is an object storage vault, not Google Docs).
+- Complex multi-tenant enterprise ACL hierarchies (Anbar is an owner-controlled private cloud vault).
+- Heavy external database dependencies (PostgreSQL, Redis) — Anbar intentionally remains zero-ops SQLite with WAL mode.

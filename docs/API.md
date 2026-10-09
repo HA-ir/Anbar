@@ -336,6 +336,90 @@ buffered on disk); entries keep filenames with a short-id suffix and are
 de-duplicated. Admin/session only; `application/zip` attachment named
 `anbar-YYYYMMDD-HHMMSS.zip`. Missing ids are skipped; all-missing → `404`.
 
+## S3-Compatible Gateway Endpoints *(v0.11–v0.15.60)*
+
+Prefix: `/s3`. Compatible with standard AWS clients (`boto3`, `aws-cli`, `rclone`, Cyberduck).
+Authentication accepts standard Bearer tokens, AWS Signature Version 4 (`AWS4-HMAC-SHA256`), AWS SigV2 (`AWS key:signature`), or pre-signed URL query parameters (`?X-Amz-Credential=...`).
+
+### `GET /s3` or `GET /s3/` (ListBuckets)
+Returns XML listing all existing top-level directory buckets in `ListAllMyBucketsResult`.
+
+### `HEAD /s3/{bucket}` (HeadBucket)
+Checks bucket accessibility. Returns `200 OK` with `x-amz-bucket-region: us-east-1`.
+
+### `PUT /s3/{bucket}` (CreateBucket)
+Creates a virtual bucket folder. Returns `200 OK` with `Location: /s3/{bucket}`.
+
+### `GET /s3/{bucket}` (ListObjectsV2)
+Lists objects in `<bucket>/...` returning `ListBucketResult` XML.
+Query parameters:
+- `prefix`: Filter keys by prefix.
+- `delimiter`: Group sub-directories into `<CommonPrefixes><Prefix>...</Prefix></CommonPrefixes>`.
+- `max-keys`: Maximum objects to return (1–1000).
+- `continuation-token`: Offset token for pagination.
+
+### `PUT /s3/{bucket}/{key:path}` (PutObject)
+Uploads an object into Telegram storage using standard chunking. Returns `200 OK` with `ETag`.
+
+### `GET /s3/{bucket}/{key:path}` (GetObject)
+Retrieves object data. Supports `Range: bytes=start-end` (`206 Partial Content`), `If-None-Match: <etag>` (`304 Not Modified`), and standard headers.
+
+### `HEAD /s3/{bucket}/{key:path}` (HeadObject)
+Retrieves object headers (`ETag`, `Content-Length`, `Content-Type`, `Last-Modified`).
+
+### `DELETE /s3/{bucket}/{key:path}` (DeleteObject)
+Deletes object from storage and SQLite metadata. Returns `204 No Content`.
+
+### `POST /s3/{bucket}?delete` (DeleteObjects)
+Multi-object batch deletion. Accepts `<Delete><Object><Key>...</Key></Object></Delete>` XML payload with XXE protection. Purges all underlying Telegram chunks and returns `DeleteResult` XML.
+
+## Telegram Bot Ingestion & Webhook Endpoints *(v0.15.59–v0.15.60)*
+
+### `POST /api/v1/tg/webhook`
+Telegram Bot Webhook endpoint. Authenticates incoming updates via header `X-Telegram-Bot-Api-Secret-Token` and enforces strict sender authorization (`ANBAR_OWNER_TG_IDS`).
+- Drops unauthorized senders silently without replying.
+- Handles direct media forward (Mode A).
+- Handles protected channel post links `t.me/c/...` (Mode B) via FastTelethon MTProto pipelining.
+- Handles remote web URLs (Mode C).
+- Responds to bot commands: `/help`, `/status`, `/cancel`.
+
+### `POST /api/v1/admin/telegram/webhook/set`
+Registers the webhook URL with the Telegram Bot API.
+
+### `GET /api/v1/admin/telegram/webhook/info`
+Queries current webhook status, pending updates count, and SSL status from the Bot API.
+
+### `POST /api/v1/admin/telegram/webhook/delete`
+Deregisters the webhook from the Telegram Bot API.
+
+### `POST /api/v1/admin/telegram/test`
+Live-tests configured Telegram credentials (bot tokens via `/getMe`, MTProto user session via `get_me()`) and returns verified usernames and IDs.
+
+### `GET /api/v1/admin/telegram-config` & `POST /api/v1/admin/telegram-config`
+Retrieves or updates Telegram storage backend, ingest concurrency (1–8 workers), bot token pool, channel ID, owner IDs, and developer credentials.
+
+## Active Task Monitor Endpoints *(v0.15.59–v0.15.60)*
+
+### `GET /api/v1/admin/ingest/active`
+Returns a JSON list of all currently active background URL and Telegram ingest tasks with live progress, speed (MB/s), and ETA.
+
+### `POST /api/v1/admin/ingest/{task_id}/cancel`
+Cancels an in-progress background ingest task and triggers transactional rollback of uploaded chunk blobs.
+
+## Hierarchical Folder Management *(v0.15.58)*
+
+### `POST /api/v1/admin/folders/move`
+Moves an array of object IDs into a new directory prefix. Supports multiple files with the same name.
+```json
+{"ids": ["obj1", "obj2"], "prefix": "archive/2026/"}
+```
+
+### `POST /api/v1/admin/folders/rename`
+Renames an existing virtual folder prefix to a new prefix.
+
+### `POST /api/v1/admin/folders/delete`
+Bulk deletes all objects residing within a virtual directory prefix.
+
 ## `anbarctl` — the CLI  *(F4, v0.10.5)*
 
 `anbarctl` ships with the package (`[project.scripts]` in pyproject.toml)
