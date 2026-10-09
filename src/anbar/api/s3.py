@@ -88,6 +88,7 @@ async def list_buckets(request: Request):
 
 
 @router.head("/{bucket}")
+@router.head("/{bucket}/", include_in_schema=False)
 async def head_bucket(bucket: str, request: Request):
     """S3 HeadBucket endpoint checking bucket accessibility."""
     _check_s3_auth(request)
@@ -96,6 +97,7 @@ async def head_bucket(bucket: str, request: Request):
 
 
 @router.put("/{bucket}")
+@router.put("/{bucket}/", include_in_schema=False)
 async def create_bucket(bucket: str, request: Request):
     """S3 CreateBucket endpoint."""
     _check_s3_auth(request, write=True)
@@ -103,6 +105,7 @@ async def create_bucket(bucket: str, request: Request):
 
 
 @router.get("/{bucket}")
+@router.get("/{bucket}/", include_in_schema=False)
 async def list_objects_v2(
     bucket: str,
     request: Request,
@@ -215,6 +218,7 @@ async def put_object(bucket: str, key: str, request: Request):
     manifest = Manifest()
 
     async def on_chunk(data: bytes, media: bool = False) -> str:
+        _ = media
         ref = await backend.store(data, opaque_chunk_name(len(manifest.chunks)), content_type=None)
         manifest.chunks.append(
             Chunk(
@@ -436,3 +440,66 @@ async def delete_object(bucket: str, key: str, request: Request):
         db.delete_object(obj_id)
     db.kv_delete(f"s3:{bucket}:{key}")
     return Response(status_code=204)
+
+
+@router.post("/{bucket}")
+@router.post("/{bucket}/", include_in_schema=False)
+async def delete_objects(bucket: str, request: Request):
+    """S3 DeleteObjects multi-object delete endpoint (POST /s3/{bucket}?delete)."""
+    _check_s3_auth(request, write=True)
+    db: Database = request.app.state.db
+    backend = request.app.state.backend
+    pool = getattr(request.app.state, "bot_pool", None)
+
+    body_bytes = await request.body()
+    # Guard against XXE and billion-laughs attacks on XML parsing
+    if len(body_bytes) > 1024 * 1024:
+        return _xml_error(
+            "EntityTooLarge",
+            "Your proposed upload exceeds the maximum allowed size.",
+            f"/{bucket}",
+            400,
+        )
+    if b"<!ENTITY" in body_bytes or b"<!DOCTYPE" in body_bytes:
+        return _xml_error(
+            "MalformedXML", "XML doctype/entity definitions are not allowed", f"/{bucket}", 400
+        )
+
+    keys_to_delete: list[str] = []
+    try:
+        root_el = ET.fromstring(body_bytes)
+        for obj_el in root_el.iter():
+            if obj_el.tag.endswith("Object") or obj_el.tag == "Object":
+                for child in obj_el:
+                    if (child.tag.endswith("Key") or child.tag == "Key") and child.text:
+                        keys_to_delete.append(child.text.strip())
+    except Exception:
+        return _xml_error("MalformedXML", "The XML provided was not well-formed", f"/{bucket}", 400)
+
+    res_root = ET.Element(
+        "DeleteResult", attrib={"xmlns": "http://s3.amazonaws.com/doc/2006-03-01/"}
+    )
+    for key in keys_to_delete:
+        obj_id = db.kv_get(f"s3:{bucket}:{key}")
+        if obj_id:
+            row = db.get_object(obj_id)
+            if row:
+                manifest = Manifest.from_json(row["manifest"])
+                for c in manifest.chunks:
+                    chunk_backend = backend
+                    if c.backend and pool is not None:
+                        chunk_backend = pool.by_name(c.backend) or backend
+                    try:
+                        ref = ObjectRef(
+                            file_id=c.file_id, message_id=c.message_id, backend=chunk_backend.name
+                        )
+                        await chunk_backend.delete(ref)
+                    except Exception:
+                        pass
+                db.delete_object(obj_id)
+            db.kv_delete(f"s3:{bucket}:{key}")
+        del_el = ET.SubElement(res_root, "Deleted")
+        ET.SubElement(del_el, "Key").text = key
+
+    xml_bytes = ET.tostring(res_root, encoding="utf-8", xml_declaration=True)
+    return Response(content=xml_bytes, media_type="application/xml")

@@ -159,16 +159,42 @@ def _match_dynamic_key(key: str, db) -> bool:
 def whoami(request) -> str:
     """Resolve the caller: 'admin' | 'uploader' | 'anon' (constant-time).
 
-    Accepts a `Authorization: Bearer *** header OR a valid web session
-    cookie (issued by the F7 UI). The bearer header wins when present.
+    Accepts:
+    - Authorization: Bearer <token>
+    - Authorization: AWS4-HMAC-SHA256 Credential=<key>/... (AWS SigV4)
+    - Authorization: AWS <key>:<signature> (AWS SigV2)
+    - ?X-Amz-Credential=<key>/... (AWS S3 Presigned URL)
+    - X-Api-Key: <key>
+    - valid web session cookie (issued by the F7 UI).
     """
     settings = getattr(request.app.state, "settings", None)
     if not settings:
         from anbar.config import get_settings
 
         settings = get_settings()
-    auth = request.headers.get("authorization", "")
-    key = auth[7:] if auth.lower().startswith("bearer ") else None
+    auth = request.headers.get("authorization", "").strip()
+    key = None
+    if auth.lower().startswith("bearer "):
+        key = auth[7:].strip()
+    elif auth.startswith("AWS4-HMAC-SHA256"):
+        # AWS SigV4: Credential=ACCESS_KEY/YYYYMMDD/region/service/aws4_request
+        import re
+
+        m = re.search(r"Credential=([^/,\s]+)/", auth)
+        if m:
+            key = m.group(1).strip()
+    elif auth.startswith("AWS ") and ":" in auth[4:]:
+        # AWS SigV2: AWS ACCESS_KEY:SIGNATURE
+        key = auth[4:].split(":", 1)[0].strip()
+    elif "x-amz-credential" in request.query_params or "X-Amz-Credential" in request.query_params:
+        # Pre-signed SigV4 URL: ?X-Amz-Credential=ACCESS_KEY/YYYYMMDD/...
+        cred = request.query_params.get("x-amz-credential") or request.query_params.get(
+            "X-Amz-Credential", ""
+        )
+        if "/" in cred:
+            key = cred.split("/", 1)[0].strip()
+    elif "x-api-key" in request.headers:
+        key = request.headers.get("x-api-key", "").strip()
     admin_key = (
         settings.admin_key.get_secret_value()
         if settings.admin_key is not None and hasattr(settings.admin_key, "get_secret_value")
