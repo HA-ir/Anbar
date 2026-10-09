@@ -865,8 +865,10 @@ def _get_env_file_path() -> Path:
     prod_env = Path("/opt/anbar/.env")
     if prod_env.exists():
         return prod_env
-    local_env = Path(".env")
-    return local_env
+    data_dir = os.environ.get("ANBAR_DATA_DIR")
+    if data_dir and (Path(data_dir) / ".env").exists():
+        return Path(data_dir) / ".env"
+    return Path(".env")
 
 
 def _read_env_dict(path: Path) -> dict[str, str]:
@@ -1218,12 +1220,15 @@ async def telegram_config_get(request: Request, test: bool = False):
         "mtproto_peer": mtproto_peer,
         "chunk_size_mb": chunk_size_mb,
         "owner_tg_ids": (
-            env_vars.get("ANBAR_OWNER_TG_IDS")
+            (db.kv_get("cfg_tg_owner_ids") if db else None)
+            or env_vars.get("ANBAR_OWNER_TG_IDS")
             or env_vars.get("ANBAR_OWNER_TG_ID")
+            or (s.owner_tg_ids_raw if hasattr(s, "owner_tg_ids_raw") and s.owner_tg_ids_raw else "")
             or (", ".join(str(i) for i in sorted(s.owner_tg_ids)) if s.owner_tg_ids else "")
         ),
         "tg_webhook_secret": _mask_secret(
-            env_vars.get("ANBAR_TG_WEBHOOK_SECRET")
+            (db.kv_get("cfg_tg_webhook_secret") if db else None)
+            or env_vars.get("ANBAR_TG_WEBHOOK_SECRET")
             or (s.tg_webhook_secret.get_secret_value() if s.tg_webhook_secret else ""),
             4,
         ),
@@ -1359,6 +1364,8 @@ async def telegram_config_update(request: Request):
         oids = str(body["owner_tg_ids"]).strip()
         updates["ANBAR_OWNER_TG_IDS"] = oids
         s.owner_tg_ids_raw = oids
+        if request.app.state.db:
+            request.app.state.db.kv_set("cfg_tg_owner_ids", oids)
 
     if "tg_webhook_secret" in body:
         wsec = str(body["tg_webhook_secret"]).strip()
@@ -1367,6 +1374,8 @@ async def telegram_config_update(request: Request):
 
             updates["ANBAR_TG_WEBHOOK_SECRET"] = wsec
             s.tg_webhook_secret = SecretStr(wsec)
+            if request.app.state.db:
+                request.app.state.db.kv_set("cfg_tg_webhook_secret", wsec)
 
     if "tg_ingest_storage_strategy" in body:
         strat = str(body["tg_ingest_storage_strategy"]).strip().lower()
