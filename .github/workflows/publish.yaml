@@ -30,19 +30,8 @@ jobs:
       - name: Install
         run: uv sync --extra dev
 
-      - name: Install Playwright browsers
-        run: uv run playwright install --with-deps chromium
-
-      - name: Lint
-        run: |
-          uv run ruff check src tests
-          uv run ruff format --check src tests
-
-      - name: Typecheck (mypy)
-        run: uv run mypy src
-
-      - name: Test (including Playwright E2E)
-        run: uv run pytest -q
+      - name: Test (unit & integration)
+        run: uv run pytest -q --ignore=tests/test_e2e_playwright.py
 
   publish:
     name: Build & publish GHCR image

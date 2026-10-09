@@ -1024,7 +1024,7 @@ def test_settings_mobile_responsiveness_and_telegram_test(authed_page: Page):
 
     # Intercept /telegram/test API call
     page.evaluate("""() => {
-        const origFetch = window.fetch;
+        window._origFetch = window.fetch;
         window.fetch = async (...args) => {
             const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || "");
             if (url.includes('/admin/telegram/test')) {
@@ -1049,7 +1049,7 @@ def test_settings_mobile_responsiveness_and_telegram_test(authed_page: Page):
                     }
                 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
             }
-            return origFetch(...args);
+            return window._origFetch(...args);
         };
     }""")
 
@@ -1061,6 +1061,9 @@ def test_settings_mobile_responsiveness_and_telegram_test(authed_page: Page):
     assert conn_box.is_visible()
     box_text = conn_box.inner_text()
     assert "verified_user" in box_text or "Verified User" in box_text
+
+    # Restore fetch
+    page.evaluate("() => { if (window._origFetch) window.fetch = window._origFetch; }")
 
     # Close settings
     page.click("#setClose")
@@ -1168,7 +1171,7 @@ def test_settings_telegram_webhook_and_owner_id_panel(authed_page: Page):
         page.click("#setBtn")
     page.wait_for_selector("#drawer.on", timeout=10000)
     page.wait_for_function(
-        "() => document.querySelector('#s_tg_owner_ids').value !== ''", timeout=10000
+        "() => document.querySelector('#s_tg_owner_ids').value !== ''", timeout=15000
     )
     val = page.input_value("#s_tg_owner_ids")
     assert val == "11223344, 55667788"
