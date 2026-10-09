@@ -1069,16 +1069,67 @@ Ratified on 2026-09-30 (v1.0.0). Mandates:
   - `uv run pytest`: 532/532 passed (100% pass rate).
   - Linters: `ruff check` (0 errors), `ruff format --check` (100% formatted), `mypy` (0 errors).
 - **Deployment Status**:
-  - **DEPLOYED TO PRODUCTION (Falkenstein, commit ec22aa0, v0.15.60)**:
+  - **DEPLOYED TO PRODUCTION (Falkenstein, commit 2c17e44, v0.15.60)**:
     - Remote host: Falkenstein production server
     - Container status: `anbar-anbar-1 Up (healthy)` running `anbar:prod`
     - Local healthcheck: `{"status":"ok","service":"anbar","version":"0.15.60"}`
     - Public HTTPS healthcheck (`https://dl.amiri-dev.ir/healthz`): `{"status":"ok","service":"anbar","version":"0.15.60"}`
     - Host invariants intact: `/opt/anbar/data`, `/opt/anbar/secrets`, `/opt/anbar/.env` preserved without data loss.
 - **Current Git Commit / Branch**:
-  - `ec22aa0` on `main` (deployed to Falkenstein).
+  - `2c17e44` on `main` (deployed to Falkenstein).
+
+---
+
+### Session: 2026-10-09 (Part 2) — External S3 Client Protocol Compatibility & Zero-Bandwidth Remote Verification
+
+- **Current Objective**:
+  - Enable full interoperability with external S3 clients (boto3, rclone, aws-cli, Cyberduck) without breaking native Bearer authentication.
+  - Implement AWS SigV4, SigV2, Pre-signed URL query authentication, and S3 Multi-Object Delete (`POST /{bucket}?delete`).
+  - Perform live zero-bandwidth validation on Falkenstein production loopback with immediate cleanup.
+- **Completed Work**:
+  1. **AWS S3 Authentication Compatibility (`src/anbar/auth.py`)**:
+     - Added support in `whoami(request)` to extract and constant-time validate credentials from:
+       - `Authorization: AWS4-HMAC-SHA256 Credential=<AccessKey>/...` (AWS SigV4)
+       - `Authorization: AWS <AccessKey>:<Signature>` (AWS SigV2)
+       - `?X-Amz-Credential=<AccessKey>/...` (AWS S3 Pre-signed URLs)
+       - `X-Api-Key: <AccessKey>`
+     - Supports both `ANBAR_ADMIN_KEY`, `ANBAR_API_KEY`, and dynamically generated API keys from the admin panel.
+  2. **S3 Multi-Object Delete (`POST /s3/{bucket}?delete`) in `src/anbar/api/s3.py`**:
+     - Implemented `DeleteObjects` accepting `<Delete><Object><Key>...</Key></Object></Delete>` XML bodies.
+     - Automatically purges underlying chunk blobs across holding members in `BotPool` and purges SQLite metadata.
+     - Added hardening against XML Entity Expansion (rejects `<!DOCTYPE` and `<!ENTITY>` to prevent XXE / billion-laughs DoS) and 1 MB payload size limit.
+  3. **Trailing-Slash Route Normalization**:
+     - Added dual endpoint bindings (`/s3/{bucket}` and `/s3/{bucket}/`) across `ListObjectsV2`, `HeadBucket`, `CreateBucket`, and `DeleteObjects` to prevent client redirection loops.
+  4. **Zero-Bandwidth Falkenstein Production Smoke Test**:
+     - Pruned Docker builder cache on Falkenstein recovering 1.45 GB disk space (reducing disk usage to 98%, 953 MB available).
+     - Executed 7-step S3 protocol validation locally on Falkenstein loopback (`http://127.0.0.1:8318/s3`):
+       - `ListBuckets` (`GET /s3/`): 200 OK (`ListAllMyBucketsResult` XML)
+       - `CreateBucket` (`PUT /s3/validation-bucket`): 200 OK
+       - `PutObject` (`PUT /s3/validation-bucket/hello.txt` with SigV4): 200 OK (ETag returned)
+       - `HeadObject` (`HEAD /s3/validation-bucket/hello.txt`): 200 OK (Content-Length 45)
+       - `GetObject` with Range (`GET /s3/validation-bucket/hello.txt`, `Range: bytes=0-4`): 206 Partial Content (b"Hello")
+       - `ListObjectsV2` (`GET /s3/validation-bucket`): 200 OK (key found in `ListBucketResult` XML)
+       - `DeleteObjects` Multi-Delete (`POST /s3/validation-bucket?delete`): 200 OK (purged, subsequent HEAD returned 404)
+     - 0 residual bytes left on disk and 0 bytes transferred over laptop connection.
+- **Files/Components Changed**:
+  - `src/anbar/auth.py` (SigV4, SigV2, Pre-signed URL credential extraction)
+  - `src/anbar/api/s3.py` (Multi-Delete endpoint, XXE guards, trailing-slash routes)
+  - `tests/test_s3_external_client.py` (unit & integration tests for external S3 clients)
+  - `docs/WORKING_RECORD.md`
+- **Tests Executed**:
+  - `tests/test_s3_external_client.py`: 6/6 passed (100%).
+  - `tests/test_s3*.py`: 18/18 passed (100%).
+  - Full suite (`pytest tests/ --ignore=tests/test_e2e_playwright.py`): 504/504 passed (100%).
+  - Playwright test suite (`tests/test_e2e_playwright.py`): 34/34 passed.
+  - Falkenstein production remote S3 smoke test: 7/7 steps passed (100%).
+  - Linters: `ruff check` (0 errors), `ruff format --check` (100% formatted), `mypy` (0 errors across 42 source files).
+- **Deployment Status**:
+  - Production running commit `2c17e44` on Falkenstein (`https://dl.amiri-dev.ir/healthz`).
+- **Current Git Commit / Branch**:
+  - `2c17e44` on `main`.
 - **Exact Next Step for Next Session**:
-  - Complete any remaining operational or feature requests.
+  - All requested features, tests, and production validations complete. Stand by for future requirements.
+
 
 
 
